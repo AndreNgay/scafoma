@@ -27,6 +27,20 @@ export const getUser = async (req, res) => {
   }
 }
 
+export const getAllUsers = async (req, res) => {
+  try {
+    const result = await pool.query("SELECT id, first_name, last_name, email, contact_number, role, created_at FROM tbluser ORDER BY created_at DESC");
+    res.status(200).json({
+      status: "success",
+      message: "Users retrieved successfully",
+      users: result.rows
+    });
+  } catch (error) {
+    console.error("Error retrieving all users:", error);
+    res.status(500).json({ status: "failed", message: "Internal Server Error" });
+  }
+};
+
 export const changePassword = async (req, res) => {
     try {
         const {userId} = req.body.user;
@@ -72,8 +86,8 @@ export const changePassword = async (req, res) => {
 
 export const updateUser = async (req, res) => {
     try {
-        const { userId } = req.body.user;
-        const { first_name, last_name, contact_number } = req.body;
+        const { userId } = req.body.user; // or req.user.id
+        const { first_name, last_name, email, role } = req.body;
 
         const userExists = await pool.query({
             text: "SELECT * FROM tbluser WHERE id = $1",
@@ -89,11 +103,13 @@ export const updateUser = async (req, res) => {
         }
 
         const updatedUser = await pool.query({
-            text: "UPDATE tbluser SET first_name = $1, last_name = $2, contact_number = $3, updated_at = CURRENT_TIMESTAMP WHERE id = $4 RETURNING *",
-            values: [first_name, last_name, contact_number, userId]
+            text: `UPDATE tbluser 
+                   SET first_name = $1, last_name = $2, email = $3, role = $4, updated_at = CURRENT_TIMESTAMP 
+                   WHERE id = $5 RETURNING *`,
+            values: [first_name, last_name, email, role, userId]
         });
 
-        updatedUser.rows[0].password = undefined; // Exclude password from response
+        updatedUser.rows[0].password = undefined; // Exclude password
         res.status(200).json({
             status: "success",
             message: "User updated successfully",
@@ -101,10 +117,11 @@ export const updateUser = async (req, res) => {
         });
 
     } catch (error) {
-        
+        console.error("Error updating user:", error);
+        res.status(500).json({ status: "failed", message: "Internal Server Error" });
     }
+};
 
-}
 
 // export const getUser = async (req, res) => {
 //   try {

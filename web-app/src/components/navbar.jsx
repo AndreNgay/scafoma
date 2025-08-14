@@ -15,7 +15,6 @@ export const Navbar = () => {
   const location = useLocation();
   const profileRef = useRef(null);
 
-  // Close profile dropdown when clicking outside
   useEffect(() => {
     function handleClickOutside(event) {
       if (profileRef.current && !profileRef.current.contains(event.target)) {
@@ -27,13 +26,11 @@ export const Navbar = () => {
   }, []);
 
   return (
-    <nav className="bg-gray-100 md:px-20">
+    <nav className="bg-gray-100 shadow-md sticky top-0 z-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-16">
           {/* Logo */}
-          <div className="flex items-center">
-            <span className="text-xl font-bold text-[#A62C2B]">SCaFOMA-UB</span>
-          </div>
+          <span className="text-xl font-bold text-[#A62C2B]">SCaFOMA-UB</span>
 
           {/* Desktop Menu */}
           <div className="hidden md:flex items-center space-x-6">
@@ -58,7 +55,7 @@ export const Navbar = () => {
                 className="focus:outline-none"
               >
                 <img
-                  src="https://via.placeholder.com/40"
+                  src="https://placehold.co/40x40"
                   alt="Profile"
                   className="w-10 h-10 rounded-full border-2 border-[#A62C2B]"
                 />
@@ -82,43 +79,40 @@ export const Navbar = () => {
             </div>
           </div>
 
-          {/* Mobile Hamburger Button */}
-          <div className="md:hidden flex items-center">
-            <button
-              onClick={() => setIsOpen(!isOpen)}
-              className="focus:outline-none text-[#2E2E2E]"
+          {/* Mobile Hamburger */}
+          <button
+            onClick={() => setIsOpen(!isOpen)}
+            className="md:hidden focus:outline-none text-[#2E2E2E]"
+          >
+            <svg
+              className="w-6 h-6"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
             >
-              <svg
-                className="w-6 h-6"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-                xmlns="http://www.w3.org/2000/svg"
-              >
-                {isOpen ? (
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M6 18L18 6M6 6l12 12"
-                  />
-                ) : (
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M4 6h16M4 12h16M4 18h16"
-                  />
-                )}
-              </svg>
-            </button>
-          </div>
+              {isOpen ? (
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M6 18L18 6M6 6l12 12"
+                />
+              ) : (
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M4 6h16M4 12h16M4 18h16"
+                />
+              )}
+            </svg>
+          </button>
         </div>
       </div>
 
       {/* Mobile Menu */}
       {isOpen && (
-        <div className="md:hidden px-2 pt-2 pb-3 space-y-1 bg-[#FFF8F0]">
+        <div className="md:hidden px-4 pb-4 bg-[#FFF8F0] space-y-2">
           {links.map((link) => (
             <Link
               key={link.path}
@@ -134,8 +128,8 @@ export const Navbar = () => {
             </Link>
           ))}
 
-          {/* Mobile Profile Dropdown */}
-          <div className="mt-3 border-t pt-3">
+          {/* Mobile Profile */}
+          <div className="border-t pt-3">
             <Link
               to="/profile"
               onClick={() => setIsOpen(false)}
