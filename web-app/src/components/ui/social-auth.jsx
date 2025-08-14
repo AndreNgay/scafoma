@@ -1,4 +1,4 @@
-import { GoogleAuthProvider, signInWithPopup } from "firebase/auth";
+import { GoogleAuthProvider, FacebookAuthProvider, signInWithPopup } from "firebase/auth";
 import React, { useEffect, useState } from "react";
 import { useAuthState } from "react-firebase-hooks/auth";
 import { toast } from "sonner";
@@ -6,7 +6,10 @@ import { useNavigate } from "react-router-dom";
 import useStore from "../../store/index.js";
 import { Button } from "../ui/button.tsx";
 import api from "../../libs/apiCall.js";
-import { auth } from "../../libs/firebaseConfig.js"; // ✅ Added
+import { app, auth } from "../../libs/firebaseConfig.js";
+import { FcGoogle } from "react-icons/fc";
+import { FaFacebook } from "react-icons/fa";
+
 
 
 
@@ -26,52 +29,77 @@ export const SocialAuth = ({ isLoading, setLoading }) => {
     }
   };
 
-  useEffect(() => {
-    const saveUserToDb = async () => {
-      try {
-        const userData = {
-          name: user.displayName,
-          email: user.email,
-          provider: selectedProvider,
-          uid: user.uid,
-        };
+  const signInWithFacebook = async () => {
+  const provider = new FacebookAuthProvider();
+  setSelectedProvider("facebook");
+  try {
+    await signInWithPopup(auth, provider);
+  } catch (error) {
+    console.error("Facebook Sign-In Error:", error);
+  }
+};
 
-        setLoading(true);
-        const { data: res } = await api.post("/auth/sign-in", userData);
-        console.log(res);
+useEffect(() => {
+  const saveUserToDb = async () => {
+    try {
+      // Safely split full name into first and last
+      const [first_name, ...lastParts] = (user.displayName || "").split(" ");
+      const last_name = lastParts.join(" "); // Handles middle names too
 
-        if (res?.user) {
-          toast.success(res?.message);
-          const userInfo = { ...res?.user, token: res?.token };
-          localStorage.setItem("user", JSON.stringify(userInfo));
-          setCredentials(userInfo);
+      const userData = {
+        first_name,
+        last_name,
+        email: user.email,
+        provider: selectedProvider,
+        uid: user.uid,
+      };
 
-          setTimeout(() => {
-            navigate("/overview");
-          }, 1500);
-        }
-      } catch (error) {
-        console.error("Error saving user to database:", error);
-        toast.error("Failed to save user data. Please try again.");
-      } finally {
-        setLoading(false);
+      setLoading(true);
+      const { data: res } = await api.post("/auth/sign-in", userData);
+      console.log(res);
+
+      if (res?.user) {
+        toast.success(res?.message);
+        const userInfo = { ...res?.user, token: res?.token };
+        localStorage.setItem("user", JSON.stringify(userInfo));
+        setCredentials(userInfo);
+
+        setTimeout(() => {
+          navigate("/overview");
+        }, 1500);
       }
-    };
-
-    if (user) {
-      saveUserToDb();
+    } catch (error) {
+      console.error("Error saving user to database:", error);
+      toast.error("Failed to save user data. Please try again.");
+    } finally {
+      setLoading(false);
     }
-  }, [user, selectedProvider, setLoading, navigate, setCredentials]);
+  };
+
+  if (user) {
+    saveUserToDb();
+  }
+}, [user, selectedProvider, setLoading, navigate, setCredentials]);
+
 
   return (
-    <div>
-      <Button
-        onClick={signInWithGoogle}
-        disabled={isLoading}
-        type="button"
-      >
-        Continue with Google
-      </Button>
-    </div>
+  <div className="flex space-x-2 w-full">
+    <Button
+      onClick={signInWithGoogle}
+      disabled={isLoading}
+      type="button"
+      className="flex-1"
+    >
+      <FcGoogle className="mr-2" /> Google
+    </Button>
+    <Button
+      onClick={signInWithFacebook}
+      disabled={isLoading}
+      type="button"
+      className="flex-1 text-blue-600"
+    >
+      <FaFacebook className="mr-2" /> Facebook
+    </Button>
+  </div>
   );
 };
