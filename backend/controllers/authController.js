@@ -3,32 +3,39 @@ import { comparePassword, createJWT, hashPassword } from "../libs/index.js";
 
 export const signupUser = async (req, res) => {
   try {
-    const { first_name, email, password } = req.body;
-    if(!first_name || !email || !password) {
-      return res.status(400).json({ 
+    const { first_name, last_name, email, password } = req.body;
+
+    if (!first_name || !last_name || !email || !password) {
+      return res.status(400).json({
         status: "failed",
         message: "All fields are required"
       });
     }
+
     const userExist = await pool.query({
-        text: "SELECT EXISTS (SELECT * FROM tbluser WHERE email = $1)",
-        values: [email]
+      text: "SELECT EXISTS (SELECT 1 FROM tbluser WHERE email = $1)",
+      values: [email]
     });
 
-    if(userExist.rows[0].userExist) {
-      return res.status(400).json({ 
+    // In Postgres, the result key is usually 'exists'
+    if (userExist.rows[0].exists) {
+      return res.status(400).json({
         status: "failed",
         message: "Email already exists. Try Login"
       });
     }
 
     const hashedPassword = await hashPassword(password);
-    
+
     const user = await pool.query({
-      text: "INSERT INTO tbluser (email, first_name, password) VALUES ($1, $2, $3) RETURNING *",
-      values: [email, first_name, hashedPassword]
+      text: `
+        INSERT INTO tbluser (email, first_name, last_name, password) 
+        VALUES ($1, $2, $3, $4) 
+        RETURNING *
+      `,
+      values: [email, first_name, last_name, hashedPassword]
     });
-  
+
     user.rows[0].password = undefined;
 
     res.status(201).json({
@@ -36,10 +43,13 @@ export const signupUser = async (req, res) => {
       message: "User created successfully",
       user: user.rows[0],
     });
+
   } catch (error) {
+    console.error(error);
     res.status(500).json(error);
   }
-}
+};
+
 
 export const signinUser = async (req, res) => {
   try {

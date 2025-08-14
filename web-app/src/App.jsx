@@ -3,11 +3,14 @@ import SignIn from "./pages/auth/sign-in"
 import SignUp from "./pages/auth/sign-up"
 import Dashboard from "./pages/dashboard"
 import Settings from "./pages/settings"
-import Concessions from "./pages/concessions"
 import useStore from "./store"
 import { setAuthToken } from "./libs/apiCall"
-import { useState } from "react"
 import { Toaster } from "sonner"
+import { Navbar } from "./components/navbar"
+import { Cafeterias } from "./pages/cafeterias"
+import { Users } from "./pages/users"
+import { MenuItems } from "./pages/menu-items"
+import { Orders } from "./pages/orders"
 
 const RootLayout = () => {
   const {user} = useStore((state) => state)
@@ -17,6 +20,7 @@ const RootLayout = () => {
 
   ) : (
     <>
+    <Navbar />
     <div className="min-h-[cal(h-screen-100px)]">
       <Outlet />
     </div>
@@ -29,13 +33,16 @@ const RootLayout = () => {
 function App() {
   return(
     <main>
-      <div className="w-full min-h-screen px-6 bg-gray-100 md:px-20 dark:bg-slate-900">
+      <div className="w-full min-h-screen px-6 bg-gray-100 md:px-20">
         <Routes>
           <Route element={<RootLayout/>}>
             <Route path="/" element={<Navigate to="/overview" />} />
             <Route path="/overview" element={<Dashboard />} />
-            <Route path="/concessions" element={<Concessions />} />
+            <Route path="/cafeterias" element={<Cafeterias />} />
+            <Route path="/users" element={<Users />} />
+            <Route path="/menu-items" element={<MenuItems />} />
             <Route path="/settings" element={<Settings />} />
+            <Route path="orders" element={<Orders />} />
           </Route>
           <Route path="/sign-in" element={<SignIn />} />
           <Route path="/sign-up" element={<SignUp />} />
