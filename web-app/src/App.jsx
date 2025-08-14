@@ -5,10 +5,13 @@ import Dashboard from "./pages/dashboard"
 import Settings from "./pages/settings"
 import Concessions from "./pages/concessions"
 import useStore from "./store"
+import { setAuthToken } from "./libs/apiCall"
+import { useState } from "react"
+import { Toaster } from "sonner"
 
 const RootLayout = () => {
   const {user} = useStore((state) => state)
-  console.log(user)
+  setAuthToken(user?.token || "")
   return !user ? (
     <Navigate to="/sign-in" replace={true}/>
 
@@ -23,27 +26,25 @@ const RootLayout = () => {
   
 }
 
-export default function App() {
-  return (
-  <main>
-    <div className="w-full min-h-screen px-6 bg-gray-100 md:px-20 dark:bg-slate-900">
+function App() {
+  return(
+    <main>
+      <div className="w-full min-h-screen px-6 bg-gray-100 md:px-20 dark:bg-slate-900">
+        <Routes>
+          <Route element={<RootLayout/>}>
+            <Route path="/" element={<Navigate to="/overview" />} />
+            <Route path="/overview" element={<Dashboard />} />
+            <Route path="/concessions" element={<Concessions />} />
+            <Route path="/settings" element={<Settings />} />
+          </Route>
+          <Route path="/sign-in" element={<SignIn />} />
+          <Route path="/sign-up" element={<SignUp />} />
+        </Routes>
+      </div>
 
-    </div>
-    <Routes>
-      <Route element={<RootLayout/>}>
-        <Route path="/" element={<Navigate to="/overview" />} />
-        <Route path="/overview" element={<Dashboard />} />
-        <Route path="/concessions" element={<Concessions />} />
-        <Route path="/settings" element={<Settings />} />
-      </Route>
-
-
-      <Route path="/sign-in" element={<SignIn />} />
-      <Route path="/sign-up" element={<SignUp />} />
-    </Routes>
-  </main>
+      <Toaster richColors position="top-center" />
+    </main>
   )
-
-
-  
 }
+
+export default App;

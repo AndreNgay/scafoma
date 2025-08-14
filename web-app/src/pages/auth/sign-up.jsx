@@ -1,7 +1,8 @@
-import React from "react";
+import React, { useState } from "react";
 import { useForm } from "react-hook-form";
 import * as z from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { SocialAuth } from "../../components/ui/social-auth";
 
 const RegisterSchema = z.object({
   email: z.string({ required_error: "Email is required" })
@@ -11,6 +12,8 @@ const RegisterSchema = z.object({
 });
 
 const SignUp = () => {
+  const [isLoading, setLoading] = useState(false);
+
   const {
     register,
     handleSubmit,
@@ -67,6 +70,9 @@ const SignUp = () => {
           >
             Sign Up
           </button>
+
+          {/* Social Auth */}
+          <SocialAuth isLoading={isLoading} setLoading={setLoading} />
         </form>
       </div>
     </div>
