@@ -85,42 +85,43 @@ export const changePassword = async (req, res) => {
 }
 
 export const updateUser = async (req, res) => {
-    try {
-        const { userId } = req.body.user; // or req.user.id
-        const { first_name, last_name, email, role } = req.body;
+  try {
+    const { id } = req.params; // <-- get from params
+    const { first_name, last_name, email, role } = req.body;
 
-        const userExists = await pool.query({
-            text: "SELECT * FROM tbluser WHERE id = $1",
-            values: [userId]
-        });
+    const userExists = await pool.query({
+      text: "SELECT * FROM tbluser WHERE id = $1",
+      values: [id],
+    });
 
-        const user = userExists.rows[0];
-        if (!user) {
-            return res.status(404).json({
-                status: "failed",
-                message: "User not found"
-            });
-        }
-
-        const updatedUser = await pool.query({
-            text: `UPDATE tbluser 
-                   SET first_name = $1, last_name = $2, email = $3, role = $4, updated_at = CURRENT_TIMESTAMP 
-                   WHERE id = $5 RETURNING *`,
-            values: [first_name, last_name, email, role, userId]
-        });
-
-        updatedUser.rows[0].password = undefined; // Exclude password
-        res.status(200).json({
-            status: "success",
-            message: "User updated successfully",
-            user: updatedUser.rows[0]
-        });
-
-    } catch (error) {
-        console.error("Error updating user:", error);
-        res.status(500).json({ status: "failed", message: "Internal Server Error" });
+    if (userExists.rowCount === 0) {
+      return res.status(404).json({
+        status: "failed",
+        message: "User not found",
+      });
     }
+
+    const updatedUser = await pool.query({
+      text: `UPDATE tbluser 
+             SET first_name = $1, last_name = $2, email = $3, role = $4, updated_at = CURRENT_TIMESTAMP 
+             WHERE id = $5 RETURNING *`,
+      values: [first_name, last_name, email, role, id],
+    });
+
+    const user = updatedUser.rows[0];
+    if (user) user.password = undefined; // hide password
+
+    res.status(200).json({
+      status: "success",
+      message: "User updated successfully",
+      user,
+    });
+  } catch (error) {
+    console.error("Error updating user:", error);
+    res.status(500).json({ status: "failed", message: "Internal Server Error" });
+  }
 };
+
 
 export const deleteUser = async (req, res) => {
   try {
