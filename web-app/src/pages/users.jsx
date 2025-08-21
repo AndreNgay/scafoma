@@ -2,8 +2,12 @@ import React, { useState, useEffect } from "react";
 import { toast } from "sonner";
 import api from "../libs/apiCall.js";
 import { z } from "zod";
-import { DataGrid } from "@mui/x-data-grid";
+import {
+  DataGrid,
+  GridToolbar
+} from "@mui/x-data-grid";
 import { Button } from "@mui/material";
+
 
 // Zod schema for validation
 const UserSchema = z.object({
@@ -32,6 +36,7 @@ export const Users = () => {
   const fetchUsers = async () => {
     try {
       const { data } = await api.get("/user/all");
+      console.log(data.users)
       const formattedUsers = (data.users || []).map((u) => ({
         id: u.id || u.user_id,
         ...u,
@@ -140,16 +145,27 @@ export const Users = () => {
     { field: "last_name", headerName: "Last Name", width: 150 },
     { field: "email", headerName: "Email", minWidth: 220, flex: 1 },
     { field: "role", headerName: "Role", width: 120 },
+    { field: "created_at", headerName: "Created At", width: 120 },
+    { field: "updated_at", headerName: "Updated At", width: 120 },
     {
       field: "actions",
       headerName: "Actions",
-      width: 280,
+      width: 300,
       sortable: false,
       flexShrink: 0,
-      align: "center", // ✅ center horizontally
-      headerAlign: "center", // ✅ center header too
+      align: "center", 
+      headerAlign: "center", 
       renderCell: (params) => (
-        <div style={{ display: "flex", gap: "8px", justifyContent: "center", width: "100%" }}>
+        <div
+          style={{
+            display: "flex",
+            gap: "8px",
+            justifyContent: "center",
+            alignItems: "center", 
+            width: "100%",
+            height: "100%",
+          }}
+        >
           <Button
             size="small"
             variant="contained"

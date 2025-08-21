@@ -114,7 +114,7 @@ export const getUser = async (req, res) => {
 
 export const getAllUsers = async (req, res) => {
   try {
-    const result = await pool.query("SELECT id, first_name, last_name, email, contact_number, role, created_at FROM tbluser ORDER BY created_at DESC");
+    const result = await pool.query("SELECT id, first_name, last_name, email, contact_number, role, created_at, updated_at FROM tbluser ORDER BY created_at DESC");
     res.status(200).json({
       status: "success",
       message: "Users retrieved successfully",
