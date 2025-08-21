@@ -1,6 +1,91 @@
 import { comparePassword, hashPassword } from "../libs/index.js";
 import { pool } from "../libs/database.js";
 
+
+// Utility function for random password
+const generateRandomPassword = (length = 6) => {
+  const chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+  return Array.from({ length })
+    .map(() => chars[Math.floor(Math.random() * chars.length)])
+    .join("");
+};
+
+// ✅ Create concessionaire
+export const createConcessionaire = async (req, res) => {
+  try {
+    const { email } = req.body;
+
+    // Check if email already exists
+    const exists = await pool.query({
+      text: "SELECT id FROM tbluser WHERE email = $1",
+      values: [email],
+    });
+    if (exists.rowCount > 0) {
+      return res.status(400).json({
+        status: "failed",
+        message: "Email already in use",
+      });
+    }
+
+    const passwordPlain = generateRandomPassword();
+    const passwordHash = await hashPassword(passwordPlain);
+
+    const result = await pool.query({
+      text: `INSERT INTO tbluser (email, password, role, created_at) 
+             VALUES ($1, $2, 'concessionaire', CURRENT_TIMESTAMP) 
+             RETURNING id, email, role, created_at`,
+      values: [email, passwordHash],
+    });
+
+    const user = result.rows[0];
+
+    res.status(201).json({
+      status: "success",
+      message: "Concessionaire created successfully",
+      user,
+      password: passwordPlain, // return raw password
+    });
+  } catch (error) {
+    console.error("Error creating concessionaire:", error);
+    res.status(500).json({ status: "failed", message: "Internal Server Error" });
+  }
+};
+
+// ✅ Reset password
+export const resetPassword = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const userExists = await pool.query({
+      text: "SELECT id FROM tbluser WHERE id = $1",
+      values: [id],
+    });
+    if (userExists.rowCount === 0) {
+      return res.status(404).json({
+        status: "failed",
+        message: "User not found",
+      });
+    }
+
+    const newPasswordPlain = generateRandomPassword();
+    const newPasswordHash = await hashPassword(newPasswordPlain);
+
+    await pool.query({
+      text: "UPDATE tbluser SET password = $1 WHERE id = $2",
+      values: [newPasswordHash, id],
+    });
+
+    res.status(200).json({
+      status: "success",
+      message: "Password reset successfully",
+      newPassword: newPasswordPlain,
+    });
+  } catch (error) {
+    console.error("Error resetting password:", error);
+    res.status(500).json({ status: "failed", message: "Internal Server Error" });
+  }
+};
+
 export const getUser = async (req, res) => {
   try {
     const { userId } = req.body.user;

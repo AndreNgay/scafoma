@@ -32,13 +32,10 @@ export const Users = () => {
   const fetchUsers = async () => {
     try {
       const { data } = await api.get("/user/all");
-
-      // ✅ Ensure each user has an `id` field for DataGrid
       const formattedUsers = (data.users || []).map((u) => ({
-        id: u.id || u.user_id, // fallback if Postgres uses user_id
+        id: u.id || u.user_id,
         ...u,
       }));
-
       setUsers(formattedUsers);
       setFilteredUsers(formattedUsers);
     } catch (error) {
@@ -53,7 +50,7 @@ export const Users = () => {
     fetchUsers();
   }, []);
 
-  // custom search logic
+  // custom search
   useEffect(() => {
     if (!searchTerm) {
       setFilteredUsers(users);
@@ -88,6 +85,17 @@ export const Users = () => {
       ...prev,
       [name]: value,
     }));
+  };
+
+  const handleResetPassword = async (id) => {
+    if (!window.confirm("Reset this user's password?")) return;
+    try {
+      const { data } = await api.post(`/user/${id}/reset-password`);
+      toast.success(`Password reset! New password: ${data.newPassword}`);
+    } catch (error) {
+      console.error("Error resetting password:", error);
+      toast.error("Failed to reset password.");
+    }
   };
 
   const handleUpdateUser = async (e) => {
@@ -127,26 +135,36 @@ export const Users = () => {
 
   // DataGrid columns
   const columns = [
-    { field: "id", headerName: "ID", width: 90 },
-    { field: "first_name", headerName: "First Name", flex: 1 },
-    { field: "last_name", headerName: "Last Name", flex: 1 },
-    { field: "email", headerName: "Email", flex: 1.5 },
-    { field: "role", headerName: "Role", width: 130 },
+    { field: "id", headerName: "ID", width: 80 },
+    { field: "first_name", headerName: "First Name", width: 150 },
+    { field: "last_name", headerName: "Last Name", width: 150 },
+    { field: "email", headerName: "Email", minWidth: 220, flex: 1 },
+    { field: "role", headerName: "Role", width: 120 },
     {
       field: "actions",
       headerName: "Actions",
-      width: 200,
+      width: 280,
       sortable: false,
+      flexShrink: 0,
+      align: "center", // ✅ center horizontally
+      headerAlign: "center", // ✅ center header too
       renderCell: (params) => (
-        <>
+        <div style={{ display: "flex", gap: "8px", justifyContent: "center", width: "100%" }}>
           <Button
             size="small"
             variant="contained"
             color="primary"
             onClick={() => handleEditClick(params.row)}
-            style={{ marginRight: "8px" }}
           >
             Edit
+          </Button>
+          <Button
+            size="small"
+            variant="contained"
+            color="warning"
+            onClick={() => handleResetPassword(params.row.id)}
+          >
+            Reset
           </Button>
           <Button
             size="small"
@@ -156,7 +174,7 @@ export const Users = () => {
           >
             Delete
           </Button>
-        </>
+        </div>
       ),
     },
   ];
@@ -165,16 +183,36 @@ export const Users = () => {
     <div className="p-4 sm:p-6">
       <h2 className="text-lg sm:text-xl font-bold mb-4">Users</h2>
 
-      {/* Custom Search Bar */}
-      <input
-        type="text"
-        placeholder="Search users..."
-        value={searchTerm}
-        onChange={(e) => setSearchTerm(e.target.value)}
-        className="mb-4 w-full sm:w-1/3 border rounded px-3 py-2"
-      />
+      {/* Top bar: Search left, Add button right */}
+      <div className="flex justify-between items-center mb-4">
+        <input
+          type="text"
+          placeholder="Search users..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          className="w-full sm:w-1/3 border rounded px-3 py-2"
+        />
 
-      <div style={{ height: 500, width: "100%" }}>
+        <button
+          onClick={async () => {
+            const email = prompt("Enter concessionaire email:");
+            if (!email) return;
+            try {
+              const { data } = await api.post("/user/concessionaire", { email });
+              toast.success(`Created! New password: ${data.password}`);
+              await fetchUsers();
+            } catch (error) {
+              toast.error("Failed to create concessionaire.");
+            }
+          }}
+          className="ml-4 px-4 py-2 bg-green-500 text-white rounded"
+        >
+          + Add Concessionaire
+        </button>
+      </div>
+
+      {/* DataGrid with scroll support */}
+      <div style={{ height: 500, width: "100%", overflowX: "auto" }}>
         <DataGrid
           rows={filteredUsers}
           columns={columns}
@@ -204,7 +242,6 @@ export const Users = () => {
                   className="w-full border rounded px-3 py-2"
                 />
               </div>
-
               <div>
                 <label className="block mb-2 text-sm font-medium">Last Name</label>
                 <input
@@ -215,7 +252,6 @@ export const Users = () => {
                   className="w-full border rounded px-3 py-2"
                 />
               </div>
-
               <div>
                 <label className="block mb-2 text-sm font-medium">Email</label>
                 <input
@@ -226,21 +262,15 @@ export const Users = () => {
                   className="w-full border rounded px-3 py-2"
                 />
               </div>
-
               <div>
                 <label className="block mb-2 text-sm font-medium">Role</label>
-                <select
-                  name="role"
+                <input
+                  type="text"
                   value={formData.role}
-                  onChange={handleInputChange}
-                  className="w-full border rounded px-3 py-2"
-                >
-                  <option value="admin">Admin</option>
-                  <option value="staff">Staff</option>
-                  <option value="customer">Customer</option>
-                </select>
+                  disabled
+                  className="w-full border rounded px-3 py-2 bg-gray-100"
+                />
               </div>
-
               <div className="flex justify-end gap-3">
                 <button
                   type="button"
