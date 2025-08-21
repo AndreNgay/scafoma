@@ -42,7 +42,7 @@ function App() {
             <Route path="/users" element={<Users />} />
             <Route path="/menu-items" element={<MenuItems />} />
             <Route path="/settings" element={<Settings />} />
-            <Route path="orders" element={<Orders />} />
+            <Route path="/orders" element={<Orders />} />
           </Route>
           <Route path="/sign-in" element={<SignIn />} />
           <Route path="/sign-up" element={<SignUp />} />
