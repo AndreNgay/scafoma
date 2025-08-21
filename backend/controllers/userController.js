@@ -122,11 +122,33 @@ export const updateUser = async (req, res) => {
     }
 };
 
+export const deleteUser = async (req, res) => {
+  try {
+    const { id } = req.params;
 
-// export const getUser = async (req, res) => {
-//   try {
-//     res.status(200).json({ message: "User signed in successfully" });
-//   } catch (error) {
-//     res.status(500).json({ error: "Internal Server Error" });
-//   }
-// }
+    const userExists = await pool.query({
+      text: "SELECT * FROM tbluser WHERE id = $1",
+      values: [id],
+    });
+
+    if (userExists.rowCount === 0) {
+      return res.status(404).json({
+        status: "failed",
+        message: "User not found",
+      });
+    }
+
+    await pool.query({
+      text: "DELETE FROM tbluser WHERE id = $1",
+      values: [id],
+    });
+
+    res.status(200).json({
+      status: "success",
+      message: "User deleted successfully",
+    });
+  } catch (error) {
+    console.error("Error deleting user:", error);
+    res.status(500).json({ status: "failed", message: "Internal Server Error" });
+  }
+};
