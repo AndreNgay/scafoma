@@ -235,7 +235,7 @@ const handleInputChange = (e, isCreate = false) => {
         <MenuItem value="">-- Select Concessionaire --</MenuItem>
         {concessionaires.map((u) => (
           <MenuItem key={u.id} value={String(u.id)}>
-            {u.first_name} {u.last_name} ({u.email})
+            {u.first_name} {u.last_name}
           </MenuItem>
         ))}
       </TextField>
