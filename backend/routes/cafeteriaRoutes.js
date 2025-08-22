@@ -4,7 +4,7 @@ import { getCafeterias, getCafeteriaById, createCafeteria, updateCafeteria, dele
 const router = express.Router();
 
 // Get all cafeterias
-router.get("/", getCafeterias);
+router.get("/all", getCafeterias);
 
 // Get a single cafeteria by ID
 router.get("/:id", getCafeteriaById);

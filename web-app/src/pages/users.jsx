@@ -36,7 +36,6 @@ export const Users = () => {
   const fetchUsers = async () => {
     try {
       const { data } = await api.get("/user/all");
-      console.log(data.users)
       const formattedUsers = (data.users || []).map((u) => ({
         id: u.id || u.user_id,
         ...u,
