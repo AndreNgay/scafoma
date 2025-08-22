@@ -11,6 +11,7 @@ import { Cafeterias } from "./pages/cafeterias"
 import { Users } from "./pages/users"
 import { MenuItems } from "./pages/menu-items"
 import { Orders } from "./pages/orders"
+import { Concessions } from "./pages/concessions"
 
 const RootLayout = () => {
   const {user} = useStore((state) => state)
@@ -39,6 +40,8 @@ function App() {
             <Route path="/" element={<Navigate to="/overview" />} />
             <Route path="/overview" element={<Dashboard />} />
             <Route path="/cafeterias" element={<Cafeterias />} />
+            <Route path="/concessions/:cafeteriaId" element={<Concessions />} />
+
             <Route path="/users" element={<Users />} />
             <Route path="/menu-items" element={<MenuItems />} />
             <Route path="/settings" element={<Settings />} />

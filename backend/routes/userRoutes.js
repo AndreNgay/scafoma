@@ -16,7 +16,7 @@ const router = express.Router();
 router.get("/", authMiddleware, getUser);
 
 // Get all users
-router.get("/all", authMiddleware, getAllUsers);
+router.get("/all", getAllUsers);
 
 // Change password (self)
 router.put("/change-password", authMiddleware, changePassword);

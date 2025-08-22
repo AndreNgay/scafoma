@@ -1,20 +1,36 @@
-import database from "../libs/database.js";
+import { pool } from "../libs/database.js";
 
 // Get all concessions
 export const getConcessions = async (req, res) => {
   try {
-    const result = await database.query(
-      `SELECT c.id, c.concession_name, 
-              u.first_name || ' ' || u.last_name AS concessionaire_name,
-              f.cafeteria_name, 
-              c.created_at, c.updated_at
-       FROM tblconcessions c
-       JOIN tbluser u ON c.concessionaire_id = u.id
-       JOIN tblcafeteria f ON c.cafeteria_id = f.id
-       ORDER BY c.id ASC`
-    );
-    res.json(result.rows);
+    const concessions = await pool.query(`
+      SELECT 
+        c.id,
+        c.concession_name,
+        c.concessionaire_id,
+        u.first_name || ' ' || u.last_name AS concessionaire_name,
+        c.cafeteria_id,
+        c.created_at,
+        c.updated_at
+      FROM tblconcession c
+      LEFT JOIN tbluser u ON c.concessionaire_id = u.id
+      ORDER BY c.created_at DESC
+    `);
+
+    if (concessions.rows.length === 0) {
+      return res.status(404).json({
+        status: "failed",
+        message: "No concessions found",
+      });
+    }
+
+    res.status(200).json({
+      status: "success",
+      message: "Concessions retrieved successfully",
+      data: concessions.rows,
+    });
   } catch (err) {
+    console.error("Error fetching concessions:", err);
     res.status(500).json({ error: err.message });
   }
 };
@@ -22,12 +38,12 @@ export const getConcessions = async (req, res) => {
 // Get concession by ID
 export const getConcessionById = async (req, res) => {
   try {
-    const result = await database.query(
+    const result = await pool.query(
       `SELECT c.id, c.concession_name, 
               u.first_name || ' ' || u.last_name AS concessionaire_name,
               f.cafeteria_name, 
               c.created_at, c.updated_at
-       FROM tblconcessions c
+       FROM tblconcession c
        JOIN tbluser u ON c.concessionaire_id = u.id
        JOIN tblcafeteria f ON c.cafeteria_id = f.id
        WHERE c.id = $1`,
@@ -47,8 +63,8 @@ export const getConcessionById = async (req, res) => {
 export const createConcession = async (req, res) => {
   const { concession_name, concessionaire_id, cafeteria_id } = req.body;
   try {
-    const result = await database.query(
-      `INSERT INTO tblconcessions (concession_name, concessionaire_id, cafeteria_id, created_at, updated_at)
+    const result = await pool.query(
+      `INSERT INTO tblconcession (concession_name, concessionaire_id, cafeteria_id, created_at, updated_at)
        VALUES ($1, $2, $3, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
        RETURNING *`,
       [concession_name, concessionaire_id, cafeteria_id]
@@ -63,8 +79,8 @@ export const createConcession = async (req, res) => {
 export const updateConcession = async (req, res) => {
   const { concession_name, concessionaire_id, cafeteria_id } = req.body;
   try {
-    const result = await database.query(
-      `UPDATE tblconcessions 
+    const result = await pool.query(
+      `UPDATE tblconcession 
        SET concession_name = $1, concessionaire_id = $2, cafeteria_id = $3, updated_at = CURRENT_TIMESTAMP
        WHERE id = $4
        RETURNING *`,
@@ -83,8 +99,8 @@ export const updateConcession = async (req, res) => {
 // Delete concession
 export const deleteConcession = async (req, res) => {
   try {
-    const result = await database.query(
-      `DELETE FROM tblconcessions WHERE id = $1 RETURNING *`,
+    const result = await pool.query(
+      `DELETE FROM tblconcession WHERE id = $1 RETURNING *`,
       [req.params.id]
     );
 

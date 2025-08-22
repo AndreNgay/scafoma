@@ -2,19 +2,17 @@ import React, { useState, useEffect } from "react";
 import { toast } from "sonner";
 import api from "../libs/apiCall.js";
 import { z } from "zod";
-import {
-  DataGrid,
-  GridToolbar
-} from "@mui/x-data-grid";
+import { DataGrid } from "@mui/x-data-grid";
 import { Button } from "@mui/material";
-
 
 // Zod schema for validation
 const UserSchema = z.object({
   first_name: z.string().min(1, { message: "First name is required" }),
   last_name: z.string().min(1, { message: "Last name is required" }),
   email: z.string().email({ message: "Invalid email address" }),
-  role: z.enum(["admin", "staff", "customer"], { message: "Role is required" }),
+  role: z.enum(["admin", "staff", "customer", "concessionaire"], {
+    message: "Role is required",
+  }),
 });
 
 export const Users = () => {
@@ -36,10 +34,14 @@ export const Users = () => {
   const fetchUsers = async () => {
     try {
       const { data } = await api.get("/user/all");
-      const formattedUsers = (data.users || []).map((u) => ({
-        id: u.id || u.user_id,
-        ...u,
-      }));
+
+      const formattedUsers = Array.isArray(data?.users)
+        ? data.users.map((u) => ({
+            id: u.id || u.user_id,
+            ...u,
+          }))
+        : [];
+
       setUsers(formattedUsers);
       setFilteredUsers(formattedUsers);
     } catch (error) {
@@ -75,10 +77,10 @@ export const Users = () => {
   const handleEditClick = (user) => {
     setEditingUser(user);
     setFormData({
-      first_name: user.first_name,
-      last_name: user.last_name,
-      email: user.email,
-      role: user.role,
+      first_name: user.first_name || "",
+      last_name: user.last_name || "",
+      email: user.email || "",
+      role: user.role || "",
     });
     setIsModalOpen(true);
   };
@@ -105,8 +107,11 @@ export const Users = () => {
   const handleUpdateUser = async (e) => {
     e.preventDefault();
     const result = UserSchema.safeParse(formData);
+
     if (!result.success) {
-      const errorMessages = result.error.errors.map((err) => err.message).join("\n");
+      const errorMessages = result.error.errors
+        .map((err) => err.message)
+        .join("\n");
       toast.error(errorMessages);
       return;
     }
@@ -151,16 +156,15 @@ export const Users = () => {
       headerName: "Actions",
       width: 300,
       sortable: false,
-      flexShrink: 0,
-      align: "center", 
-      headerAlign: "center", 
+      align: "center",
+      headerAlign: "center",
       renderCell: (params) => (
         <div
           style={{
             display: "flex",
             gap: "8px",
             justifyContent: "center",
-            alignItems: "center", 
+            alignItems: "center",
             width: "100%",
             height: "100%",
           }}
@@ -248,21 +252,25 @@ export const Users = () => {
 
             <form onSubmit={handleUpdateUser} className="space-y-4">
               <div>
-                <label className="block mb-2 text-sm font-medium">First Name</label>
+                <label className="block mb-2 text-sm font-medium">
+                  First Name
+                </label>
                 <input
                   type="text"
                   name="first_name"
-                  value={formData.first_name}
+                  value={formData.first_name || ""}
                   onChange={handleInputChange}
                   className="w-full border rounded px-3 py-2"
                 />
               </div>
               <div>
-                <label className="block mb-2 text-sm font-medium">Last Name</label>
+                <label className="block mb-2 text-sm font-medium">
+                  Last Name
+                </label>
                 <input
                   type="text"
                   name="last_name"
-                  value={formData.last_name}
+                  value={formData.last_name || ""}
                   onChange={handleInputChange}
                   className="w-full border rounded px-3 py-2"
                 />
@@ -272,7 +280,7 @@ export const Users = () => {
                 <input
                   type="email"
                   name="email"
-                  value={formData.email}
+                  value={formData.email || ""}
                   onChange={handleInputChange}
                   className="w-full border rounded px-3 py-2"
                 />
@@ -281,7 +289,7 @@ export const Users = () => {
                 <label className="block mb-2 text-sm font-medium">Role</label>
                 <input
                   type="text"
-                  value={formData.role}
+                  value={formData.role || ""}
                   disabled
                   className="w-full border rounded px-3 py-2 bg-gray-100"
                 />
