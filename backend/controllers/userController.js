@@ -99,7 +99,10 @@ export const getUser = async (req, res) => {
       return res.status(404).json({ message: "User not found" });
     }
 
-    res.json({ user: result.rows[0] });
+    // res.json({ user: result.rows[0] });
+    res.status(200).json({
+      user: result.rows
+    })
   } catch (error) {
     console.error("Error fetching user:", error);
     res.status(500).json({ message: "Server error" });

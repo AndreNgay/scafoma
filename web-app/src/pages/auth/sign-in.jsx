@@ -45,7 +45,7 @@ const SignIn = () => {
                     token: res.token
                 };
                 localStorage.setItem("user", JSON.stringify(userInfo));
-                localStorage.setItem("token", res.user.token);
+                localStorage.setItem("token", res.token);
 
 
                 setCredentials(userInfo);
