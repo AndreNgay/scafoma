@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from "react";
 import { toast } from "sonner";
 import api from "../libs/apiCall.js";
-import {
-  DataGrid,
-} from "@mui/x-data-grid";
+import { DataGrid } from "@mui/x-data-grid";
 import { Button } from "@mui/material";
 import { useNavigate } from "react-router-dom";
+import Modal from "react-modal";
+
+// Accessibility requirement for react-modal
+Modal.setAppElement("#root");
 
 export const Cafeterias = () => {
   const [cafeterias, setCafeterias] = useState([]);
@@ -13,39 +15,36 @@ export const Cafeterias = () => {
   const [searchTerm, setSearchTerm] = useState("");
 
   const [isLoading, setIsLoading] = useState(true);
-  const [isModalOpen, setIsModalOpen] = useState(false);
+
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
 
   const [editingCafeteria, setEditingCafeteria] = useState(null);
-  const [formData, setFormData] = useState({
-    cafeteria_name: "",
-    location: "",
-  });
-  const [createData, setCreateData] = useState({
-    cafeteria_name: "",
-    location: "",
-  });
+  const [deletingCafeteria, setDeletingCafeteria] = useState(null);
+
+  const [formData, setFormData] = useState({ cafeteria_name: "", location: "" });
+  const [createData, setCreateData] = useState({ cafeteria_name: "", location: "" });
 
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
-const fetchCafeterias = async () => {
-  try {
-    const { data } = await api.get("/cafeteria/all");
-    const formatted = (data.data || []).map((c) => ({
-      id: c.id,
-      ...c,
-    }));
-    setCafeterias(formatted);
-    setFilteredCafeterias(formatted);
-  } catch (error) {
-    console.error("Error fetching cafeterias:", error);
-    toast.error("Failed to fetch cafeterias. Please try again later.");
-  } finally {
-    setIsLoading(false);
-  }
-};
-
+  const fetchCafeterias = async () => {
+    try {
+      const { data } = await api.get("/cafeteria/all");
+      const formatted = (data.data || []).map((c) => ({
+        id: c.id,
+        ...c,
+      }));
+      setCafeterias(formatted);
+      setFilteredCafeterias(formatted);
+    } catch (error) {
+      console.error("Error fetching cafeterias:", error);
+      toast.error("Failed to fetch cafeterias. Please try again later.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   useEffect(() => {
     fetchCafeterias();
@@ -74,7 +73,12 @@ const fetchCafeterias = async () => {
       cafeteria_name: cafeteria.cafeteria_name,
       location: cafeteria.location,
     });
-    setIsModalOpen(true);
+    setIsEditModalOpen(true);
+  };
+
+  const handleDeleteClick = (cafeteria) => {
+    setDeletingCafeteria(cafeteria);
+    setIsDeleteModalOpen(true);
   };
 
   const handleInputChange = (e, isCreate = false) => {
@@ -92,7 +96,7 @@ const fetchCafeterias = async () => {
       setLoading(true);
       await api.put(`/cafeteria/${editingCafeteria.id}`, formData);
       toast.success("Cafeteria updated successfully!");
-      setIsModalOpen(false);
+      setIsEditModalOpen(false);
       await fetchCafeterias();
     } catch (error) {
       console.error("Error updating cafeteria:", error);
@@ -119,11 +123,11 @@ const fetchCafeterias = async () => {
     }
   };
 
-  const handleDeleteCafeteria = async (id) => {
-    if (!window.confirm("Are you sure you want to delete this cafeteria?")) return;
+  const handleDeleteCafeteria = async () => {
     try {
-      await api.delete(`/cafeteria/${id}`);
+      await api.delete(`/cafeteria/${deletingCafeteria.id}`);
       toast.success("Cafeteria deleted successfully!");
+      setIsDeleteModalOpen(false);
       await fetchCafeterias();
     } catch (error) {
       console.error("Error deleting cafeteria:", error);
@@ -157,7 +161,7 @@ const fetchCafeterias = async () => {
             size="small"
             variant="contained"
             color="error"
-            onClick={() => handleDeleteCafeteria(params.row.id)}
+            onClick={() => handleDeleteClick(params.row)}
           >
             Delete
           </Button>
@@ -211,104 +215,139 @@ const fetchCafeterias = async () => {
       </div>
 
       {/* Edit Modal */}
-      {isModalOpen && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex justify-center items-center">
-          <div className="bg-white rounded-lg p-6 w-full max-w-md shadow-lg z-50">
-            <h3 className="text-lg font-bold mb-4">Edit Cafeteria</h3>
-            <form onSubmit={handleUpdateCafeteria} className="space-y-4">
-              <div>
-                <label className="block mb-2 text-sm font-medium">Cafeteria Name</label>
-                <input
-                  type="text"
-                  name="cafeteria_name"
-                  value={formData.cafeteria_name}
-                  onChange={handleInputChange}
-                  className="w-full border rounded px-3 py-2"
-                />
-              </div>
-              <div>
-                <label className="block mb-2 text-sm font-medium">Location</label>
-                <input
-                  type="text"
-                  name="location"
-                  value={formData.location}
-                  onChange={handleInputChange}
-                  className="w-full border rounded px-3 py-2"
-                />
-              </div>
-              <div className="flex justify-end gap-3">
-                <button
-                  type="button"
-                  onClick={() => setIsModalOpen(false)}
-                  className="px-4 py-2 bg-gray-300 rounded hover:bg-gray-400"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={loading}
-                  className={`px-4 py-2 text-white rounded ${
-                    loading ? "bg-blue-300" : "bg-blue-500 hover:bg-blue-600"
-                  }`}
-                >
-                  {loading ? "Saving..." : "Save"}
-                </button>
-              </div>
-            </form>
+      <Modal
+        isOpen={isEditModalOpen}
+        onRequestClose={() => setIsEditModalOpen(false)}
+        contentLabel="Edit Cafeteria"
+        className="bg-white rounded-lg p-6 w-full max-w-md mx-auto mt-20 shadow-lg outline-none"
+        overlayClassName="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-start z-50"
+      >
+        <h3 className="text-lg font-bold mb-4">Edit Cafeteria</h3>
+        <form onSubmit={handleUpdateCafeteria} className="space-y-4">
+          <div>
+            <label className="block mb-2 text-sm font-medium">Cafeteria Name</label>
+            <input
+              type="text"
+              name="cafeteria_name"
+              value={formData.cafeteria_name}
+              onChange={handleInputChange}
+              className="w-full border rounded px-3 py-2"
+            />
           </div>
-        </div>
-      )}
+          <div>
+            <label className="block mb-2 text-sm font-medium">Location</label>
+            <input
+              type="text"
+              name="location"
+              value={formData.location}
+              onChange={handleInputChange}
+              className="w-full border rounded px-3 py-2"
+            />
+          </div>
+          <div className="flex justify-end gap-3">
+            <button
+              type="button"
+              onClick={() => setIsEditModalOpen(false)}
+              className="px-4 py-2 bg-gray-300 rounded hover:bg-gray-400"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={loading}
+              className={`px-4 py-2 text-white rounded ${
+                loading ? "bg-blue-300" : "bg-blue-500 hover:bg-blue-600"
+              }`}
+            >
+              {loading ? "Saving..." : "Save"}
+            </button>
+          </div>
+        </form>
+      </Modal>
 
       {/* Create Modal */}
-      {isCreateModalOpen && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex justify-center items-center">
-          <div className="bg-white rounded-lg p-6 w-full max-w-md shadow-lg z-50">
-            <h3 className="text-lg font-bold mb-4">Add Cafeteria</h3>
-            <form onSubmit={handleCreateCafeteria} className="space-y-4">
-              <div>
-                <label className="block mb-2 text-sm font-medium">Cafeteria Name</label>
-                <input
-                  type="text"
-                  name="cafeteria_name"
-                  value={createData.cafeteria_name}
-                  onChange={(e) => handleInputChange(e, true)}
-                  className="w-full border rounded px-3 py-2"
-                  required
-                />
-              </div>
-              <div>
-                <label className="block mb-2 text-sm font-medium">Location</label>
-                <input
-                  type="text"
-                  name="location"
-                  value={createData.location}
-                  onChange={(e) => handleInputChange(e, true)}
-                  className="w-full border rounded px-3 py-2"
-                  required
-                />
-              </div>
-              <div className="flex justify-end gap-3">
-                <button
-                  type="button"
-                  onClick={() => setIsCreateModalOpen(false)}
-                  className="px-4 py-2 bg-gray-300 rounded hover:bg-gray-400"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={loading}
-                  className={`px-4 py-2 text-white rounded ${
-                    loading ? "bg-green-300" : "bg-green-500 hover:bg-green-600"
-                  }`}
-                >
-                  {loading ? "Creating..." : "Create"}
-                </button>
-              </div>
-            </form>
+      <Modal
+        isOpen={isCreateModalOpen}
+        onRequestClose={() => setIsCreateModalOpen(false)}
+        contentLabel="Create Cafeteria"
+        className="bg-white rounded-lg p-6 w-full max-w-md mx-auto mt-20 shadow-lg outline-none"
+        overlayClassName="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-start z-50"
+      >
+        <h3 className="text-lg font-bold mb-4">Add Cafeteria</h3>
+        <form onSubmit={handleCreateCafeteria} className="space-y-4">
+          <div>
+            <label className="block mb-2 text-sm font-medium">Cafeteria Name</label>
+            <input
+              type="text"
+              name="cafeteria_name"
+              value={createData.cafeteria_name}
+              onChange={(e) => handleInputChange(e, true)}
+              className="w-full border rounded px-3 py-2"
+              required
+            />
           </div>
+          <div>
+            <label className="block mb-2 text-sm font-medium">Location</label>
+            <input
+              type="text"
+              name="location"
+              value={createData.location}
+              onChange={(e) => handleInputChange(e, true)}
+              className="w-full border rounded px-3 py-2"
+              required
+            />
+          </div>
+          <div className="flex justify-end gap-3">
+            <button
+              type="button"
+              onClick={() => setIsCreateModalOpen(false)}
+              className="px-4 py-2 bg-gray-300 rounded hover:bg-gray-400"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={loading}
+              className={`px-4 py-2 text-white rounded ${
+                loading ? "bg-green-300" : "bg-green-500 hover:bg-green-600"
+              }`}
+            >
+              {loading ? "Creating..." : "Create"}
+            </button>
+          </div>
+        </form>
+      </Modal>
+
+      {/* Delete Confirmation Modal */}
+      <Modal
+        isOpen={isDeleteModalOpen}
+        onRequestClose={() => setIsDeleteModalOpen(false)}
+        contentLabel="Delete Cafeteria"
+        className="bg-white rounded-lg p-6 w-full max-w-md mx-auto mt-20 shadow-lg outline-none"
+        overlayClassName="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-start z-50"
+      >
+        <h3 className="text-lg font-bold mb-4">Confirm Delete</h3>
+        <p>
+          Are you sure you want to delete{" "}
+          <strong>{deletingCafeteria?.cafeteria_name}</strong>?
+        </p>
+        <div className="flex justify-end gap-3 mt-4">
+          <button
+            type="button"
+            onClick={() => setIsDeleteModalOpen(false)}
+            className="px-4 py-2 bg-gray-300 rounded hover:bg-gray-400"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={handleDeleteCafeteria}
+            className="px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600"
+          >
+            Delete
+          </button>
         </div>
-      )}
+      </Modal>
     </div>
   );
 };

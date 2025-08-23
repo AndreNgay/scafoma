@@ -45,6 +45,9 @@ const SignIn = () => {
                     token: res.token
                 };
                 localStorage.setItem("user", JSON.stringify(userInfo));
+                localStorage.setItem("token", res.user.token);
+
+
                 setCredentials(userInfo);
                 setTimeout(() => navigate("/overview"), 1500);
             } else {

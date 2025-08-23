@@ -1,13 +1,13 @@
 import express from "express";
 import authMiddleware from "../middleware/authMiddleware.js";
 import {
-  getUser,
   changePassword,
   updateUser,
   getAllUsers,
   deleteUser,
   createConcessionaire,
-  resetPassword
+  resetPassword,
+  getUser
 } from "../controllers/userController.js";
 
 const router = express.Router();
@@ -22,7 +22,7 @@ router.get("/all", getAllUsers);
 router.put("/change-password", authMiddleware, changePassword);
 
 // Create concessionaire
-router.post("/concessionaire", authMiddleware, createConcessionaire);
+router.post("/concessionaire", createConcessionaire);
 
 // Reset password
 router.post("/:id/reset-password", authMiddleware, resetPassword);

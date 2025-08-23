@@ -3,7 +3,11 @@ import { useParams } from "react-router-dom";
 import { DataGrid } from "@mui/x-data-grid";
 import { Button, MenuItem, TextField } from "@mui/material";
 import { toast } from "sonner";
+import Modal from "react-modal";
 import api from "../libs/apiCall";
+
+// Accessibility requirement
+Modal.setAppElement("#root");
 
 export const Concessions = () => {
   const { cafeteriaId } = useParams();
@@ -13,10 +17,14 @@ export const Concessions = () => {
   const [searchTerm, setSearchTerm] = useState("");
 
   const [isLoading, setIsLoading] = useState(true);
-  const [isModalOpen, setIsModalOpen] = useState(false);
+
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
 
   const [editingConcession, setEditingConcession] = useState(null);
+  const [deletingConcession, setDeletingConcession] = useState(null);
+
   const [formData, setFormData] = useState({
     concession_name: "",
     concessionaire_id: "",
@@ -103,18 +111,22 @@ export const Concessions = () => {
         : "",
       cafeteria_id: cafeteriaId,
     });
-    setIsModalOpen(true);
+    setIsEditModalOpen(true);
   };
 
-const handleInputChange = (e, isCreate = false) => {
-  const { name, value } = e.target;
-  if (isCreate) {
-    setCreateData((prev) => ({ ...prev, [name]: value }));
-  } else {
-    setFormData((prev) => ({ ...prev, [name]: value }));
-  }
-};
+  const handleDeleteClick = (concession) => {
+    setDeletingConcession(concession);
+    setIsDeleteModalOpen(true);
+  };
 
+  const handleInputChange = (e, isCreate = false) => {
+    const { name, value } = e.target;
+    if (isCreate) {
+      setCreateData((prev) => ({ ...prev, [name]: value }));
+    } else {
+      setFormData((prev) => ({ ...prev, [name]: value }));
+    }
+  };
 
   const handleUpdate = async (e) => {
     e.preventDefault();
@@ -126,7 +138,7 @@ const handleInputChange = (e, isCreate = false) => {
         concessionaire_id: Number(formData.concessionaire_id) || null,
       });
       toast.success("Concession updated!");
-      setIsModalOpen(false);
+      setIsEditModalOpen(false);
       await fetchConcessions();
     } catch (err) {
       console.error(err);
@@ -160,12 +172,11 @@ const handleInputChange = (e, isCreate = false) => {
     }
   };
 
-  const handleDelete = async (id) => {
-    if (!window.confirm("Are you sure you want to delete this concession?"))
-      return;
+  const handleDelete = async () => {
     try {
-      await api.delete(`/concession/${id}`);
+      await api.delete(`/concession/${deletingConcession.id}`);
       toast.success("Concession deleted!");
+      setIsDeleteModalOpen(false);
       await fetchConcessions();
     } catch (err) {
       console.error(err);
@@ -208,7 +219,7 @@ const handleInputChange = (e, isCreate = false) => {
             size="small"
             variant="contained"
             color="error"
-            onClick={() => handleDelete(params.row.id)}
+            onClick={() => handleDeleteClick(params.row)}
           >
             Delete
           </Button>
@@ -217,7 +228,6 @@ const handleInputChange = (e, isCreate = false) => {
     },
   ];
 
-  // Render select safely
   const renderConcessionaireSelect = (value, onChange) => {
     const safeValue =
       concessionaires.some((u) => String(u.id) === String(value)) || value === ""
@@ -248,6 +258,7 @@ const handleInputChange = (e, isCreate = false) => {
         Concessions (Cafeteria #{cafeteriaId})
       </h2>
 
+      {/* Top bar */}
       <div className="flex justify-between items-center mb-4">
         <input
           type="text"
@@ -265,6 +276,7 @@ const handleInputChange = (e, isCreate = false) => {
         </button>
       </div>
 
+      {/* DataGrid */}
       <div style={{ height: 500, width: "100%" }}>
         <DataGrid
           rows={filteredConcessions}
@@ -279,109 +291,131 @@ const handleInputChange = (e, isCreate = false) => {
       </div>
 
       {/* Edit Modal */}
-      {isModalOpen && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex justify-center items-center">
-          <div className="bg-white rounded-lg p-6 w-full max-w-md shadow-lg z-50">
-            <h3 className="text-lg font-bold mb-4">Edit Concession</h3>
-            <form onSubmit={handleUpdate} className="space-y-4">
-              <div>
-                <label className="block mb-2 text-sm font-medium">
-                  Concession Name
-                </label>
-                <input
-                  type="text"
-                  name="concession_name"
-                  value={formData.concession_name}
-                  onChange={handleInputChange}
-                  className="w-full border rounded px-3 py-2"
-                  required
-                />
-              </div>
-              <div>
-                <label className="block mb-2 text-sm font-medium">
-                  Concessionaire
-                </label>
-{renderConcessionaireSelect(
-  formData.concessionaire_id,
-  (e) => handleInputChange(e, false)   // explicitly set false
-)}
-
-              </div>
-              <div className="flex justify-end gap-3">
-                <button
-                  type="button"
-                  onClick={() => setIsModalOpen(false)}
-                  className="px-4 py-2 bg-gray-300 rounded hover:bg-gray-400"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={loading}
-                  className={`px-4 py-2 text-white rounded ${
-                    loading ? "bg-blue-300" : "bg-blue-500 hover:bg-blue-600"
-                  }`}
-                >
-                  {loading ? "Saving..." : "Save"}
-                </button>
-              </div>
-            </form>
+      <Modal
+        isOpen={isEditModalOpen}
+        onRequestClose={() => setIsEditModalOpen(false)}
+        contentLabel="Edit Concession"
+        className="bg-white rounded-lg p-6 w-full max-w-md mx-auto mt-20 shadow-lg outline-none"
+        overlayClassName="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-start z-50"
+      >
+        <h3 className="text-lg font-bold mb-4">Edit Concession</h3>
+        <form onSubmit={handleUpdate} className="space-y-4">
+          <div>
+            <label className="block mb-2 text-sm font-medium">Concession Name</label>
+            <input
+              type="text"
+              name="concession_name"
+              value={formData.concession_name}
+              onChange={handleInputChange}
+              className="w-full border rounded px-3 py-2"
+              required
+            />
           </div>
-        </div>
-      )}
+          <div>
+            <label className="block mb-2 text-sm font-medium">Concessionaire</label>
+            {renderConcessionaireSelect(formData.concessionaire_id, (e) =>
+              handleInputChange(e, false)
+            )}
+          </div>
+          <div className="flex justify-end gap-3">
+            <button
+              type="button"
+              onClick={() => setIsEditModalOpen(false)}
+              className="px-4 py-2 bg-gray-300 rounded hover:bg-gray-400"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={loading}
+              className={`px-4 py-2 text-white rounded ${
+                loading ? "bg-blue-300" : "bg-blue-500 hover:bg-blue-600"
+              }`}
+            >
+              {loading ? "Saving..." : "Save"}
+            </button>
+          </div>
+        </form>
+      </Modal>
 
       {/* Create Modal */}
-      {isCreateModalOpen && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex justify-center items-center">
-          <div className="bg-white rounded-lg p-6 w-full max-w-md shadow-lg z-50">
-            <h3 className="text-lg font-bold mb-4">Add Concession</h3>
-            <form onSubmit={handleCreate} className="space-y-4">
-              <div>
-                <label className="block mb-2 text-sm font-medium">
-                  Concession Name
-                </label>
-                <input
-                  type="text"
-                  name="concession_name"
-                  value={createData.concession_name}
-                  onChange={(e) => handleInputChange(e, true)}
-                  className="w-full border rounded px-3 py-2"
-                  required
-                />
-              </div>
-              <div>
-                <label className="block mb-2 text-sm font-medium">
-                  Concessionaire
-                </label>
-{renderConcessionaireSelect(
-  createData.concessionaire_id,
-  (e) => handleInputChange(e, true)    // explicitly set true
-)}
-
-
-              </div>
-              <div className="flex justify-end gap-3">
-                <button
-                  type="button"
-                  onClick={() => setIsCreateModalOpen(false)}
-                  className="px-4 py-2 bg-gray-300 rounded hover:bg-gray-400"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={loading}
-                  className={`px-4 py-2 text-white rounded ${
-                    loading ? "bg-green-300" : "bg-green-500 hover:bg-green-600"
-                  }`}
-                >
-                  {loading ? "Creating..." : "Create"}
-                </button>
-              </div>
-            </form>
+      <Modal
+        isOpen={isCreateModalOpen}
+        onRequestClose={() => setIsCreateModalOpen(false)}
+        contentLabel="Create Concession"
+        className="bg-white rounded-lg p-6 w-full max-w-md mx-auto mt-20 shadow-lg outline-none"
+        overlayClassName="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-start z-50"
+      >
+        <h3 className="text-lg font-bold mb-4">Add Concession</h3>
+        <form onSubmit={handleCreate} className="space-y-4">
+          <div>
+            <label className="block mb-2 text-sm font-medium">Concession Name</label>
+            <input
+              type="text"
+              name="concession_name"
+              value={createData.concession_name}
+              onChange={(e) => handleInputChange(e, true)}
+              className="w-full border rounded px-3 py-2"
+              required
+            />
           </div>
+          <div>
+            <label className="block mb-2 text-sm font-medium">Concessionaire</label>
+            {renderConcessionaireSelect(createData.concessionaire_id, (e) =>
+              handleInputChange(e, true)
+            )}
+          </div>
+          <div className="flex justify-end gap-3">
+            <button
+              type="button"
+              onClick={() => setIsCreateModalOpen(false)}
+              className="px-4 py-2 bg-gray-300 rounded hover:bg-gray-400"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={loading}
+              className={`px-4 py-2 text-white rounded ${
+                loading ? "bg-green-300" : "bg-green-500 hover:bg-green-600"
+              }`}
+            >
+              {loading ? "Creating..." : "Create"}
+            </button>
+          </div>
+        </form>
+      </Modal>
+
+      {/* Delete Confirmation Modal */}
+      <Modal
+        isOpen={isDeleteModalOpen}
+        onRequestClose={() => setIsDeleteModalOpen(false)}
+        contentLabel="Delete Concession"
+        className="bg-white rounded-lg p-6 w-full max-w-md mx-auto mt-20 shadow-lg outline-none"
+        overlayClassName="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-start z-50"
+      >
+        <h3 className="text-lg font-bold mb-4">Confirm Delete</h3>
+        <p>
+          Are you sure you want to delete{" "}
+          <strong>{deletingConcession?.concession_name}</strong>?
+        </p>
+        <div className="flex justify-end gap-3 mt-4">
+          <button
+            type="button"
+            onClick={() => setIsDeleteModalOpen(false)}
+            className="px-4 py-2 bg-gray-300 rounded hover:bg-gray-400"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={handleDelete}
+            className="px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600"
+          >
+            Delete
+          </button>
         </div>
-      )}
+      </Modal>
     </div>
   );
 };

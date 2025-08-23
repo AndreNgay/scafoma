@@ -4,6 +4,10 @@ import api from "../libs/apiCall.js";
 import { z } from "zod";
 import { DataGrid } from "@mui/x-data-grid";
 import { Button } from "@mui/material";
+import Modal from "react-modal";
+
+// Accessibility requirement
+Modal.setAppElement("#root");
 
 // Zod schema for validation
 const UserSchema = z.object({
@@ -21,6 +25,8 @@ export const Users = () => {
   const [searchTerm, setSearchTerm] = useState("");
 
   const [isLoading, setIsLoading] = useState(true);
+
+  // Edit modal
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingUser, setEditingUser] = useState(null);
   const [formData, setFormData] = useState({
@@ -30,6 +36,14 @@ export const Users = () => {
     role: "",
   });
   const [loading, setLoading] = useState(false);
+
+  // Add concessionaire modal
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [newEmail, setNewEmail] = useState("");
+
+  // Delete confirmation modal
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [deleteUserId, setDeleteUserId] = useState(null);
 
   const fetchUsers = async () => {
     try {
@@ -130,15 +144,31 @@ export const Users = () => {
     }
   };
 
-  const handleDeleteUser = async (id) => {
-    if (!window.confirm("Are you sure you want to delete this user?")) return;
+  const handleDeleteUser = async () => {
+    if (!deleteUserId) return;
     try {
-      await api.delete(`/user/${id}`);
+      await api.delete(`/user/${deleteUserId}`);
       toast.success("User deleted successfully!");
+      setIsDeleteModalOpen(false);
       await fetchUsers();
     } catch (error) {
       console.error("Error deleting user:", error);
       toast.error("Failed to delete user.");
+    }
+  };
+
+  const handleAddConcessionaire = async (e) => {
+    e.preventDefault();
+    try {
+      const { data } = await api.post("/user/concessionaire", {
+        email: newEmail,
+      });
+      toast.success(`Created! New password: ${data.password}`);
+      setIsAddModalOpen(false);
+      setNewEmail("");
+      await fetchUsers();
+    } catch (error) {
+      toast.error("Failed to create concessionaire.");
     }
   };
 
@@ -159,16 +189,7 @@ export const Users = () => {
       align: "center",
       headerAlign: "center",
       renderCell: (params) => (
-        <div
-          style={{
-            display: "flex",
-            gap: "8px",
-            justifyContent: "center",
-            alignItems: "center",
-            width: "100%",
-            height: "100%",
-          }}
-        >
+        <div className="flex gap-2 justify-center items-center w-full h-full">
           <Button
             size="small"
             variant="contained"
@@ -189,7 +210,10 @@ export const Users = () => {
             size="small"
             variant="contained"
             color="error"
-            onClick={() => handleDeleteUser(params.row.id)}
+            onClick={() => {
+              setDeleteUserId(params.row.id);
+              setIsDeleteModalOpen(true);
+            }}
           >
             Delete
           </Button>
@@ -213,24 +237,14 @@ export const Users = () => {
         />
 
         <button
-          onClick={async () => {
-            const email = prompt("Enter concessionaire email:");
-            if (!email) return;
-            try {
-              const { data } = await api.post("/user/concessionaire", { email });
-              toast.success(`Created! New password: ${data.password}`);
-              await fetchUsers();
-            } catch (error) {
-              toast.error("Failed to create concessionaire.");
-            }
-          }}
+          onClick={() => setIsAddModalOpen(true)}
           className="ml-4 px-4 py-2 bg-green-500 text-white rounded"
         >
           + Add Concessionaire
         </button>
       </div>
 
-      {/* DataGrid with scroll support */}
+      {/* DataGrid */}
       <div style={{ height: 500, width: "100%", overflowX: "auto" }}>
         <DataGrid
           rows={filteredUsers}
@@ -245,77 +259,139 @@ export const Users = () => {
       </div>
 
       {/* Edit Modal */}
-      {isModalOpen && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex justify-center items-center">
-          <div className="bg-white rounded-lg p-6 w-full max-w-md shadow-lg z-50">
-            <h3 className="text-lg font-bold mb-4">Edit User</h3>
-
-            <form onSubmit={handleUpdateUser} className="space-y-4">
-              <div>
-                <label className="block mb-2 text-sm font-medium">
-                  First Name
-                </label>
-                <input
-                  type="text"
-                  name="first_name"
-                  value={formData.first_name || ""}
-                  onChange={handleInputChange}
-                  className="w-full border rounded px-3 py-2"
-                />
-              </div>
-              <div>
-                <label className="block mb-2 text-sm font-medium">
-                  Last Name
-                </label>
-                <input
-                  type="text"
-                  name="last_name"
-                  value={formData.last_name || ""}
-                  onChange={handleInputChange}
-                  className="w-full border rounded px-3 py-2"
-                />
-              </div>
-              <div>
-                <label className="block mb-2 text-sm font-medium">Email</label>
-                <input
-                  type="email"
-                  name="email"
-                  value={formData.email || ""}
-                  onChange={handleInputChange}
-                  className="w-full border rounded px-3 py-2"
-                />
-              </div>
-              <div>
-                <label className="block mb-2 text-sm font-medium">Role</label>
-                <input
-                  type="text"
-                  value={formData.role || ""}
-                  disabled
-                  className="w-full border rounded px-3 py-2 bg-gray-100"
-                />
-              </div>
-              <div className="flex justify-end gap-3">
-                <button
-                  type="button"
-                  onClick={() => setIsModalOpen(false)}
-                  className="px-4 py-2 bg-gray-300 rounded hover:bg-gray-400"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={loading}
-                  className={`px-4 py-2 text-white rounded ${
-                    loading ? "bg-blue-300" : "bg-blue-500 hover:bg-blue-600"
-                  }`}
-                >
-                  {loading ? "Saving..." : "Save"}
-                </button>
-              </div>
-            </form>
+      <Modal
+        isOpen={isModalOpen}
+        onRequestClose={() => setIsModalOpen(false)}
+        contentLabel="Edit User"
+        className="bg-white rounded-lg p-6 w-full max-w-md mx-auto mt-20 shadow-lg outline-none"
+        overlayClassName="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-start z-50"
+      >
+        <h3 className="text-lg font-bold mb-4">Edit User</h3>
+        <form onSubmit={handleUpdateUser} className="space-y-4">
+          <div>
+            <label className="block mb-2 text-sm font-medium">First Name</label>
+            <input
+              type="text"
+              name="first_name"
+              value={formData.first_name || ""}
+              onChange={handleInputChange}
+              className="w-full border rounded px-3 py-2"
+            />
           </div>
+          <div>
+            <label className="block mb-2 text-sm font-medium">Last Name</label>
+            <input
+              type="text"
+              name="last_name"
+              value={formData.last_name || ""}
+              onChange={handleInputChange}
+              className="w-full border rounded px-3 py-2"
+            />
+          </div>
+          <div>
+            <label className="block mb-2 text-sm font-medium">Email</label>
+            <input
+              type="email"
+              name="email"
+              value={formData.email || ""}
+              onChange={handleInputChange}
+              className="w-full border rounded px-3 py-2"
+            />
+          </div>
+          <div>
+            <label className="block mb-2 text-sm font-medium">Role</label>
+            <input
+              type="text"
+              value={formData.role || ""}
+              disabled
+              className="w-full border rounded px-3 py-2 bg-gray-100"
+            />
+          </div>
+          <div className="flex justify-end gap-3">
+            <button
+              type="button"
+              onClick={() => setIsModalOpen(false)}
+              className="px-4 py-2 bg-gray-300 rounded hover:bg-gray-400"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={loading}
+              className={`px-4 py-2 text-white rounded ${
+                loading ? "bg-blue-300" : "bg-blue-500 hover:bg-blue-600"
+              }`}
+            >
+              {loading ? "Saving..." : "Save"}
+            </button>
+          </div>
+        </form>
+      </Modal>
+
+      {/* Add Concessionaire Modal */}
+      <Modal
+        isOpen={isAddModalOpen}
+        onRequestClose={() => setIsAddModalOpen(false)}
+        contentLabel="Add Concessionaire"
+        className="bg-white rounded-lg p-6 w-full max-w-md mx-auto mt-20 shadow-lg outline-none"
+        overlayClassName="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-start z-50"
+      >
+        <h3 className="text-lg font-bold mb-4">Add Concessionaire</h3>
+        <form onSubmit={handleAddConcessionaire} className="space-y-4">
+          <div>
+            <label className="block mb-2 text-sm font-medium">Email</label>
+            <input
+              type="email"
+              value={newEmail}
+              onChange={(e) => setNewEmail(e.target.value)}
+              required
+              className="w-full border rounded px-3 py-2"
+              placeholder="Enter concessionaire email"
+            />
+          </div>
+          <div className="flex justify-end gap-3">
+            <button
+              type="button"
+              onClick={() => setIsAddModalOpen(false)}
+              className="px-4 py-2 bg-gray-300 rounded hover:bg-gray-400"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className="px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600"
+            >
+              Add
+            </button>
+          </div>
+        </form>
+      </Modal>
+
+      {/* Delete Confirmation Modal */}
+      <Modal
+        isOpen={isDeleteModalOpen}
+        onRequestClose={() => setIsDeleteModalOpen(false)}
+        contentLabel="Delete User"
+        className="bg-white rounded-lg p-6 w-full max-w-md mx-auto mt-20 shadow-lg outline-none"
+        overlayClassName="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-start z-50"
+      >
+        <h3 className="text-lg font-bold mb-4 text-red-600">Delete User</h3>
+        <p>Are you sure you want to delete this user?</p>
+        <div className="flex justify-end gap-3 mt-6">
+          <button
+            onClick={() => setIsDeleteModalOpen(false)}
+            className="px-4 py-2 bg-gray-300 rounded hover:bg-gray-400"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={handleDeleteUser}
+            className="px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600"
+          >
+            Delete
+          </button>
         </div>
-      )}
+      </Modal>
     </div>
   );
 };

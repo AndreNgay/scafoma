@@ -88,29 +88,23 @@ export const resetPassword = async (req, res) => {
 
 export const getUser = async (req, res) => {
   try {
-    const { userId } = req.body.user;
-    const userExists = await pool.query({
-        text: "SELECT * FROM tbluser WHERE id = $1",
-        values: [userId]
-    });
-    const user = userExists.rows[0];
-    if (!user) {
-      return res.status(404).json({
-        status: "failed",
-        message: "User not found"});
+    const { id } = req.user;
+
+    const result = await pool.query(
+      "SELECT id, email, first_name, last_name, contact_number, role, profile_image_url FROM tbluser WHERE id = $1",
+      [id]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ message: "User not found" });
     }
 
-    user.password = undefined; // Exclude password from response
-    res.status(200).json({
-      status: "success",
-      message: "User retrieved successfully",
-      user: user
-    });
-    
+    res.json({ user: result.rows[0] });
   } catch (error) {
-    console.error("Error retrieving user:", error); 
+    console.error("Error fetching user:", error);
+    res.status(500).json({ message: "Server error" });
   }
-}
+};
 
 export const getAllUsers = async (req, res) => {
   try {
