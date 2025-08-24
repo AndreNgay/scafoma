@@ -3,6 +3,7 @@ import authMiddleware from "../middleware/authMiddleware.js";
 import {
   changePassword,
   updateUser,
+  updateProfile,
   getAllUsers,
   deleteUser,
   createConcessionaire,
@@ -19,7 +20,7 @@ router.get("/", authMiddleware, getUser);
 router.get("/all", getAllUsers);
 
 // Change password (self)
-router.put("/change-password", authMiddleware, changePassword);
+router.put("/change-password/:id", authMiddleware, changePassword);
 
 // Create concessionaire
 router.post("/concessionaire", createConcessionaire);
@@ -27,8 +28,12 @@ router.post("/concessionaire", createConcessionaire);
 // Reset password
 router.post("/:id/reset-password", authMiddleware, resetPassword);
 
+router.put("/profile", authMiddleware, updateProfile);
+
 // Update user details
 router.put("/:id", authMiddleware, updateUser);
+
+
 
 // Delete user
 router.delete("/:id", authMiddleware, deleteUser);

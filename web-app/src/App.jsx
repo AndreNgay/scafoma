@@ -14,6 +14,7 @@ import { Orders } from "./pages/orders"
 import { Concessions } from "./pages/concessions"
 import { Profile } from "./pages/profile"
 
+
 const RootLayout = () => {
   const {user} = useStore((state) => state)
   setAuthToken(user?.token || "")

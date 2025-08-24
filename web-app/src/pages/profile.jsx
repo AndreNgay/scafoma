@@ -1,6 +1,9 @@
 // src/pages/Profile.jsx
 import React, { useEffect, useState, useRef } from "react";
 import api from "../libs/apiCall.js";
+import { toast } from "sonner";
+import { z } from "zod";
+
 
 export const Profile = () => {
   const [user, setUser] = useState(null);
@@ -50,77 +53,82 @@ export const Profile = () => {
   }, [token]);
 
   // Handle update profile
-  const handleSave = async () => {
-    try {
-      setLoading(true);
-      const res = await api.put(`/user/${user.id}`, formData, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      setMessage(res.data.message);
-      setUser(res.data.user);
-    } catch (err) {
-      console.error("Error updating profile:", err);
-      setMessage("Failed to update profile");
-    } finally {
-      setLoading(false);
-    }
-  };
+const handleSave = async () => {
+  try {
+    setLoading(true);
+    const res = await api.put(`/user/profile`, formData, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    setUser(res.data.user);
+    toast.success(res.data.message || "Profile updated successfully!");
+  } catch (err) {
+    console.error("Error updating profile:", err);
+    toast.error("Failed to update profile");
+  } finally {
+    setLoading(false);
+  }
+};
+
 
   // Handle password change
-  const handleChangePassword = async () => {
-    try {
-      setLoading(true);
-      const res = await api.put("/user/change-password", passwordData, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      setMessage(res.data.message);
-      setPasswordData({
-        currentPassword: "",
-        newPassword: "",
-        confirmPassword: "",
-      });
-    } catch (err) {
-      console.error("Error changing password:", err);
-      setMessage("Failed to change password");
-    } finally {
-      setLoading(false);
-    }
-  };
+const handleChangePassword = async () => {
+  try {
+    setLoading(true);
+    
+    const res = await api.put(`/user/change-password/${user.id}`, passwordData, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    toast.success(res.data.message || "Password changed successfully!");
+    setPasswordData({
+      currentPassword: "",
+      newPassword: "",
+      confirmPassword: "",
+    });
+  } catch (err) {
+    console.error("Error changing password:", err);
+    toast.error(
+      err.response?.data?.message || "Failed to change password"
+    );
+  } finally {
+    setLoading(false);
+  }
+};
 
   // Handle image upload
   const handleImageClick = () => {
     fileInputRef.current.click();
   };
 
-  const handleImageChange = async (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
+const handleImageChange = async (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
 
-    const formDataUpload = new FormData();
-    formDataUpload.append("profile_image", file);
+  const formDataUpload = new FormData();
+  formDataUpload.append("profile_image", file);
 
-    try {
-      setLoading(true);
-      const res = await api.post(`/user/${user.id}/upload-profile`, formDataUpload, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "multipart/form-data",
-        },
-      });
+  try {
+    setLoading(true);
+    const res = await api.post(`/user/${user.id}/upload-profile`, formDataUpload, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "multipart/form-data",
+      },
+    });
 
-      setFormData({
-        ...formData,
-        profile_image_url: res.data.profile_image_url,
-      });
-      setUser({ ...user, profile_image_url: res.data.profile_image_url });
-      setMessage("Profile picture updated!");
-    } catch (err) {
-      console.error("Error uploading image:", err);
-      setMessage("Failed to upload image");
-    } finally {
-      setLoading(false);
-    }
-  };
+    setFormData({
+      ...formData,
+      profile_image_url: res.data.profile_image_url,
+    });
+    setUser({ ...user, profile_image_url: res.data.profile_image_url });
+    toast.success("Profile picture updated!");
+  } catch (err) {
+    console.error("Error uploading image:", err);
+    toast.error("Failed to upload image");
+  } finally {
+    setLoading(false);
+  }
+};
+
 
   if (!user) return <div className="p-6">Loading...</div>;
 

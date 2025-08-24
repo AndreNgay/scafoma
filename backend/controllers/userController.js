@@ -124,47 +124,54 @@ export const getAllUsers = async (req, res) => {
 };
 
 export const changePassword = async (req, res) => {
-    try {
-        const {userId} = req.body.user;
-        const{currentPassword, newPassword, confirmPassword} = req.body;
-        const userExists = await pool.query({
-            text: "SELECT * FROM tbluser WHERE id = $1",
-            values: [userId]
-        });
-        const user = userExists.rows[0];
-        if (!user) {
-        return res.status(404).json({
-            status: "failed",
-            message: "User not found"
-        });
-        }
-        if(newPassword !== confirmPassword) {
-        return res.status(400).json({
-            status: "failed",
-            message: "New password and confirm password do not match"
-        });
-        }
-        const isMatch = await comparePassword(currentPassword, user?.password);
-        if (!isMatch) {
-        return res.status(400).json({
-            status: "failed",
-            message: "Current password is incorrect"
-        });
-        }
+  try {
+    const { id } = req.params;  // ✅ get from URL param
+    const { currentPassword, newPassword, confirmPassword } = req.body;
 
-        const hashedPassword = await hashPassword(newPassword);
-        await pool.query({
-        text: "UPDATE tbluser SET password = $1 WHERE id = $2 RETURNING *",
-        values: [hashedPassword, userId]
-        });
-        res.status(200).json({
-        status: "success",
-        message: "Password updated successfully"
-        });
-    } catch (error) {
-        res.status(500).json({ error: "Internal Server Error" });
+    const userExists = await pool.query({
+      text: "SELECT * FROM tbluser WHERE id = $1",
+      values: [id],
+    });
+
+    const user = userExists.rows[0];
+    if (!user) {
+      return res.status(404).json({
+        status: "failed",
+        message: "User not found",
+      });
     }
-}
+
+    if (newPassword !== confirmPassword) {
+      return res.status(400).json({
+        status: "failed",
+        message: "New password and confirm password do not match",
+      });
+    }
+
+    const isMatch = await comparePassword(currentPassword, user.password);
+    if (!isMatch) {
+      return res.status(400).json({
+        status: "failed",
+        message: "Current password is incorrect",
+      });
+    }
+
+    const hashedPassword = await hashPassword(newPassword);
+    await pool.query({
+      text: "UPDATE tbluser SET password = $1 WHERE id = $2 RETURNING *",
+      values: [hashedPassword, id],
+    });
+
+    res.status(200).json({
+      status: "success",
+      message: "Password updated successfully",
+    });
+  } catch (error) {
+    console.error("Error changing password:", error);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
+};
+
 
 export const updateUser = async (req, res) => {
   try {
@@ -203,6 +210,49 @@ export const updateUser = async (req, res) => {
     res.status(500).json({ status: "failed", message: "Internal Server Error" });
   }
 };
+
+export const updateProfile = async (req, res) => {
+  try {
+    const { id } = req.user; // comes from JWT
+    const { first_name, last_name, contact_number, profile_image_url } = req.body;
+
+    const userExists = await pool.query({
+      text: "SELECT * FROM tbluser WHERE id = $1",
+      values: [id],
+    });
+
+    if (userExists.rowCount === 0) {
+      return res.status(404).json({
+        status: "failed",
+        message: "User not found",
+      });
+    }
+
+    const updatedUser = await pool.query({
+      text: `
+        UPDATE tbluser 
+        SET first_name = $1, 
+            last_name = $2, 
+            contact_number = $3, 
+            profile_image_url = $4, 
+            updated_at = CURRENT_TIMESTAMP 
+        WHERE id = $5 
+        RETURNING id, email, first_name, last_name, contact_number, role, profile_image_url
+      `,
+      values: [first_name, last_name, contact_number, profile_image_url, id],
+    });
+
+    res.status(200).json({
+      status: "success",
+      message: "Profile updated successfully",
+      user: updatedUser.rows[0],
+    });
+  } catch (error) {
+    console.error("Error updating profile:", error);
+    res.status(500).json({ status: "failed", message: "Internal Server Error" });
+  }
+};
+
 
 
 export const deleteUser = async (req, res) => {
