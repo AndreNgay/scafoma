@@ -4,6 +4,28 @@ import api from "../libs/apiCall.js";
 import { toast } from "sonner";
 import { z } from "zod";
 
+// ✅ Define Zod schemas
+const profileSchema = z.object({
+  first_name: z.string().min(1, "First name is required"),
+  last_name: z.string().min(1, "Last name is required"),
+  contact_number: z
+    .string()
+    .min(10, "Contact number must be at least 10 digits")
+    .max(15, "Contact number must not exceed 15 digits")
+    .regex(/^[0-9]+$/, "Contact number must only contain digits"),
+  profile_image_url: z.string().url().optional().or(z.literal("")),
+});
+
+const passwordSchema = z
+  .object({
+    currentPassword: z.string().min(1, "Current password is required"),
+    newPassword: z.string().min(6, "New password must be at least 6 characters"),
+    confirmPassword: z.string().min(6, "Confirm password is required"),
+  })
+  .refine((data) => data.newPassword === data.confirmPassword, {
+    message: "Passwords do not match",
+    path: ["confirmPassword"],
+  });
 
 export const Profile = () => {
   const [user, setUser] = useState(null);
@@ -19,7 +41,6 @@ export const Profile = () => {
     confirmPassword: "",
   });
   const [loading, setLoading] = useState(false);
-  const [message, setMessage] = useState("");
 
   const token = localStorage.getItem("token");
   const fileInputRef = useRef(null);
@@ -37,7 +58,6 @@ export const Profile = () => {
         const userData = res.data.user || res.data;
         setUser(userData);
 
-        // Pre-fill form
         setFormData({
           first_name: userData.first_name || "",
           last_name: userData.last_name || "",
@@ -52,83 +72,98 @@ export const Profile = () => {
     fetchUser();
   }, [token]);
 
-  // Handle update profile
-const handleSave = async () => {
-  try {
-    setLoading(true);
-    const res = await api.put(`/user/profile`, formData, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-    setUser(res.data.user);
-    toast.success(res.data.message || "Profile updated successfully!");
-  } catch (err) {
-    console.error("Error updating profile:", err);
-    toast.error("Failed to update profile");
-  } finally {
-    setLoading(false);
-  }
-};
+  // Handle update profile with validation
+  const handleSave = async () => {
+    try {
+      const validatedData = profileSchema.parse(formData); // ✅ validate before API call
+      setLoading(true);
 
+      const res = await api.put(`/user/profile`, validatedData, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
 
-  // Handle password change
-const handleChangePassword = async () => {
-  try {
-    setLoading(true);
-    
-    const res = await api.put(`/user/change-password/${user.id}`, passwordData, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-    toast.success(res.data.message || "Password changed successfully!");
-    setPasswordData({
-      currentPassword: "",
-      newPassword: "",
-      confirmPassword: "",
-    });
-  } catch (err) {
-    console.error("Error changing password:", err);
-    toast.error(
-      err.response?.data?.message || "Failed to change password"
-    );
-  } finally {
-    setLoading(false);
-  }
-};
-
-  // Handle image upload
-  const handleImageClick = () => {
-    fileInputRef.current.click();
+      setUser(res.data.user);
+      toast.success(res.data.message || "Profile updated successfully!");
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        err.errors.forEach((e) => toast.error(e.message));
+      } else {
+        console.error("Error updating profile:", err);
+        toast.error("Failed to update profile");
+      }
+    } finally {
+      setLoading(false);
+    }
   };
 
-const handleImageChange = async (e) => {
-  const file = e.target.files[0];
-  if (!file) return;
+  // Handle password change with validation
+  const handleChangePassword = async () => {
+    try {
+      const validatedData = passwordSchema.parse(passwordData); // ✅ validate before API call
+      setLoading(true);
 
-  const formDataUpload = new FormData();
-  formDataUpload.append("profile_image", file);
+      const res = await api.put(
+        `/user/change-password/${user.id}`,
+        validatedData,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
 
-  try {
-    setLoading(true);
-    const res = await api.post(`/user/${user.id}/upload-profile`, formDataUpload, {
-      headers: {
-        Authorization: `Bearer ${token}`,
-        "Content-Type": "multipart/form-data",
-      },
-    });
+      toast.success(res.data.message || "Password changed successfully!");
+      setPasswordData({
+        currentPassword: "",
+        newPassword: "",
+        confirmPassword: "",
+      });
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        err.errors.forEach((e) => toast.error(e.message));
+      } else {
+        console.error("Error changing password:", err);
+        toast.error(err.response?.data?.message || "Failed to change password");
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
 
-    setFormData({
-      ...formData,
-      profile_image_url: res.data.profile_image_url,
-    });
-    setUser({ ...user, profile_image_url: res.data.profile_image_url });
-    toast.success("Profile picture updated!");
-  } catch (err) {
-    console.error("Error uploading image:", err);
-    toast.error("Failed to upload image");
-  } finally {
-    setLoading(false);
-  }
-};
+  // Handle image upload
+  const handleImageClick = () => fileInputRef.current.click();
 
+  const handleImageChange = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const formDataUpload = new FormData();
+    formDataUpload.append("profile_image", file);
+
+    try {
+      setLoading(true);
+      const res = await api.post(
+        `/user/${user.id}/upload-profile`,
+        formDataUpload,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "multipart/form-data",
+          },
+        }
+      );
+
+      setFormData({
+        ...formData,
+        profile_image_url: res.data.profile_image_url,
+      });
+      setUser({ ...user, profile_image_url: res.data.profile_image_url });
+      toast.success("Profile picture updated!");
+    } catch (err) {
+      console.error("Error uploading image:", err);
+      toast.error("Failed to upload image");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   if (!user) return <div className="p-6">Loading...</div>;
 
@@ -136,13 +171,10 @@ const handleImageChange = async (e) => {
     <div className="max-w-3xl mx-auto p-6">
       <h1 className="text-2xl font-bold mb-6">My Profile</h1>
 
-      {message && <div className="mb-4 text-green-600">{message}</div>}
-
       {/* Profile Info */}
       <div className="bg-white shadow-md rounded-2xl p-6 mb-6">
         <h2 className="text-lg font-semibold mb-4">Profile Information</h2>
 
-        {/* Profile Image (clickable) */}
         <div className="flex items-center gap-4 mb-4">
           <img
             src={formData.profile_image_url || "/default-avatar.png"}
@@ -207,7 +239,10 @@ const handleImageChange = async (e) => {
             placeholder="Current Password"
             value={passwordData.currentPassword}
             onChange={(e) =>
-              setPasswordData({ ...passwordData, currentPassword: e.target.value })
+              setPasswordData({
+                ...passwordData,
+                currentPassword: e.target.value,
+              })
             }
             className="border p-2 rounded-lg"
           />

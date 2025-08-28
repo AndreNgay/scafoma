@@ -91,7 +91,7 @@ export const getUser = async (req, res) => {
     const { id } = req.user;
 
     const result = await pool.query(
-      "SELECT id, email, first_name, last_name, contact_number, role, profile_image_url FROM tbluser WHERE id = $1",
+      "SELECT * FROM tbluser WHERE id = $1",
       [id]
     );
 
@@ -111,7 +111,7 @@ export const getUser = async (req, res) => {
 
 export const getAllUsers = async (req, res) => {
   try {
-    const result = await pool.query("SELECT id, first_name, last_name, email, contact_number, role, created_at, updated_at FROM tbluser ORDER BY created_at DESC");
+    const result = await pool.query("SELECT * FROM tbluser ORDER BY created_at DESC");
     res.status(200).json({
       status: "success",
       message: "Users retrieved successfully",
