@@ -1,0 +1,7 @@
+-- Drop dependent tables first
+DROP TABLE IF EXISTS tblorder CASCADE;
+DROP TABLE IF EXISTS tblitemvariation CASCADE;
+DROP TABLE IF EXISTS tblmenuitem CASCADE;
+DROP TABLE IF EXISTS tblconcession CASCADE;
+DROP TABLE IF EXISTS tblcafeteria CASCADE;
+DROP TABLE IF EXISTS tbluser CASCADE;

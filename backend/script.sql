@@ -5,11 +5,11 @@ CREATE TABLE IF NOT EXISTS tbluser (
     first_name VARCHAR(50),
     last_name VARCHAR(50),
     password VARCHAR(255) NOT NULL,
-    role VARCHAR(20) DEFAULT 'customer', -- customer, concessionaire, admin
+    role VARCHAR(20) DEFAULT 'customer' CHECK (role IN ('customer', 'concessionaire', 'admin')),
     profile_image_url TEXT,
-    gcash_number VARCHAR(11) UNIQUE CHECK (gcash_number ~ '^[0-9]{11}$'), -- optional for concessionaires
-    -- add email verified boolean
-    -- add profile created boolean
+    gcash_number VARCHAR(11) UNIQUE CHECK (gcash_number ~ '^[0-9]{11}$'),
+    email_verified BOOLEAN DEFAULT FALSE,  -- added email verified
+    profile_created BOOLEAN DEFAULT FALSE, -- added profile created
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -51,7 +51,7 @@ CREATE TABLE IF NOT EXISTS tblmenuitem (
     id SERIAL PRIMARY KEY,
     item_name VARCHAR(100) NOT NULL,
     concession_id INT NOT NULL,
-    price NUMERIC(10,2) NOT NULL CHECK (price >= 0), -- added price
+    price NUMERIC(10,2) NOT NULL CHECK (price >= 0),
     image_url TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -66,7 +66,7 @@ CREATE TABLE IF NOT EXISTS tblmenuitem (
 -- Item Variations Table
 CREATE TABLE IF NOT EXISTS tblitemvariation (
     id SERIAL PRIMARY KEY,
-    label VARCHAR(50) NOT NULL, -- e.g., Size, Flavor
+    label VARCHAR(50) NOT NULL,
     variation_name VARCHAR(100) NOT NULL,
     additional_price NUMERIC(10,2) NOT NULL CHECK (additional_price >= 0),
     menu_item_id INT NOT NULL,

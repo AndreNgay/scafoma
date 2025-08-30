@@ -7,6 +7,8 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
 import useStore from "../../store";
 import api from "../../libs/apiCall"; // axios instance
+import AsyncStorage from "@react-native-async-storage/async-storage";
+
 
 const LoginSchema = z.object({
   email: z.string().email({ message: "Invalid email address" }),
@@ -17,9 +19,12 @@ type LoginForm = z.infer<typeof LoginSchema>;
 
 type Props = NativeStackScreenProps<any, "SignIn">;
 
+
 const SignIn: React.FC<Props> = ({ navigation }) => {
   const { user, setCredentials } = useStore((state) => state);
   const [loading, setLoading] = useState(false);
+
+
 
   const {
     control,
@@ -35,32 +40,30 @@ const SignIn: React.FC<Props> = ({ navigation }) => {
     }
   }, [user]);
 
-  const onSubmit = async (data: LoginForm) => {
-    try {
-      setLoading(true);
-      const res = await api.post("/auth/sign-in", data);
+const onSubmit = async (data: LoginForm) => {
+  try {
+    setLoading(true);
+    const res = await api.post("/auth/sign-in", data);
 
-      if (res.data.user) {
-        const userInfo = {
-          ...res.data.user,
-          token: res.data.token,
-        };
+    if (res.data.user) {
+      const userInfo = { ...res.data.user, token: res.data.token };
 
-        // persist to storage if needed
-        setCredentials(userInfo);
+      setCredentials(userInfo);
 
-        Alert.alert("Success", res.data.message || "Signed in successfully!");
-        navigation.replace("Root");
-      } else {
-        Alert.alert("Error", res.data.message || "Something went wrong");
-      }
-    } catch (error: any) {
-      console.error("Sign-In Error:", error);
-      Alert.alert("Error", error.response?.data?.message || "Sign-in failed. Please try again.");
-    } finally {
-      setLoading(false);
+      Alert.alert("Success", res.data.message || "Signed in successfully!");
+      navigation.replace("Root");
+    } else {
+      Alert.alert("Error", res.data.message || "Something went wrong");
     }
-  };
+  } catch (error: any) {
+    console.error("Sign-In Error:", error);
+    Alert.alert("Error", error.response?.data?.message || "Sign-in failed. Please try again.");
+  } finally {
+    setLoading(false);
+  }
+};
+
+
 
   return (
     <View style={styles.container}>
@@ -93,12 +96,16 @@ const SignIn: React.FC<Props> = ({ navigation }) => {
               style={styles.input}
               placeholder="Enter your password"
               secureTextEntry
+              autoCapitalize="none"
               value={value}
               onChangeText={onChange}
             />
+
           )}
         />
         {errors.password && <Text style={styles.error}>{errors.password.message}</Text>}
+
+        
 
         {/* Submit Button */}
         <TouchableOpacity
