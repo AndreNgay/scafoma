@@ -1,14 +1,19 @@
-// screens/auth/SignIn.tsx
-import React, { useState, useEffect } from "react";
-import { View, Text, TextInput, TouchableOpacity, ActivityIndicator, StyleSheet, Alert } from "react-native";
+import React, { useState } from "react";
+import {
+  View,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  ActivityIndicator,
+  StyleSheet,
+  Alert,
+} from "react-native";
 import { useForm, Controller } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
 import useStore from "../../store";
 import api from "../../libs/apiCall"; // axios instance
-import AsyncStorage from "@react-native-async-storage/async-storage";
-
 
 const LoginSchema = z.object({
   email: z.string().email({ message: "Invalid email address" }),
@@ -16,15 +21,11 @@ const LoginSchema = z.object({
 });
 
 type LoginForm = z.infer<typeof LoginSchema>;
-
 type Props = NativeStackScreenProps<any, "SignIn">;
 
-
 const SignIn: React.FC<Props> = ({ navigation }) => {
-  const { user, setCredentials } = useStore((state) => state);
+  const { setCredentials } = useStore((state) => state);
   const [loading, setLoading] = useState(false);
-
-
 
   const {
     control,
@@ -32,38 +33,28 @@ const SignIn: React.FC<Props> = ({ navigation }) => {
     formState: { errors },
   } = useForm<LoginForm>({
     resolver: zodResolver(LoginSchema),
+    defaultValues: { email: "", password: "" }, // ✅ prevent uncontrolled warnings
   });
 
-  useEffect(() => {
-    if (user) {
-      navigation.replace("Root"); // redirect to tabs if already logged in
+  const onSubmit = async (data: LoginForm) => {
+    try {
+      setLoading(true);
+      const res = await api.post("/auth/sign-in", data);
+
+      if (res.data.user) {
+        const userInfo = { ...res.data.user, token: res.data.token };
+        await setCredentials(userInfo); 
+        Alert.alert("Success", "Signed in successfully!");
+      } else {
+        Alert.alert("Error", res.data.message || "Something went wrong");
+      }
+    } catch (error: any) {
+      console.error("Sign-In Error:", error);
+      Alert.alert("Error", error.response?.data?.message || "Sign-in failed. Please try again.");
+    } finally {
+      setLoading(false);
     }
-  }, [user]);
-
-const onSubmit = async (data: LoginForm) => {
-  try {
-    setLoading(true);
-    const res = await api.post("/auth/sign-in", data);
-
-    if (res.data.user) {
-      const userInfo = { ...res.data.user, token: res.data.token };
-
-      setCredentials(userInfo);
-
-      Alert.alert("Success", res.data.message || "Signed in successfully!");
-      navigation.replace("Root");
-    } else {
-      Alert.alert("Error", res.data.message || "Something went wrong");
-    }
-  } catch (error: any) {
-    console.error("Sign-In Error:", error);
-    Alert.alert("Error", error.response?.data?.message || "Sign-in failed. Please try again.");
-  } finally {
-    setLoading(false);
-  }
-};
-
-
+  };
 
   return (
     <View style={styles.container}>
@@ -100,12 +91,9 @@ const onSubmit = async (data: LoginForm) => {
               value={value}
               onChangeText={onChange}
             />
-
           )}
         />
         {errors.password && <Text style={styles.error}>{errors.password.message}</Text>}
-
-        
 
         {/* Submit Button */}
         <TouchableOpacity

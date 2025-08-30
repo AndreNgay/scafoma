@@ -1,29 +1,19 @@
-// index.tsx
-import React from "react";
-import { createStackNavigator } from "@react-navigation/stack";
+import React, { useEffect, useState } from "react";
+import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
-import useStore from "./store/index";
+import { ActivityIndicator, View } from "react-native";
+import useStore from "./store";
 
 // Screens
 import SignIn from "./screens/auth/SignIn";
 import SignUp from "./screens/auth/SignUp";
-import Orders from "./screens/concessionaire/Orders";
-import Menu from "./screens/customer/Menu";
+import Menu from "./screens/concessionaire/Menu";
 import Profile from "./screens/customer/Profile";
+import Orders from "./screens/concessionaire/Orders";
 
-const Stack = createStackNavigator();
+const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
 
-// Tabs for concessionaire
-function ConcessionaireTabs() {
-  return (
-    <Tab.Navigator screenOptions={{ headerShown: false }}>
-      <Tab.Screen name="Orders" component={Orders} />
-    </Tab.Navigator>
-  );
-}
-
-// Tabs for customer
 function CustomerTabs() {
   return (
     <Tab.Navigator screenOptions={{ headerShown: false }}>
@@ -33,20 +23,53 @@ function CustomerTabs() {
   );
 }
 
-export default function Index() {
-  const { user } = useStore((state) => state);
+function ConcessionaireTabs() {
+  return (
+    <Tab.Navigator screenOptions={{ headerShown: false }}>
+      <Tab.Screen name="Orders" component={Orders} />
+      <Tab.Screen name="Menu" component={Menu} />
+    </Tab.Navigator>
+  );
+}
+
+function AuthStack() {
+  const AuthStackNav = createNativeStackNavigator();
+  return (
+    <AuthStackNav.Navigator screenOptions={{ headerShown: false }}>
+      <AuthStackNav.Screen name="SignIn" component={SignIn} />
+      <AuthStackNav.Screen name="SignUp" component={SignUp} />
+    </AuthStackNav.Navigator>
+  );
+}
+
+export default function RootNavigator() {
+  const { user, loadStorage } = useStore();
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const init = async () => {
+      await loadStorage();
+      setLoading(false);
+    };
+    init();
+  }, []);
+
+  if (loading) {
+    return (
+      <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
+        <ActivityIndicator size="large" />
+      </View>
+    );
+  }
 
   return (
     <Stack.Navigator screenOptions={{ headerShown: false }}>
       {!user ? (
-        <>
-          <Stack.Screen name="SignIn" component={SignIn} />
-          <Stack.Screen name="SignUp" component={SignUp} />
-        </>
-      ) : user.role === "concessionaire" ? (
-        <Stack.Screen name="ConcessionaireRoot" component={ConcessionaireTabs} />
+        <Stack.Screen name="Auth" component={AuthStack} />
+      ) : user.role === "customer" ? (
+        <Stack.Screen name="Customer" component={CustomerTabs} />
       ) : (
-        <Stack.Screen name="CustomerRoot" component={CustomerTabs} />
+        <Stack.Screen name="Concessionaire" component={ConcessionaireTabs} />
       )}
     </Stack.Navigator>
   );

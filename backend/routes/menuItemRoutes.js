@@ -1,13 +1,13 @@
 import express from "express";
-import { getMenuItems, deleteMenuItem } from "../controllers/MenuItemController.js";
+import { getMenuItems, getMenuItemsByConcessionaire } from "../controllers/MenuItemController.js";
+import authMiddleware from "../middleware/authMiddleware.js";
 
 const router = express.Router();
 
 // Get all MenuItems
 router.get("/all", getMenuItems);
 
-// Delete a MenuItem
-router.delete("/:id", deleteMenuItem);
-
+// Get menu items by concessionaire ID
+router.get("/", authMiddleware, getMenuItemsByConcessionaire);
 
 export default router;

@@ -6,12 +6,12 @@ const Orders = () => {
   const [orders, setOrders] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
+
   useEffect(() => {
     const fetchOrders = async () => {
       try {
         const res = await api.get("/order");
         setOrders(res.data);
-        console.log(orders)
       } catch (err) {
         console.error("Failed to fetch orders", err);
       } finally {
@@ -35,7 +35,7 @@ const Orders = () => {
           renderItem={({ item }) => (
             <View style={styles.card}>
               <Text style={styles.customer}>
-                Customer: {item.firstname} {item.lastname}
+                Customer: {item.first_name} {item.last_name}
               </Text>
               <Text>Item: {item.item_name} ({item.size})</Text>
               <Text>Quantity: {item.quantity}</Text>
