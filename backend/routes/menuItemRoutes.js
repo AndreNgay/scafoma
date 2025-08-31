@@ -3,6 +3,8 @@ import {
   getMenuItems,
   getMenuItemsByConcessionaire,
   addMenuItem,
+  updateMenuItem,
+  deleteMenuItem,
 } from "../controllers/menuItemController.js";
 import authMiddleware from "../middleware/authMiddleware.js";
 
@@ -14,7 +16,13 @@ router.get("/all", getMenuItems);
 // Get menu items for currently logged-in concessionaire
 router.get("/", authMiddleware, getMenuItemsByConcessionaire);
 
-// Add a menu item (with variations) for concessionaire
+// Add a menu item
 router.post("/", authMiddleware, addMenuItem);
+
+// Update a menu item
+router.put("/:id", authMiddleware, updateMenuItem);
+
+// Delete a menu item
+router.delete("/:id", authMiddleware, deleteMenuItem);
 
 export default router;

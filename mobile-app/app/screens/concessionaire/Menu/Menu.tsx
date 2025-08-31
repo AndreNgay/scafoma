@@ -1,6 +1,14 @@
-import React, { useEffect, useState } from "react";
-import { View, Text, FlatList, Image, ActivityIndicator, StyleSheet, TouchableOpacity } from "react-native";
-import { useNavigation } from "@react-navigation/native";
+import React, { useState, useCallback } from "react";
+import {
+  View,
+  Text,
+  FlatList,
+  Image,
+  ActivityIndicator,
+  StyleSheet,
+  TouchableOpacity,
+} from "react-native";
+import { useNavigation, useFocusEffect } from "@react-navigation/native";
 import api from "../../../libs/apiCall";
 
 type MenuItem = {
@@ -16,19 +24,24 @@ const Menu = () => {
   const [loading, setLoading] = useState(true);
   const navigation = useNavigation<any>();
 
-  useEffect(() => {
-    const fetchMenuItems = async () => {
-      try {
-        const res = await api.get(`/menu-item`);
-        setMenuItems(res.data.data);
-      } catch (error) {
-        console.error("Error fetching menu items:", error);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchMenuItems();
-  }, []);
+  const fetchMenuItems = async () => {
+    try {
+      setLoading(true); // show spinner while refreshing
+      const res = await api.get(`/menu-item`);
+      setMenuItems(res.data.data);
+    } catch (error) {
+      console.error("Error fetching menu items:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Refresh when screen is focused
+  useFocusEffect(
+    useCallback(() => {
+      fetchMenuItems();
+    }, [])
+  );
 
   if (loading) {
     return (
@@ -58,7 +71,10 @@ const Menu = () => {
           keyExtractor={(item) => item.id.toString()}
           contentContainerStyle={styles.list}
           renderItem={({ item }) => (
-            <View style={styles.card}>
+            <TouchableOpacity
+              style={styles.card}
+              onPress={() => navigation.navigate("EditMenu", { item })}
+            >
               {item.image_url ? (
                 <Image source={{ uri: item.image_url }} style={styles.image} />
               ) : (
@@ -70,7 +86,7 @@ const Menu = () => {
                 <Text style={styles.name}>{item.item_name}</Text>
                 <Text style={styles.price}>₱ {item.price}</Text>
               </View>
-            </View>
+            </TouchableOpacity>
           )}
         />
       )}

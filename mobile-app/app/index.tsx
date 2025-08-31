@@ -11,19 +11,34 @@ import Menu from "./screens/concessionaire/Menu/Menu";
 import Profile from "./screens/customer/Profile";
 import Orders from "./screens/concessionaire/Orders";
 import AddMenu from "./screens/concessionaire/Menu/AddMenu";
+import EditMenu from "./screens/concessionaire/Menu/EditMenu";
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
-
 const MenuStackNav = createNativeStackNavigator();
+
 function MenuStack() {
   return (
     <MenuStackNav.Navigator>
-      <MenuStackNav.Screen name="Menu" component={Menu} options={{ headerShown: false }} />
-      <MenuStackNav.Screen name="AddMenu" component={AddMenu} options={{ title: "Add Menu Item" }} />
+      <MenuStackNav.Screen
+        name="Menu"
+        component={Menu}
+        options={{ headerShown: false }}
+      />
+      <MenuStackNav.Screen
+        name="AddMenu"
+        component={AddMenu}
+        options={{ title: "Add Menu Item" }}
+      />
+      <MenuStackNav.Screen
+        name="EditMenu"
+        component={EditMenu}
+        options={{ title: "Edit Menu Item" }}
+      />
     </MenuStackNav.Navigator>
   );
 }
+
 
 function CustomerTabs() {
   return (
