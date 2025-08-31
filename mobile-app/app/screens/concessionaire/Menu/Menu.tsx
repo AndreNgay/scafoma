@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useMemo } from "react";
 import {
   View,
   Text,
@@ -7,26 +7,33 @@ import {
   ActivityIndicator,
   StyleSheet,
   TouchableOpacity,
+  TextInput,
 } from "react-native";
 import { useNavigation, useFocusEffect } from "@react-navigation/native";
+import { Picker } from "@react-native-picker/picker";
+
 import api from "../../../libs/apiCall";
 
 type MenuItem = {
   id: number;
   item_name: string;
   price: string;
+  category?: string;
   image_url?: string;
-  concession_name?: string;
 };
 
 const Menu = () => {
   const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState("");
+  const [sortOption, setSortOption] = useState("name");
+  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc");
+
   const navigation = useNavigation<any>();
 
   const fetchMenuItems = async () => {
     try {
-      setLoading(true); // show spinner while refreshing
+      setLoading(true);
       const res = await api.get(`/menu-item`);
       setMenuItems(res.data.data);
     } catch (error) {
@@ -36,12 +43,40 @@ const Menu = () => {
     }
   };
 
-  // Refresh when screen is focused
   useFocusEffect(
     useCallback(() => {
       fetchMenuItems();
     }, [])
   );
+
+  // 🔎 Search + ↕️ Sort
+  const processedItems = useMemo(() => {
+    let items = [...menuItems];
+
+    // Search
+    if (search.trim()) {
+      items = items.filter((item) =>
+        item.item_name.toLowerCase().includes(search.toLowerCase())
+      );
+    }
+
+    // Sort
+    items.sort((a, b) => {
+      let compareVal = 0;
+
+      if (sortOption === "name") {
+        compareVal = a.item_name.localeCompare(b.item_name);
+      } else if (sortOption === "price") {
+        compareVal = parseFloat(a.price) - parseFloat(b.price);
+      } else if (sortOption === "category") {
+        compareVal = (a.category || "").localeCompare(b.category || "");
+      }
+
+      return sortOrder === "asc" ? compareVal : -compareVal;
+    });
+
+    return items;
+  }, [menuItems, search, sortOption, sortOrder]);
 
   if (loading) {
     return (
@@ -53,7 +88,7 @@ const Menu = () => {
 
   return (
     <View style={{ flex: 1 }}>
-      {/* Add Menu Item Button */}
+      {/* ➕ Add Menu Item Button */}
       <TouchableOpacity
         style={styles.addButton}
         onPress={() => navigation.navigate("AddMenu")}
@@ -61,13 +96,44 @@ const Menu = () => {
         <Text style={styles.addButtonText}>+ Add Menu Item</Text>
       </TouchableOpacity>
 
-      {menuItems.length === 0 ? (
+      {/* 🔎 Search */}
+      <TextInput
+        style={styles.searchInput}
+        placeholder="Search menu..."
+        value={search}
+        onChangeText={setSearch}
+      />
+
+      {/* ⚙️ Sort Controls */}
+      <View style={styles.controls}>
+        <Picker
+          selectedValue={sortOption}
+          style={styles.picker}
+          onValueChange={(val) => setSortOption(val)}
+        >
+          <Picker.Item label="Sort by Name" value="name" />
+          <Picker.Item label="Sort by Price" value="price" />
+          <Picker.Item label="Sort by Category" value="category" />
+        </Picker>
+
+        <Picker
+          selectedValue={sortOrder}
+          style={styles.picker}
+          onValueChange={(val) => setSortOrder(val)}
+        >
+          <Picker.Item label="Ascending" value="asc" />
+          <Picker.Item label="Descending" value="desc" />
+        </Picker>
+      </View>
+
+      {/* 📋 List */}
+      {processedItems.length === 0 ? (
         <View style={styles.center}>
           <Text>No menu items found.</Text>
         </View>
       ) : (
         <FlatList
-          data={menuItems}
+          data={processedItems}
           keyExtractor={(item) => item.id.toString()}
           contentContainerStyle={styles.list}
           renderItem={({ item }) => (
@@ -85,6 +151,9 @@ const Menu = () => {
               <View style={styles.info}>
                 <Text style={styles.name}>{item.item_name}</Text>
                 <Text style={styles.price}>₱ {item.price}</Text>
+                {item.category && (
+                  <Text style={styles.category}>Category: {item.category}</Text>
+                )}
               </View>
             </TouchableOpacity>
           )}
@@ -133,10 +202,15 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
   price: {
-    marginTop: 4,
+    marginTop: 2,
     fontSize: 14,
     color: "darkred",
     fontWeight: "500",
+  },
+  category: {
+    fontSize: 13,
+    color: "#444",
+    marginTop: 2,
   },
   addButton: {
     backgroundColor: "darkred",
@@ -149,5 +223,24 @@ const styles = StyleSheet.create({
     color: "white",
     fontWeight: "600",
     fontSize: 16,
+  },
+  searchInput: {
+    marginHorizontal: 12,
+    marginBottom: 8,
+    padding: 10,
+    borderWidth: 1,
+    borderColor: "#ccc",
+    borderRadius: 8,
+    backgroundColor: "#fff",
+  },
+  controls: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginHorizontal: 12,
+    marginBottom: 10,
+  },
+  picker: {
+    flex: 1,
+    marginHorizontal: 4,
   },
 });
