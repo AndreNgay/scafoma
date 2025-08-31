@@ -53,6 +53,7 @@ CREATE TABLE IF NOT EXISTS tblmenuitem (
     concession_id INT NOT NULL,
     price NUMERIC(10,2) NOT NULL CHECK (price >= 0),
     image_url TEXT,
+    category VARCHAR(100),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 
