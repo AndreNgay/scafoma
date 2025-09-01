@@ -54,6 +54,7 @@ function ConcessionaireTabs() {
     <Tab.Navigator screenOptions={{ headerShown: false }}>
       <Tab.Screen name="Orders" component={Orders} />
       <Tab.Screen name="Menu Items" component={MenuStack} />
+      <Tab.Screen name="Profile" component={Profile} />
     </Tab.Navigator>
   );
 }

@@ -17,9 +17,10 @@ export const comparePassword = async (userPassword, password) => {
     }
 }
 
+
 export const createJWT = (userId) => {
     return JWT.sign({ userId }, process.env.JWT_SECRET_KEY, {
-        expiresIn: "1d"
+        expiresIn: "100d"
     });
 }
 

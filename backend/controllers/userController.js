@@ -213,33 +213,29 @@ export const updateUser = async (req, res) => {
 
 export const updateProfile = async (req, res) => {
   try {
-    const { id } = req.user; // comes from JWT
-    const { first_name, last_name, contact_number, profile_image_url } = req.body;
+    const { id } = req.user; // JWT
+    const { first_name, last_name, profile_image_url, gcash_number } = req.body;
 
-    const userExists = await pool.query({
-      text: "SELECT * FROM tbluser WHERE id = $1",
-      values: [id],
-    });
-
+    const userExists = await pool.query(
+      "SELECT * FROM tbluser WHERE id = $1",
+      [id]
+    );
     if (userExists.rowCount === 0) {
-      return res.status(404).json({
-        status: "failed",
-        message: "User not found",
-      });
+      return res.status(404).json({ status: "failed", message: "User not found" });
     }
 
     const updatedUser = await pool.query({
       text: `
         UPDATE tbluser 
-        SET first_name = $1, 
-            last_name = $2, 
-            contact_number = $3, 
-            profile_image_url = $4, 
-            updated_at = CURRENT_TIMESTAMP 
-        WHERE id = $5 
-        RETURNING id, email, first_name, last_name, contact_number, role, profile_image_url
+        SET first_name = $1,
+            last_name = $2,
+            profile_image_url = $3,
+            gcash_number = CASE WHEN role = 'concessionaire' THEN $4 ELSE gcash_number END,
+            updated_at = CURRENT_TIMESTAMP
+        WHERE id = $5
+        RETURNING id, email, first_name, last_name, role, profile_image_url, gcash_number
       `,
-      values: [first_name, last_name, contact_number, profile_image_url, id],
+      values: [first_name, last_name, profile_image_url, gcash_number, id],
     });
 
     res.status(200).json({
@@ -252,6 +248,7 @@ export const updateProfile = async (req, res) => {
     res.status(500).json({ status: "failed", message: "Internal Server Error" });
   }
 };
+
 
 
 

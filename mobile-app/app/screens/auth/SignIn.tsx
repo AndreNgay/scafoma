@@ -34,7 +34,7 @@ const SignIn: React.FC<Props> = ({ navigation }) => {
     formState: { errors },
   } = useForm<LoginForm>({
     resolver: zodResolver(LoginSchema),
-    defaultValues: { email: "", password: "" }, // ✅ prevent uncontrolled warnings
+    defaultValues: { email: "", password: "" }, 
   });
 
   const onSubmit = async (data: LoginForm) => {
