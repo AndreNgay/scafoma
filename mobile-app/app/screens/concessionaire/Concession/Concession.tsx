@@ -45,7 +45,15 @@ const Concession = () => {
     setSaving(true);
     try {
       const res = await api.put("/concession/me", concession);
-      setConcession(res.data.data);
+
+      // keep cafeteria_name & location if backend does not return them
+      setConcession({
+        ...concession,
+        ...res.data.data,
+        cafeteria_name: res.data.data.cafeteria_name || concession.cafeteria_name,
+        location: res.data.data.location || concession.location,
+      });
+
       Alert.alert("Success", "Concession updated successfully");
     } catch (err) {
       console.error("Error updating concession:", err);
@@ -54,6 +62,7 @@ const Concession = () => {
       setSaving(false);
     }
   };
+
 
   useEffect(() => {
     fetchConcession();
