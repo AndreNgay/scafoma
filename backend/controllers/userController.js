@@ -214,7 +214,7 @@ export const updateUser = async (req, res) => {
 export const updateProfile = async (req, res) => {
   try {
     const { id } = req.user; // JWT
-    const { first_name, last_name, profile_image_url, gcash_number } = req.body;
+    const { first_name, last_name, profile_image_url } = req.body;
 
     const userExists = await pool.query(
       "SELECT * FROM tbluser WHERE id = $1",
@@ -230,12 +230,11 @@ export const updateProfile = async (req, res) => {
         SET first_name = $1,
             last_name = $2,
             profile_image_url = $3,
-            gcash_number = CASE WHEN role = 'concessionaire' THEN $4 ELSE gcash_number END,
             updated_at = CURRENT_TIMESTAMP
         WHERE id = $5
-        RETURNING id, email, first_name, last_name, role, profile_image_url, gcash_number
+        RETURNING id, email, first_name, last_name, role, profile_image_url,
       `,
-      values: [first_name, last_name, profile_image_url, gcash_number, id],
+      values: [first_name, last_name, profile_image_url, id],
     });
 
     res.status(200).json({

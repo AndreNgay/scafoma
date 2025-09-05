@@ -1,6 +1,6 @@
 import { View, Text, FlatList, ActivityIndicator, StyleSheet } from "react-native";
 import React, { useEffect, useState } from "react";
-import api from "../../libs/apiCall";
+import api from "../../../libs/apiCall";
 
 const Orders = () => {
   const [orders, setOrders] = useState<any[]>([]);

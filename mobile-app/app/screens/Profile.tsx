@@ -10,8 +10,8 @@ import {
   Alert,
   Image,
 } from "react-native";
-import api from "../../libs/apiCall";
-import useStore from "../../store";
+import api from "../libs/apiCall";
+import useStore from "../store";
 import { z } from "zod";
 
 // ✅ Zod schemas
@@ -20,11 +20,6 @@ const profileSchema = z.object({
   last_name: z.string().min(1, "Last name is required"),
   email: z.string().email("Invalid email"),
   profile_image_url: z.string().url("Invalid image URL").optional().or(z.literal("")),
-  gcash_number: z
-    .string()
-    .regex(/^\d{11}$/, "GCash number must be 11 digits")
-    .optional()
-    .or(z.literal("")),
 });
 
 const passwordSchema = z.object({
@@ -46,7 +41,6 @@ const Profile = () => {
     last_name: "",
     email: "",
     profile_image_url: "",
-    gcash_number: "",
   });
 
   const [passwords, setPasswords] = useState({
@@ -87,7 +81,6 @@ const Profile = () => {
           last_name: u.last_name || "",
           email: u.email || "",
           profile_image_url: u.profile_image_url || "",
-          gcash_number: u.gcash_number || "",
         });
       } catch (error) {
         console.error("Error fetching user:", error);
@@ -219,18 +212,6 @@ const Profile = () => {
       <TextInput style={[styles.input, { backgroundColor: "#eee" }]} editable={false} value={profile.email} />
       {errors.email && <Text style={styles.error}>{errors.email}</Text>}
 
-      {user.role === "concessionaire" && (
-        <>
-          <Text style={styles.label}>GCash Number</Text>
-          <TextInput
-            style={styles.input}
-            keyboardType="numeric"
-            value={profile.gcash_number}
-            onChangeText={(t) => setProfile({ ...profile, gcash_number: t })}
-          />
-          {errors.gcash_number && <Text style={styles.error}>{errors.gcash_number}</Text>}
-        </>
-      )}
 
       <TouchableOpacity style={styles.button} onPress={handleUpdateProfile}>
         <Text style={styles.buttonText}>Save Profile</Text>

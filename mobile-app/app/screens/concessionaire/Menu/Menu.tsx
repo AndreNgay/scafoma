@@ -91,7 +91,7 @@ const Menu = () => {
       {/* ➕ Add Menu Item Button */}
       <TouchableOpacity
         style={styles.addButton}
-        onPress={() => navigation.navigate("AddMenu")}
+        onPress={() => navigation.navigate("Add Menu")}
       >
         <Text style={styles.addButtonText}>+ Add Menu Item</Text>
       </TouchableOpacity>
@@ -139,7 +139,7 @@ const Menu = () => {
           renderItem={({ item }) => (
             <TouchableOpacity
               style={styles.card}
-              onPress={() => navigation.navigate("EditMenu", { item })}
+              onPress={() => navigation.navigate("Edit Menu", { item })}
             >
               {item.image_url ? (
                 <Image source={{ uri: item.image_url }} style={styles.image} />

@@ -35,29 +35,6 @@ export const getConcessions = async (req, res) => {
   }
 };
 
-// Get concession by ID
-export const getConcessionById = async (req, res) => {
-  try {
-    const result = await pool.query(
-      `SELECT c.id, c.concession_name, 
-              u.first_name || ' ' || u.last_name AS concessionaire_name,
-              f.cafeteria_name, 
-              c.created_at, c.updated_at
-       FROM tblconcession c
-       JOIN tbluser u ON c.concessionaire_id = u.id
-       JOIN tblcafeteria f ON c.cafeteria_id = f.id
-       WHERE c.id = $1`,
-      [req.params.id]
-    );
-
-    if (result.rows.length === 0) {
-      return res.status(404).json({ message: "Concession not found" });
-    }
-    res.json(result.rows[0]);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-};
 
 // Create concession
 export const createConcession = async (req, res) => {
@@ -112,3 +89,76 @@ export const deleteConcession = async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 };
+
+// Get concession for logged-in concessionaire
+export const getConcessionById = async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT c.*, f.cafeteria_name, f.location
+       FROM tblconcession c
+       JOIN tblcafeteria f ON c.cafeteria_id = f.id
+       WHERE c.concessionaire_id = $1`,
+      [req.user.id]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ message: "Concession not found for this user" });
+    }
+
+    res.json({
+      status: "success",
+      data: result.rows[0],
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
+// concessionController.js
+
+// Update concession for logged-in concessionaire
+export const updateMyConcession = async (req, res) => {
+  const {
+    concession_name,
+    image_url,
+    gcash_payment_available,
+    oncounter_payment_available,
+    gcash_number,
+  } = req.body;
+
+  try {
+    const result = await pool.query(
+      `UPDATE tblconcession 
+       SET 
+         concession_name = $1,
+         image_url = $2,
+         gcash_payment_available = $3,
+         oncounter_payment_available = $4,
+         gcash_number = $5,
+         updated_at = CURRENT_TIMESTAMP
+       WHERE concessionaire_id = $6
+       RETURNING *`,
+      [
+        concession_name,
+        image_url,
+        gcash_payment_available,
+        oncounter_payment_available,
+        gcash_number,
+        req.user.id,
+      ]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ message: "Concession not found for this user" });
+    }
+
+    res.json({
+      status: "success",
+      message: "Concession updated successfully",
+      data: result.rows[0],
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
+

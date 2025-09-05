@@ -1,4 +1,6 @@
+-- =========================
 -- Users Table
+-- =========================
 CREATE TABLE IF NOT EXISTS tbluser (
     id SERIAL PRIMARY KEY,
     email VARCHAR(100) NOT NULL UNIQUE,
@@ -7,14 +9,15 @@ CREATE TABLE IF NOT EXISTS tbluser (
     password VARCHAR(255) NOT NULL,
     role VARCHAR(20) DEFAULT 'customer' CHECK (role IN ('customer', 'concessionaire', 'admin')),
     profile_image_url TEXT,
-    gcash_number VARCHAR(11) UNIQUE CHECK (gcash_number ~ '^[0-9]{11}$'),
-    email_verified BOOLEAN DEFAULT FALSE,  -- added email verified
-    profile_created BOOLEAN DEFAULT FALSE, -- added profile created
+    email_verified BOOLEAN DEFAULT FALSE,
+    profile_created BOOLEAN DEFAULT FALSE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+-- =========================
 -- Cafeteria Table
+-- =========================
 CREATE TABLE IF NOT EXISTS tblcafeteria (
     id SERIAL PRIMARY KEY,
     cafeteria_name VARCHAR(100) NOT NULL,
@@ -23,13 +26,19 @@ CREATE TABLE IF NOT EXISTS tblcafeteria (
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+-- =========================
 -- Concession Table
+-- =========================
 CREATE TABLE IF NOT EXISTS tblconcession (
     id SERIAL PRIMARY KEY,
     concession_name VARCHAR(100) NOT NULL,
     concessionaire_id INT NOT NULL,
     cafeteria_id INT NOT NULL,
     image_url TEXT,
+    -- status (open or not)
+    gcash_payment_available BOOLEAN DEFAULT FALSE,   -- ✅ gcash payment available
+    oncounter_payment_available BOOLEAN DEFAULT TRUE, -- ✅ on-counter payment available
+    gcash_number VARCHAR(11) CHECK (gcash_number ~ '^[0-9]{11}$'),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 
@@ -46,7 +55,9 @@ CREATE TABLE IF NOT EXISTS tblconcession (
         ON UPDATE CASCADE
 );
 
+-- =========================
 -- Menu Items Table
+-- =========================
 CREATE TABLE IF NOT EXISTS tblmenuitem (
     id SERIAL PRIMARY KEY,
     item_name VARCHAR(100) NOT NULL,
@@ -54,6 +65,7 @@ CREATE TABLE IF NOT EXISTS tblmenuitem (
     price NUMERIC(10,2) NOT NULL CHECK (price >= 0),
     image_url TEXT,
     category VARCHAR(100),
+    available BOOLEAN DEFAULT FALSE, -- ✅ availability (default not available)
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 
@@ -64,7 +76,9 @@ CREATE TABLE IF NOT EXISTS tblmenuitem (
         ON UPDATE CASCADE
 );
 
+-- =========================
 -- Item Variations Table
+-- =========================
 CREATE TABLE IF NOT EXISTS tblitemvariation (
     id SERIAL PRIMARY KEY,
     label VARCHAR(50) NOT NULL,
@@ -81,7 +95,9 @@ CREATE TABLE IF NOT EXISTS tblitemvariation (
         ON UPDATE CASCADE
 );
 
+-- =========================
 -- Orders Table
+-- =========================
 CREATE TABLE IF NOT EXISTS tblorder (
     id SERIAL PRIMARY KEY,
     customer_id INT NOT NULL,
@@ -121,3 +137,26 @@ CREATE TABLE IF NOT EXISTS tblorder (
         ON UPDATE CASCADE
 );
 
+-- =========================
+-- Feedbacks Table ✅
+-- =========================
+CREATE TABLE IF NOT EXISTS tblfeedback (
+    id SERIAL PRIMARY KEY,
+    customer_id INT NOT NULL,
+    menu_item_id INT NOT NULL,
+    rating INT NOT NULL CHECK (rating >= 1 AND rating <= 5),
+    comment TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT fk_feedback_customer
+        FOREIGN KEY (customer_id)
+        REFERENCES tbluser (id)
+        ON DELETE CASCADE
+        ON UPDATE CASCADE,
+
+    CONSTRAINT fk_feedback_menuitem
+        FOREIGN KEY (menu_item_id)
+        REFERENCES tblmenuitem (id)
+        ON DELETE CASCADE
+        ON UPDATE CASCADE
+);

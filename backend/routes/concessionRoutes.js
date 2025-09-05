@@ -1,27 +1,28 @@
+// concessionRoutes.js
 import express from "express";
 import {
   getConcessions,
   getConcessionById,
   createConcession,
   updateConcession,
-  deleteConcession
+  deleteConcession,
+  updateMyConcession,
 } from "../controllers/concessionController.js";
+import authMiddleware from "../middleware/authMiddleware.js";
 
 const router = express.Router();
 
-// Get all concessions
-router.get("/", getConcessions);
-
-// Get a single concession by ID
+// Public
+router.get("/all", getConcessions);
 router.get("/:id", getConcessionById);
 
-// Create a new concession
+// Protected
+router.get("/", authMiddleware, getConcessionById);
+router.put("/me", authMiddleware, updateMyConcession);
+
+// Create/Delete
 router.post("/", createConcession);
-
-// Update a concession
 router.put("/:id", updateConcession);
-
-// Delete a concession
 router.delete("/:id", deleteConcession);
 
 export default router;
