@@ -141,6 +141,7 @@ const Menu = () => {
               style={styles.card}
               onPress={() => navigation.navigate("Edit Menu", { item })}
             >
+              
               {item.image_url ? (
                 <Image source={{ uri: item.image_url }} style={styles.image} />
               ) : (

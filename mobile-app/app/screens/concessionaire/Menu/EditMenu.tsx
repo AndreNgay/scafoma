@@ -7,10 +7,20 @@ import {
   StyleSheet,
   Alert,
   ScrollView,
+  Image,
+  Switch,
 } from "react-native";
 import { useNavigation, useRoute } from "@react-navigation/native";
 import { Picker } from "@react-native-picker/picker";
+import { z } from "zod";
 import api from "../../../libs/apiCall";
+
+// ✅ Validation Schema
+const menuSchema = z.object({
+  item_name: z.string().min(2, "Item name must be at least 2 characters"),
+  price: z.string().regex(/^\d+(\.\d{1,2})?$/, "Enter a valid price"),
+  category: z.string().min(1, "Category is required"),
+});
 
 const EditMenu = () => {
   const route = useRoute<any>();
@@ -19,8 +29,12 @@ const EditMenu = () => {
 
   const [itemName, setItemName] = useState(item.item_name || "");
   const [price, setPrice] = useState(item.price?.toString() || "");
-  const [imageUrl, setImageUrl] = useState(item.image_url || "");
   const [category, setCategory] = useState(item.category || "Beverage");
+  const [availability, setAvailability] = useState(
+    item.availability ?? true
+  );
+  const [imageError, setImageError] = useState(false);
+  const [errors, setErrors] = useState<Record<string, string>>({});
 
   const [variationGroups, setVariationGroups] = useState<
     { label: string; variations: { name: string; price: string }[] }[]
@@ -68,22 +82,43 @@ const EditMenu = () => {
 
   // === Submit Update ===
   const handleUpdateMenu = async () => {
-    if (!itemName || !price) {
-      Alert.alert("Error", "Please fill in all required fields.");
+    setErrors({});
+    const validation = menuSchema.safeParse({
+      item_name: itemName,
+      price,
+      category,
+    });
+
+    if (!validation.success) {
+      const newErrors: Record<string, string> = {};
+      validation.error.issues.forEach((issue) => {
+        if (issue.path[0]) newErrors[issue.path[0] as string] = issue.message;
+      });
+      setErrors(newErrors);
       return;
     }
 
     try {
+      // ✅ Convert prices to numbers before sending
+      const formattedVariations = variationGroups.map((group) => ({
+        label: group.label,
+        variations: group.variations.map((v) => ({
+          name: v.name,
+          price: parseFloat(v.price) || 0,
+        })),
+      }));
+
       await api.put(`/menu-item/${item.id}`, {
         item_name: itemName,
-        price,
-        image_url: imageUrl || null,
+        price: parseFloat(price),
+        image_url: item.image_url || null, // keep existing image
         category,
-        variations: variationGroups,
+        availability,
+        variations: formattedVariations,
       });
 
       Alert.alert("Success", "Menu item updated successfully!", [
-        { text: "OK", onPress: () => navigation.goBack() },
+        { text: "OK" },
       ]);
     } catch (error) {
       console.error("Error updating menu item:", error);
@@ -92,13 +127,22 @@ const EditMenu = () => {
   };
 
   return (
-    <ScrollView style={styles.container}>
-      <Text style={styles.label}>Item Name *</Text>
-      <TextInput
-        style={styles.input}
-        value={itemName}
-        onChangeText={setItemName}
+    <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: 100 }}>
+      {/* Image Preview */}
+      <Image
+        source={{
+          uri:
+            !imageError && item.image_url
+              ? item.image_url
+              : "https://cdn-icons-png.flaticon.com/512/9417/9417083.png",
+        }}
+        style={styles.image}
+        onError={() => setImageError(true)}
       />
+
+      <Text style={styles.label}>Item Name *</Text>
+      <TextInput style={styles.input} value={itemName} onChangeText={setItemName} />
+      {errors.item_name && <Text style={styles.error}>{errors.item_name}</Text>}
 
       <Text style={styles.label}>Price *</Text>
       <TextInput
@@ -107,16 +151,10 @@ const EditMenu = () => {
         keyboardType="numeric"
         onChangeText={setPrice}
       />
+      {errors.price && <Text style={styles.error}>{errors.price}</Text>}
 
-      <Text style={styles.label}>Image URL</Text>
-      <TextInput
-        style={styles.input}
-        value={imageUrl}
-        onChangeText={setImageUrl}
-      />
-
-      {/* CATEGORY DROPDOWN */}
-      <Text style={styles.label}>Category</Text>
+      {/* Category */}
+      <Text style={styles.label}>Category *</Text>
       <View style={styles.pickerWrapper}>
         <Picker selectedValue={category} onValueChange={setCategory}>
           <Picker.Item label="Beverage" value="Beverage" />
@@ -124,6 +162,17 @@ const EditMenu = () => {
           <Picker.Item label="Meal" value="Meal" />
           <Picker.Item label="Dessert" value="Dessert" />
         </Picker>
+      </View>
+      {errors.category && <Text style={styles.error}>{errors.category}</Text>}
+
+      {/* Availability Toggle */}
+      <View style={styles.toggleRow}>
+        <Text style={styles.label}>Availability</Text>
+        <Switch
+          value={availability}
+          onValueChange={setAvailability}
+          trackColor={{ true: "darkred" }}
+        />
       </View>
 
       {/* Variations */}
@@ -187,44 +236,54 @@ const EditMenu = () => {
         <Text style={styles.buttonOutlineText}>+ Add Variation Group</Text>
       </TouchableOpacity>
 
-      <TouchableOpacity style={styles.button} onPress={handleUpdateMenu}>
-        <Text style={styles.buttonText}>Update Menu Item</Text>
-      </TouchableOpacity>
-      <TouchableOpacity
-        style={[styles.button, { backgroundColor: "gray" }]}
-        onPress={async () => {
+      {/* Update & Delete Buttons side by side */}
+      <View style={styles.buttonRow}>
+        <TouchableOpacity style={styles.button} onPress={handleUpdateMenu}>
+          <Text style={styles.buttonText}>Update</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[styles.button, { backgroundColor: "gray" }]}
+          onPress={async () => {
             Alert.alert("Confirm Delete", "Are you sure you want to delete this menu item?", [
-            { text: "Cancel", style: "cancel" },
-            {
+              { text: "Cancel", style: "cancel" },
+              {
                 text: "Delete",
                 style: "destructive",
                 onPress: async () => {
-                try {
+                  try {
                     await api.delete(`/menu-item/${item.id}`);
                     Alert.alert("Deleted", "Menu item deleted successfully!", [
-                    { text: "OK", onPress: () => navigation.goBack() },
+                      { text: "OK", onPress: () => navigation.goBack() },
                     ]);
-                } catch (error) {
+                  } catch (error) {
                     console.error("Error deleting menu item:", error);
                     Alert.alert("Error", "Failed to delete menu item. Try again.");
-                }
+                  }
                 },
-            },
+              },
             ]);
-        }}
+          }}
         >
-  <Text style={styles.buttonText}>Delete Menu Item</Text>
-</TouchableOpacity>
-
+          <Text style={styles.buttonText}>Delete</Text>
+        </TouchableOpacity>
+      </View>
     </ScrollView>
   );
 };
 
 export default EditMenu;
 
-// ✅ Reuse the same styles from AddMenu
 const styles = StyleSheet.create({
   container: { flex: 1, padding: 16, backgroundColor: "#fff" },
+  image: {
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    alignSelf: "center",
+    marginBottom: 16,
+    backgroundColor: "#eee",
+  },
   label: { marginTop: 12, fontSize: 14, fontWeight: "600" },
   input: {
     borderWidth: 1,
@@ -233,11 +292,18 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     marginTop: 6,
   },
+  error: { color: "red", fontSize: 12, marginTop: 4 },
   pickerWrapper: {
     borderWidth: 1,
     borderColor: "#ccc",
     borderRadius: 8,
     marginTop: 6,
+  },
+  toggleRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginTop: 16,
+    alignItems: "center",
   },
   groupBox: {
     borderWidth: 1,
@@ -286,12 +352,18 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   buttonOutlineText: { color: "darkred", fontWeight: "600", fontSize: 14 },
+  buttonRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginTop: 20,
+  },
   button: {
+    flex: 1,
     backgroundColor: "darkred",
     padding: 14,
     borderRadius: 8,
-    marginTop: 20,
     alignItems: "center",
+    marginHorizontal: 5,
   },
   buttonText: { color: "white", fontWeight: "600", fontSize: 16 },
 });

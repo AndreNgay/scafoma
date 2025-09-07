@@ -148,10 +148,10 @@ export const addMenuItem = async (req, res) => {
   }
 };
 
-// Update a menu item (with variations)
+// Update a menu item (with variations + availability)
 export const updateMenuItem = async (req, res) => {
   const { id } = req.params;
-  const { item_name, price, image_url, category, variations } = req.body;
+  const { item_name, price, image_url, category, variations, availability } = req.body;
   const concessionaireId = req.user.id;
 
   try {
@@ -170,11 +170,16 @@ export const updateMenuItem = async (req, res) => {
       });
     }
 
-    // Step 2: Update basic menu item fields
+    // Step 2: Update basic menu item fields (with availability)
     const updateQuery = `
       UPDATE tblmenuitem
-      SET item_name = $1, price = $2, image_url = $3, category = $4, updated_at = NOW()
-      WHERE id = $5
+      SET item_name = $1, 
+          price = $2, 
+          image_url = $3, 
+          category = $4, 
+          availability = COALESCE($5, availability), 
+          updated_at = NOW()
+      WHERE id = $6
       RETURNING *
     `;
     const updateResult = await pool.query(updateQuery, [
@@ -182,6 +187,7 @@ export const updateMenuItem = async (req, res) => {
       price,
       image_url,
       category,
+      availability, // can be true/false or undefined (keeps old value)
       id,
     ]);
     const updatedItem = updateResult.rows[0];
@@ -218,6 +224,7 @@ export const updateMenuItem = async (req, res) => {
     });
   }
 };
+
 
 // Delete a menu item
 export const deleteMenuItem = async (req, res) => {
