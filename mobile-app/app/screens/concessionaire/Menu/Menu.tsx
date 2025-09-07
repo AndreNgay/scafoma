@@ -20,6 +20,7 @@ type MenuItem = {
   price: string;
   category?: string;
   image_url?: string;
+  availability?: boolean; 
 };
 
 const Menu = () => {
@@ -28,6 +29,9 @@ const Menu = () => {
   const [search, setSearch] = useState("");
   const [sortOption, setSortOption] = useState("name");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc");
+  const [imageError, setImageError] = useState<Record<number, boolean>>({});
+  
+  
 
   const navigation = useNavigation<any>();
 
@@ -53,14 +57,12 @@ const Menu = () => {
   const processedItems = useMemo(() => {
     let items = [...menuItems];
 
-    // Search
     if (search.trim()) {
       items = items.filter((item) =>
         item.item_name.toLowerCase().includes(search.toLowerCase())
       );
     }
 
-    // Sort
     items.sort((a, b) => {
       let compareVal = 0;
 
@@ -70,6 +72,8 @@ const Menu = () => {
         compareVal = parseFloat(a.price) - parseFloat(b.price);
       } else if (sortOption === "category") {
         compareVal = (a.category || "").localeCompare(b.category || "");
+      } else if (sortOption === "availability") {
+        compareVal = (a.availability === b.availability) ? 0 : a.availability ? -1 : 1;
       }
 
       return sortOrder === "asc" ? compareVal : -compareVal;
@@ -88,7 +92,6 @@ const Menu = () => {
 
   return (
     <View style={{ flex: 1 }}>
-      {/* ➕ Add Menu Item Button */}
       <TouchableOpacity
         style={styles.addButton}
         onPress={() => navigation.navigate("Add Menu")}
@@ -96,7 +99,6 @@ const Menu = () => {
         <Text style={styles.addButtonText}>+ Add Menu Item</Text>
       </TouchableOpacity>
 
-      {/* 🔎 Search */}
       <TextInput
         style={styles.searchInput}
         placeholder="Search menu..."
@@ -104,29 +106,20 @@ const Menu = () => {
         onChangeText={setSearch}
       />
 
-      {/* ⚙️ Sort Controls */}
       <View style={styles.controls}>
-        <Picker
-          selectedValue={sortOption}
-          style={styles.picker}
-          onValueChange={(val) => setSortOption(val)}
-        >
+        <Picker selectedValue={sortOption} style={styles.picker} onValueChange={(val) => setSortOption(val)}>
           <Picker.Item label="Sort by Name" value="name" />
           <Picker.Item label="Sort by Price" value="price" />
           <Picker.Item label="Sort by Category" value="category" />
+          <Picker.Item label="Sort by Availability" value="availability" /> {/* ✅ */}
         </Picker>
 
-        <Picker
-          selectedValue={sortOrder}
-          style={styles.picker}
-          onValueChange={(val) => setSortOrder(val)}
-        >
+        <Picker selectedValue={sortOrder} style={styles.picker} onValueChange={(val) => setSortOrder(val)}>
           <Picker.Item label="Ascending" value="asc" />
           <Picker.Item label="Descending" value="desc" />
         </Picker>
       </View>
 
-      {/* 📋 List */}
       {processedItems.length === 0 ? (
         <View style={styles.center}>
           <Text>No menu items found.</Text>
@@ -141,20 +134,29 @@ const Menu = () => {
               style={styles.card}
               onPress={() => navigation.navigate("Edit Menu", { item })}
             >
-              
-              {item.image_url ? (
-                <Image source={{ uri: item.image_url }} style={styles.image} />
-              ) : (
-                <View style={[styles.image, styles.imagePlaceholder]}>
-                  <Text style={{ color: "#666" }}>No Image</Text>
-                </View>
-              )}
+              <Image
+                source={{
+                  uri:
+                    !imageError[item.id] && item.image_url
+                      ? item.image_url
+                      : "https://cdn-icons-png.flaticon.com/512/9417/9417083.png",
+                }}
+                style={styles.image}
+                onError={() =>
+                  setImageError((prev) => ({ ...prev, [item.id]: true }))
+                }
+              />
+
+
               <View style={styles.info}>
                 <Text style={styles.name}>{item.item_name}</Text>
                 <Text style={styles.price}>₱ {item.price}</Text>
                 {item.category && (
                   <Text style={styles.category}>Category: {item.category}</Text>
                 )}
+                <Text style={{ color: item.availability ? "green" : "red", marginTop: 2 }}>
+                  {item.availability ? "Available" : "Unavailable"}
+                </Text>
               </View>
             </TouchableOpacity>
           )}
