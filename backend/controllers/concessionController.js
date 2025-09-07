@@ -114,8 +114,6 @@ export const getConcessionById = async (req, res) => {
   }
 };
 
-// concessionController.js
-
 // Update concession for logged-in concessionaire
 export const updateMyConcession = async (req, res) => {
   const {
@@ -124,6 +122,7 @@ export const updateMyConcession = async (req, res) => {
     gcash_payment_available,
     oncounter_payment_available,
     gcash_number,
+    status
   } = req.body;
 
   try {
@@ -135,8 +134,9 @@ export const updateMyConcession = async (req, res) => {
          gcash_payment_available = $3,
          oncounter_payment_available = $4,
          gcash_number = $5,
+         status = $6,
          updated_at = CURRENT_TIMESTAMP
-       WHERE concessionaire_id = $6
+       WHERE concessionaire_id = $7
        RETURNING *`,
       [
         concession_name,
@@ -144,6 +144,7 @@ export const updateMyConcession = async (req, res) => {
         gcash_payment_available,
         oncounter_payment_available,
         gcash_number,
+        status,
         req.user.id,
       ]
     );
@@ -158,7 +159,9 @@ export const updateMyConcession = async (req, res) => {
       data: result.rows[0],
     });
   } catch (err) {
+    console.error("Error updating concession:", err);
     res.status(500).json({ error: err.message });
   }
 };
+
 

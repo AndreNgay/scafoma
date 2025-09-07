@@ -35,9 +35,11 @@ CREATE TABLE IF NOT EXISTS tblconcession (
     concessionaire_id INT NOT NULL,
     cafeteria_id INT NOT NULL,
     image_url TEXT,
-    -- status (open or not)
-    gcash_payment_available BOOLEAN DEFAULT FALSE,   -- ✅ gcash payment available
-    oncounter_payment_available BOOLEAN DEFAULT TRUE, -- ✅ on-counter payment available
+
+    status VARCHAR(20) DEFAULT 'open' CHECK (status IN ('open', 'closed')), -- ✅ NEW status field
+
+    gcash_payment_available BOOLEAN DEFAULT FALSE,
+    oncounter_payment_available BOOLEAN DEFAULT TRUE,
     gcash_number VARCHAR(11) CHECK (gcash_number ~ '^[0-9]{11}$'),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -54,6 +56,7 @@ CREATE TABLE IF NOT EXISTS tblconcession (
         ON DELETE CASCADE
         ON UPDATE CASCADE
 );
+
 
 -- =========================
 -- Menu Items Table

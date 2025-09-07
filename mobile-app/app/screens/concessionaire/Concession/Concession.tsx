@@ -12,6 +12,7 @@ import {
   Alert,
 } from "react-native";
 import api from "../../../libs/apiCall";
+import { z } from "zod";
 
 type Concession = {
   id: number;
@@ -22,17 +23,42 @@ type Concession = {
   gcash_payment_available: boolean;
   oncounter_payment_available: boolean;
   gcash_number?: string;
+  status: "open" | "closed";
 };
+
+const concessionSchema = z
+  .object({
+    concession_name: z
+      .string()
+      .min(2, "Concession name must be at least 2 characters"),
+    image_url: z.string().url("Invalid image URL").optional().or(z.literal("")),
+    gcash_payment_available: z.boolean(),
+    gcash_number: z.string().optional().or(z.literal("")),
+  })
+  .refine(
+    (data) =>
+      !data.gcash_payment_available ||
+      (data.gcash_number && /^[0-9]{11}$/.test(data.gcash_number)),
+    {
+      message: "GCash number must be 11 digits.",
+      path: ["gcash_number"],
+    }
+  );
 
 const Concession = () => {
   const [concession, setConcession] = useState<Concession | null>(null);
+  const [original, setOriginal] = useState<Concession | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+
+  // ✅ New: Track validation errors per field
+  const [errors, setErrors] = useState<Record<string, string>>({});
 
   const fetchConcession = async () => {
     try {
       const res = await api.get("/concession");
       setConcession(res.data.data);
+      setOriginal(res.data.data); // Keep copy for comparison
     } catch (error) {
       console.error("Error fetching concession:", error);
     } finally {
@@ -42,17 +68,36 @@ const Concession = () => {
 
   const handleSave = async () => {
     if (!concession) return;
+
+    const validation = concessionSchema.safeParse(concession);
+
+    if (!validation.success) {
+      // ✅ Map errors to state
+      const fieldErrors: Record<string, string> = {};
+      validation.error.issues.forEach((issue) => {
+        if (issue.path[0]) {
+          fieldErrors[issue.path[0].toString()] = issue.message;
+        }
+      });
+      setErrors(fieldErrors);
+      return;
+    }
+
+    // ✅ Clear errors if valid
+    setErrors({});
     setSaving(true);
+
     try {
       const res = await api.put("/concession/me", concession);
 
-      // keep cafeteria_name & location if backend does not return them
       setConcession({
         ...concession,
         ...res.data.data,
-        cafeteria_name: res.data.data.cafeteria_name || concession.cafeteria_name,
+        cafeteria_name:
+          res.data.data.cafeteria_name || concession.cafeteria_name,
         location: res.data.data.location || concession.location,
       });
+      setOriginal(res.data.data);
 
       Alert.alert("Success", "Concession updated successfully");
     } catch (err) {
@@ -63,6 +108,32 @@ const Concession = () => {
     }
   };
 
+  const handleToggleChange = async (field: keyof Concession, value: any) => {
+    if (!concession) return;
+
+    const updated = { ...concession, [field]: value };
+    setConcession(updated);
+
+    try {
+      const res = await api.put("/concession/me", updated);
+
+      setConcession((prev) =>
+        prev ? { ...prev, ...res.data.data } : res.data.data
+      );
+
+      Alert.alert("Success", `Updated successfully.`);
+    } catch (err) {
+      console.error("Error auto-saving toggle:", err);
+      setConcession(concession);
+      Alert.alert("Error", `Failed to update.`);
+    }
+  };
+
+  const isChanged =
+    concession &&
+    original &&
+    (concession.concession_name !== original.concession_name ||
+      concession.gcash_number !== original.gcash_number);
 
   useEffect(() => {
     fetchConcession();
@@ -86,19 +157,15 @@ const Concession = () => {
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
-      {/* Image */}
-      {concession.image_url ? (
-        <Image source={{ uri: concession.image_url }} style={styles.image} />
-      ) : (
-        <Image
-          source={{
-            uri: "https://static.thenounproject.com/png/3985543-200.png",
-          }}
-          style={styles.image}
-        />
-      )}
+      <Image
+        source={{
+          uri:
+            concession.image_url ||
+            "https://static.thenounproject.com/png/3985543-200.png",
+        }}
+        style={styles.image}
+      />
 
-      {/* Editable Info */}
       <View style={styles.card}>
         <Text style={styles.label}>Concession Name</Text>
         <TextInput
@@ -108,16 +175,10 @@ const Concession = () => {
             setConcession({ ...concession, concession_name: text })
           }
         />
-
-        <Text style={styles.label}>Image URL</Text>
-        <TextInput
-          style={styles.input}
-          value={concession.image_url || ""}
-          placeholder="https://example.com/myimage.jpg"
-          onChangeText={(text) =>
-            setConcession({ ...concession, image_url: text })
-          }
-        />
+        {/* ✅ Error below field */}
+        {errors.concession_name && (
+          <Text style={styles.error}>{errors.concession_name}</Text>
+        )}
 
         <Text style={styles.label}>Cafeteria</Text>
         <TextInput
@@ -133,25 +194,38 @@ const Concession = () => {
           editable={false}
         />
 
-        {/* Toggles */}
         <View style={styles.toggleRow}>
-          <Text style={styles.toggleLabel}>GCash Payment</Text>
+          <Text style={styles.toggleLabel}>
+            Status: {concession.status === "open" ? "Open" : "Closed"}
+          </Text>
+          <Switch
+            value={concession.status === "open"}
+            onValueChange={(val) =>
+              handleToggleChange("status", val ? "open" : "closed")
+            }
+            trackColor={{ true: "darkred" }}
+            thumbColor={concession.status === "open" ? "#fff" : "#f4f3f4"}
+          />
+        </View>
+
+        <Text style={[styles.label, { marginTop: 16 }]}>Payment Methods</Text>
+        <View style={styles.toggleRow}>
+          <Text style={styles.toggleLabel}>GCash</Text>
           <Switch
             value={concession.gcash_payment_available}
             onValueChange={(val) =>
-              setConcession({ ...concession, gcash_payment_available: val })
+              handleToggleChange("gcash_payment_available", val)
             }
             trackColor={{ true: "darkred" }}
             thumbColor={concession.gcash_payment_available ? "#fff" : "#f4f3f4"}
           />
         </View>
-
         <View style={styles.toggleRow}>
-          <Text style={styles.toggleLabel}>On-Counter Payment</Text>
+          <Text style={styles.toggleLabel}>On-Counter</Text>
           <Switch
             value={concession.oncounter_payment_available}
             onValueChange={(val) =>
-              setConcession({ ...concession, oncounter_payment_available: val })
+              handleToggleChange("oncounter_payment_available", val)
             }
             trackColor={{ true: "darkred" }}
             thumbColor={
@@ -162,20 +236,34 @@ const Concession = () => {
 
         <Text style={styles.label}>GCash Number</Text>
         <TextInput
-          style={styles.input}
+          style={[
+            styles.input,
+            !concession.gcash_payment_available && {
+              backgroundColor: "#f0f0f0",
+              color: "#888",
+            },
+          ]}
           value={concession.gcash_number || ""}
           placeholder="09XXXXXXXXX"
+          editable={concession.gcash_payment_available}
           onChangeText={(text) =>
             setConcession({ ...concession, gcash_number: text })
           }
+          keyboardType="numeric"
         />
+        {/* ✅ Error below GCash number */}
+        {errors.gcash_number && (
+          <Text style={styles.error}>{errors.gcash_number}</Text>
+        )}
 
-        <Button
-          title={saving ? "Saving..." : "Save Changes"}
-          color="darkred"
-          onPress={handleSave}
-          disabled={saving}
-        />
+        <View style={{ marginTop: 20 }}>
+          <Button
+            title={saving ? "Saving..." : "Save Changes"}
+            color="darkred"
+            onPress={handleSave}
+            disabled={saving || !isChanged}
+          />
+        </View>
       </View>
     </ScrollView>
   );
@@ -229,5 +317,11 @@ const styles = StyleSheet.create({
   toggleLabel: {
     fontSize: 15,
     color: "#444",
+  },
+  // ✅ Style for errors
+  error: {
+    color: "red",
+    fontSize: 12,
+    marginTop: 4,
   },
 });
