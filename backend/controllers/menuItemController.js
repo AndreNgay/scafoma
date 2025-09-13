@@ -1,4 +1,8 @@
 import { pool } from "../libs/database.js";
+import multer from "multer";
+import path from "path";
+import fs from "fs";
+
 
 // Get all menu items (admin)
 export const getMenuItems = async (req, res) => {
@@ -18,7 +22,8 @@ export const getMenuItems = async (req, res) => {
   }
 };
 
-// Get menu items by logged-in concessionaire (with variations)
+
+
 export const getMenuItemsByConcessionaire = async (req, res) => {
   const concessionaireId = req.user.id;
 
@@ -32,41 +37,23 @@ export const getMenuItemsByConcessionaire = async (req, res) => {
     `;
     const result = await pool.query(query, [concessionaireId]);
 
-    // Fetch variations for all items in one query
-    const itemIds = result.rows.map((r) => r.id);
-    let variationsMap = {};
-
-    if (itemIds.length > 0) {
-      const vQuery = `
-        SELECT id, label, variation_name, additional_price, menu_item_id
-        FROM tblitemvariation
-        WHERE menu_item_id = ANY($1::int[])
-      `;
-      const vResult = await pool.query(vQuery, [itemIds]);
-
-      // Group variations by menu_item_id & label
-      variationsMap = vResult.rows.reduce((acc, v) => {
-        if (!acc[v.menu_item_id]) acc[v.menu_item_id] = {};
-        if (!acc[v.menu_item_id][v.label]) acc[v.menu_item_id][v.label] = [];
-
-        acc[v.menu_item_id][v.label].push({
-          name: v.variation_name,
-          price: v.additional_price,
-        });
-
-        return acc;
-      }, {});
-    }
-
-    // Attach variations grouped by label
+    // Convert image BYTEA → base64 string
     const menuItems = result.rows.map((item) => {
-      const groupedVariations = variationsMap[item.id] || {};
-      const formattedGroups = Object.keys(groupedVariations).map((label) => ({
-        label,
-        variations: groupedVariations[label],
-      }));
+      let image_url = null;
+      if (item.image) {
+        const base64 = Buffer.from(item.image).toString("base64");
+        image_url = `data:image/jpeg;base64,${base64}`;
+      }
 
-      return { ...item, variations: formattedGroups };
+      return {
+        id: item.id,
+        item_name: item.item_name,
+        price: item.price,
+        category: item.category,
+        availability: item.available,
+        concession_name: item.concession_name,
+        image_url, // ✅ frontend will display this
+      };
     });
 
     res.status(200).json({
@@ -81,10 +68,27 @@ export const getMenuItemsByConcessionaire = async (req, res) => {
 };
 
 
-// Add new menu item + variations
+
+
+// configure multer
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    const uploadPath = "uploads/menu";
+    if (!fs.existsSync(uploadPath)) {
+      fs.mkdirSync(uploadPath, { recursive: true });
+    }
+    cb(null, uploadPath);
+  },
+  filename: (req, file, cb) => {
+    cb(null, Date.now() + path.extname(file.originalname));
+  },
+});
+export const upload = multer({ storage });
+
 export const addMenuItem = async (req, res) => {
   const concessionaireId = req.user.id;
-  const { item_name, price, image_url, category, variations } = req.body;
+  const { item_name, price, category } = req.body;
+  let variations = [];
 
   if (!item_name || !price || !category) {
     return res
@@ -92,12 +96,20 @@ export const addMenuItem = async (req, res) => {
       .json({ status: "failed", message: "Missing required fields" });
   }
 
-  const client = await pool.connect();
+  if (req.body.variations) {
+    try {
+      variations = JSON.parse(req.body.variations);
+    } catch (err) {
+      return res.status(400).json({ status: "failed", message: "Invalid variations JSON" });
+    }
+  }
 
+  const image_url = req.file ? `/uploads/menu/${req.file.filename}` : null;
+
+  const client = await pool.connect();
   try {
     await client.query("BEGIN");
 
-    // Find concession_id from concessionaire_id
     const concessionResult = await client.query(
       `SELECT id FROM tblconcession WHERE concessionaire_id = $1 LIMIT 1`,
       [concessionaireId]
@@ -109,21 +121,20 @@ export const addMenuItem = async (req, res) => {
 
     const concessionId = concessionResult.rows[0].id;
 
-    // Insert into tblmenuitem
+    const imageData = req.file ? fs.readFileSync(req.file.path) : null;
+
     const insertMenu = await client.query(
-      `INSERT INTO tblmenuitem (item_name, concession_id, price, image_url, category) 
-       VALUES ($1, $2, $3, $4, $5) RETURNING id`,
-      [item_name, concessionId, price, image_url, category]
+      `INSERT INTO tblmenuitem (item_name, concession_id, price, image, category) 
+      VALUES ($1, $2, $3, $4, $5) RETURNING id`,
+      [item_name, concessionId, price, imageData, category]
     );
 
     const menuItemId = insertMenu.rows[0].id;
 
-    // Insert variations (if any)
-    if (variations && variations.length > 0) {
+    if (variations.length > 0) {
       for (const group of variations) {
         for (const v of group.variations) {
-          if (!v.name) continue; // skip empty variation rows
-
+          if (!v.name) continue;
           await client.query(
             `INSERT INTO tblitemvariation (label, variation_name, additional_price, menu_item_id)
              VALUES ($1, $2, $3, $4)`,
@@ -147,6 +158,7 @@ export const addMenuItem = async (req, res) => {
     client.release();
   }
 };
+
 
 // Update a menu item (with variations + availability)
 export const updateMenuItem = async (req, res) => {

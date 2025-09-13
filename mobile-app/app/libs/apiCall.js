@@ -3,7 +3,7 @@ import axios from "axios";
 import useStore from "../store";
 
 const api = axios.create({
-  baseURL: "http://192.168.42.185:5000/api-v1", // adjust to your backend
+  baseURL: "http://192.168.42.171:5000/api-v1", // adjust to your backend
 });
 
 // Set token automatically from store

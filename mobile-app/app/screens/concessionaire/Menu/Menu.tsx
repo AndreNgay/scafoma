@@ -52,6 +52,7 @@ const Menu = () => {
       fetchMenuItems();
     }, [])
   );
+  const [categoryFilter, setCategoryFilter] = useState("all");
 
   // 🔎 Search + ↕️ Sort
   const processedItems = useMemo(() => {
@@ -62,10 +63,12 @@ const Menu = () => {
         item.item_name.toLowerCase().includes(search.toLowerCase())
       );
     }
+      if (categoryFilter !== "all") {
+    items = items.filter((item) => item.category === categoryFilter);
+  }
 
     items.sort((a, b) => {
       let compareVal = 0;
-
       if (sortOption === "name") {
         compareVal = a.item_name.localeCompare(b.item_name);
       } else if (sortOption === "price") {
@@ -73,14 +76,14 @@ const Menu = () => {
       } else if (sortOption === "category") {
         compareVal = (a.category || "").localeCompare(b.category || "");
       } else if (sortOption === "availability") {
-        compareVal = (a.availability === b.availability) ? 0 : a.availability ? -1 : 1;
+        compareVal =
+          a.availability === b.availability ? 0 : a.availability ? -1 : 1;
       }
-
       return sortOrder === "asc" ? compareVal : -compareVal;
     });
 
     return items;
-  }, [menuItems, search, sortOption, sortOrder]);
+  }, [menuItems, search, categoryFilter, sortOption, sortOrder]);
 
   if (loading) {
     return (
@@ -106,19 +109,43 @@ const Menu = () => {
         onChangeText={setSearch}
       />
 
-      <View style={styles.controls}>
-        <Picker selectedValue={sortOption} style={styles.picker} onValueChange={(val) => setSortOption(val)}>
-          <Picker.Item label="Sort by Name" value="name" />
-          <Picker.Item label="Sort by Price" value="price" />
-          <Picker.Item label="Sort by Category" value="category" />
-          <Picker.Item label="Sort by Availability" value="availability" /> {/* ✅ */}
-        </Picker>
+<View style={styles.controls}>
+  <Picker
+    selectedValue={sortOption}
+    style={styles.picker}
+    onValueChange={(val) => setSortOption(val)}
+  >
+    <Picker.Item label="Sort by Name" value="name" />
+    <Picker.Item label="Sort by Price" value="price" />
+    <Picker.Item label="Sort by Category" value="category" />
+    <Picker.Item label="Sort by Availability" value="availability" />
+  </Picker>
 
-        <Picker selectedValue={sortOrder} style={styles.picker} onValueChange={(val) => setSortOrder(val)}>
-          <Picker.Item label="Ascending" value="asc" />
-          <Picker.Item label="Descending" value="desc" />
-        </Picker>
-      </View>
+  <Picker
+    selectedValue={sortOrder}
+    style={styles.picker}
+    onValueChange={(val) => setSortOrder(val)}
+  >
+    <Picker.Item label="Ascending" value="asc" />
+    <Picker.Item label="Descending" value="desc" />
+  </Picker>
+</View>
+
+{/* 🎯 Category Filter */}
+<View style={styles.controls}>
+  <Picker
+    selectedValue={categoryFilter}
+    style={styles.picker}
+    onValueChange={(val) => setCategoryFilter(val)}
+  >
+    <Picker.Item label="All Categories" value="all" />
+    <Picker.Item label="Drinks" value="Drinks" />
+    <Picker.Item label="Snacks" value="Snacks" />
+    <Picker.Item label="Meals" value="Meals" />
+    <Picker.Item label="Desserts" value="Desserts" />
+  </Picker>
+</View>
+
 
       {processedItems.length === 0 ? (
         <View style={styles.center}>
