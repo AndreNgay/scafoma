@@ -1,6 +1,11 @@
 import { pool } from "../libs/database.js";
 
-// Get all concessions
+const formatImage = (buffer) => {
+  if (!buffer) return null;
+  const base64 = buffer.toString("base64");
+  return `data:image/jpeg;base64,${base64}`;
+};
+
 export const getConcessions = async (req, res) => {
   try {
     const concessions = await pool.query(`
@@ -90,7 +95,6 @@ export const deleteConcession = async (req, res) => {
   }
 };
 
-// Get concession for logged-in concessionaire
 export const getConcessionById = async (req, res) => {
   try {
     const result = await pool.query(
@@ -105,42 +109,51 @@ export const getConcessionById = async (req, res) => {
       return res.status(404).json({ message: "Concession not found for this user" });
     }
 
+    const concession = result.rows[0];
+    concession.image_url = formatImage(concession.image); // ✅ convert BYTEA → base64
+    delete concession.image; // hide raw buffer
+
     res.json({
       status: "success",
-      data: result.rows[0],
+      data: concession,
     });
   } catch (err) {
+    console.error("Error fetching concession:", err);
     res.status(500).json({ error: err.message });
   }
 };
 
-// Update concession for logged-in concessionaire
+
 export const updateMyConcession = async (req, res) => {
   const {
     concession_name,
-    image_url,
     gcash_payment_available,
     oncounter_payment_available,
     gcash_number,
-    status
+    status,
   } = req.body;
 
   try {
-    const result = await pool.query(
+    let imageBuffer = null;
+    if (req.file) {
+      imageBuffer = req.file.buffer;
+    }
+
+    // Update concession first
+    await pool.query(
       `UPDATE tblconcession 
        SET 
          concession_name = $1,
-         image_url = $2,
+         image = COALESCE($2, image),
          gcash_payment_available = $3,
          oncounter_payment_available = $4,
          gcash_number = $5,
          status = $6,
          updated_at = CURRENT_TIMESTAMP
-       WHERE concessionaire_id = $7
-       RETURNING *`,
+       WHERE concessionaire_id = $7`,
       [
         concession_name,
-        image_url,
+        imageBuffer,
         gcash_payment_available,
         oncounter_payment_available,
         gcash_number,
@@ -149,19 +162,32 @@ export const updateMyConcession = async (req, res) => {
       ]
     );
 
+    // Fetch updated concession with cafeteria details
+    const result = await pool.query(
+      `SELECT c.*, f.cafeteria_name, f.location
+       FROM tblconcession c
+       JOIN tblcafeteria f ON c.cafeteria_id = f.id
+       WHERE c.concessionaire_id = $1`,
+      [req.user.id]
+    );
+
     if (result.rows.length === 0) {
       return res.status(404).json({ message: "Concession not found for this user" });
     }
 
+    const concession = result.rows[0];
+    concession.image_url = concession.image
+      ? `data:image/jpeg;base64,${concession.image.toString("base64")}`
+      : null;
+    delete concession.image;
+
     res.json({
       status: "success",
       message: "Concession updated successfully",
-      data: result.rows[0],
+      data: concession,
     });
   } catch (err) {
     console.error("Error updating concession:", err);
     res.status(500).json({ error: err.message });
   }
 };
-
-

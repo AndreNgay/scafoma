@@ -8,7 +8,7 @@ CREATE TABLE IF NOT EXISTS tbluser (
     last_name VARCHAR(50),
     password VARCHAR(255) NOT NULL,
     role VARCHAR(20) DEFAULT 'customer' CHECK (role IN ('customer', 'concessionaire', 'admin')),
-    profile_image_url TEXT,
+    profile_image_url BYTEA,
     email_verified BOOLEAN DEFAULT FALSE,
     profile_created BOOLEAN DEFAULT FALSE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -34,7 +34,7 @@ CREATE TABLE IF NOT EXISTS tblconcession (
     concession_name VARCHAR(100) NOT NULL,
     concessionaire_id INT NOT NULL,
     cafeteria_id INT NOT NULL,
-    image_url TEXT,
+    image BYTEA,
 
     status VARCHAR(20) DEFAULT 'open' CHECK (status IN ('open', 'closed')), -- ✅ NEW status field
 

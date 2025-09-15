@@ -9,6 +9,10 @@ import {
   updateMyConcession,
 } from "../controllers/concessionController.js";
 import authMiddleware from "../middleware/authMiddleware.js";
+import multer from "multer";
+
+const storage = multer.memoryStorage();
+export const upload = multer({ storage });
 
 const router = express.Router();
 
@@ -18,7 +22,7 @@ router.get("/:id", getConcessionById);
 
 // Protected
 router.get("/", authMiddleware, getConcessionById);
-router.put("/me", authMiddleware, updateMyConcession);
+router.put("/me", authMiddleware, upload.single("image"), updateMyConcession);
 
 // Create/Delete
 router.post("/", createConcession);
