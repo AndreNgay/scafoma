@@ -90,23 +90,29 @@ export const getUser = async (req, res) => {
   try {
     const { id } = req.user;
 
-    const result = await pool.query(
-      "SELECT * FROM tbluser WHERE id = $1",
-      [id]
-    );
+    const result = await pool.query("SELECT * FROM tbluser WHERE id = $1", [id]);
 
     if (result.rows.length === 0) {
       return res.status(404).json({ message: "User not found" });
     }
 
-    res.status(200).json({
-      user: result.rows[0],  // <-- return single object, not array
-    });
+    const user = result.rows[0];
+
+    // 🔥 Convert binary to Base64 string for frontend
+    if (user.profile_image) {
+      user.profile_image_url = `data:image/jpeg;base64,${user.profile_image.toString("base64")}`;
+    } else {
+      user.profile_image_url = "";
+    }
+    delete user.profile_image;
+
+    res.status(200).json({ user });
   } catch (error) {
     console.error("Error fetching user:", error);
     res.status(500).json({ message: "Server error" });
   }
 };
+
 
 
 export const getAllUsers = async (req, res) => {
@@ -214,39 +220,49 @@ export const updateUser = async (req, res) => {
 export const updateProfile = async (req, res) => {
   try {
     const { id } = req.user; // JWT
-    const { first_name, last_name, profile_image_url } = req.body;
+    const { first_name, last_name } = req.body;
+    let imageBuffer = null;
 
-    const userExists = await pool.query(
-      "SELECT * FROM tbluser WHERE id = $1",
-      [id]
-    );
+    if (req.file) {
+      imageBuffer = req.file.buffer;
+    }
+
+    const userExists = await pool.query("SELECT * FROM tbluser WHERE id = $1", [id]);
     if (userExists.rowCount === 0) {
       return res.status(404).json({ status: "failed", message: "User not found" });
     }
 
-    const updatedUser = await pool.query({
-      text: `
-        UPDATE tbluser 
-        SET first_name = $1,
-            last_name = $2,
-            profile_image_url = $3,
-            updated_at = CURRENT_TIMESTAMP
-        WHERE id = $5
-        RETURNING id, email, first_name, last_name, role, profile_image_url,
-      `,
-      values: [first_name, last_name, profile_image_url, id],
-    });
+    const updatedUser = await pool.query(
+      `UPDATE tbluser
+       SET first_name = $1,
+           last_name = $2,
+           profile_image = COALESCE($3, profile_image),
+           updated_at = CURRENT_TIMESTAMP
+       WHERE id = $4
+       RETURNING id, email, first_name, last_name, role, profile_image`,
+      [first_name, last_name, imageBuffer, id]
+    );
+
+    const user = updatedUser.rows[0];
+    if (user.profile_image) {
+      user.profile_image_url = `data:image/jpeg;base64,${user.profile_image.toString("base64")}`;
+    }
+    else {
+      user.profile_image_url = null;
+    }
+    delete user.profile_image;
 
     res.status(200).json({
       status: "success",
       message: "Profile updated successfully",
-      user: updatedUser.rows[0],
+      user,
     });
   } catch (error) {
     console.error("Error updating profile:", error);
     res.status(500).json({ status: "failed", message: "Internal Server Error" });
   }
 };
+
 
 
 

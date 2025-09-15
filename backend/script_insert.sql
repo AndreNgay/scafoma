@@ -1,5 +1,5 @@
 -- Users
-INSERT INTO tbluser (email, first_name, last_name, password, role, email_verified, profile_created, profile_image_url)
+INSERT INTO tbluser (email, first_name, last_name, password, role, email_verified, profile_created, profile_image)
 VALUES 
 ('admin@scafoma.com', 'System', 'Admin', 'hashed_admin_pw', 'admin', TRUE, TRUE, decode('adminimg', 'escape')),
 ('john.cust@example.com', 'John', 'Doe', 'hashed_pw1', 'customer', TRUE, TRUE, decode('johnimg', 'escape')),

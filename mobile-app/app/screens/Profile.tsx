@@ -13,6 +13,9 @@ import {
 import api from "../libs/apiCall";
 import useStore from "../store";
 import { z } from "zod";
+import * as ImagePicker from "expo-image-picker";
+
+
 
 // ✅ Zod schemas
 const profileSchema = z.object({
@@ -62,6 +65,19 @@ const Profile = () => {
       },
     ]);
   };
+    const pickImage = async () => {
+    let result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.7,
+    });
+
+    if (!result.canceled) {
+      const asset = result.assets[0];
+      setProfile({ ...profile, profile_image_url: asset.uri }); // local preview
+    }
+  };
 
 
   const token = user?.token;
@@ -80,8 +96,11 @@ const Profile = () => {
           first_name: u.first_name || "",
           last_name: u.last_name || "",
           email: u.email || "",
-          profile_image_url: u.profile_image_url || "",
+          profile_image_url: u.profile_image_url
+            ? (u.profile_image_url.startsWith("data:") ? u.profile_image_url : String(u.profile_image_url))
+            : "",
         });
+
       } catch (error) {
         console.error("Error fetching user:", error);
         Alert.alert("Error", "Failed to fetch profile");
@@ -93,44 +112,56 @@ const Profile = () => {
     if (user) fetchUser();
   }, [user, token]);
 
-  // ✅ Profile update
-  const handleUpdateProfile = async () => {
-    const validation = profileSchema.safeParse(profile);
-    if (!validation.success) {
-      const fieldErrors: any = {};
-      validation.error.issues.forEach((issue) => {
-        fieldErrors[issue.path[0] as string] = issue.message;
-      });
-      setErrors(fieldErrors);
-      return;
+const handleUpdateProfile = async () => {
+  const validation = profileSchema.safeParse(profile);
+  if (!validation.success) {
+    const fieldErrors: any = {};
+    validation.error.issues.forEach((issue) => {
+      fieldErrors[issue.path[0] as string] = issue.message;
+    });
+    setErrors(fieldErrors);
+    return;
+  }
+
+  try {
+    setErrors({});
+    setLoading(true);
+
+    const formData = new FormData();
+    formData.append("first_name", profile.first_name);
+    formData.append("last_name", profile.last_name);
+
+    if (profile.profile_image_url && !profile.profile_image_url.startsWith("http")) {
+      // only append if it's a new picked image (local file)
+      formData.append("profile_image", {
+        uri: profile.profile_image_url,
+        name: "profile.jpg",
+        type: "image/jpeg",
+      } as any);
     }
 
-    try {
-      setErrors({});
-      setLoading(true);
-      const res = await api.put("/user/profile", profile, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+    const res = await api.put("/user/profile", formData, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "multipart/form-data",
+      },
+    });
 
-      await setCredentials({
-        ...res.data.user,
-        token: user.token,
-      });
+    await setCredentials({ ...res.data.user, token: user.token });
 
-      Alert.alert("Success", "Profile updated successfully");
-    } catch (err: any) {
-      console.error("Error updating profile:", err);
-
-      // 🔥 Show backend error
-      if (err.response?.data?.message) {
-        Alert.alert("Error", err.response.data.message);
-      } else {
-        Alert.alert("Error", "Failed to update profile");
-      }
-    } finally {
-      setLoading(false);
+    Alert.alert("Success", "Profile updated successfully");
+  } catch (err: any) {
+    console.error("Error updating profile:", err);
+    if (err.response?.data?.message) {
+      Alert.alert("Error", err.response.data.message);
+    } else {
+      Alert.alert("Error", "Failed to update profile");
     }
-  };
+  } finally {
+    setLoading(false);
+  }
+};
+
 
   // ✅ Password update
   const handleChangePassword = async () => {
@@ -181,14 +212,21 @@ const Profile = () => {
 
       {/* Profile Image */}
       <View style={styles.imageContainer}>
-        {profile.profile_image_url ? (
-          <Image source={{ uri: profile.profile_image_url }} style={styles.profileImage} />
-        ) : (
-          <View style={[styles.profileImage, styles.imagePlaceholder]}>
-            <Text style={{ color: "#666" }}>No Image</Text>
-          </View>
-        )}
+<TouchableOpacity onPress={pickImage}>
+  {profile.profile_image_url ? (
+    <Image
+      source={{ uri: String(profile.profile_image_url) }}
+      style={styles.profileImage}
+    />
+  ) : (
+    <View style={[styles.profileImage, styles.imagePlaceholder]}>
+      <Text style={{ color: "#666" }}>Pick Image</Text>
+    </View>
+  )}
+</TouchableOpacity>
+
       </View>
+
 
       <Text style={styles.sectionTitle}>Profile Information</Text>
 

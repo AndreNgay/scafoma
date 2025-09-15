@@ -8,7 +8,7 @@ CREATE TABLE IF NOT EXISTS tbluser (
     last_name VARCHAR(50),
     password VARCHAR(255) NOT NULL,
     role VARCHAR(20) DEFAULT 'customer' CHECK (role IN ('customer', 'concessionaire', 'admin')),
-    profile_image_url BYTEA,
+    profile_image BYTEA,
     email_verified BOOLEAN DEFAULT FALSE,
     profile_created BOOLEAN DEFAULT FALSE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,

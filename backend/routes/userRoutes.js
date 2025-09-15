@@ -10,7 +10,9 @@ import {
   resetPassword,
   getUser
 } from "../controllers/userController.js";
+import multer from "multer";
 
+const upload = multer(); // in-memory
 const router = express.Router();
 
 // Get currently logged-in user
@@ -28,7 +30,7 @@ router.post("/concessionaire", createConcessionaire);
 // Reset password
 router.post("/:id/reset-password", authMiddleware, resetPassword);
 
-router.put("/profile", authMiddleware, updateProfile);
+router.put("/profile", authMiddleware, upload.single("profile_image"), updateProfile);
 
 // Update user details
 router.put("/:id", authMiddleware, updateUser);
