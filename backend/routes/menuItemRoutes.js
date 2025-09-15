@@ -12,19 +12,19 @@ import authMiddleware from "../middleware/authMiddleware.js";
 
 const router = express.Router();
 
-// Get all MenuItems (for admin)
+// Public: all items (admin)
 router.get("/all", getMenuItems);
 
-// Get menu items for currently logged-in concessionaire
+// Concessionaire-specific (requires auth)
 router.get("/", authMiddleware, getMenuItemsByConcessionaire);
 
-// ✅ Add a menu item (use multer to parse form-data image + fields)
+// Create (multipart/form-data with optional 'image' field)
 router.post("/", authMiddleware, upload.single("image"), addMenuItem);
 
-// Update a menu item
+// Update (multipart/form-data; optional 'image' field to replace existing image)
 router.put("/:id", authMiddleware, upload.single("image"), updateMenuItem);
 
-// Delete a menu item
+// Delete
 router.delete("/:id", authMiddleware, deleteMenuItem);
 
 export default router;

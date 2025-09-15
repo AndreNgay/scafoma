@@ -66,9 +66,9 @@ CREATE TABLE IF NOT EXISTS tblmenuitem (
     item_name VARCHAR(100) NOT NULL,
     concession_id INT NOT NULL,
     price NUMERIC(10,2) NOT NULL CHECK (price >= 0),
-    image_url TEXT,
+    image_url BYTEA,
     category VARCHAR(100),
-    availability BOOLEAN DEFAULT FALSE, -- ✅ availability (default not available)
+    available BOOLEAN DEFAULT FALSE, -- ✅ availability (default not available)
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 
