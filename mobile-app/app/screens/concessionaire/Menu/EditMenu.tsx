@@ -89,55 +89,62 @@ const EditMenu: React.FC = () => {
     setVariationGroups(updated);
   };
 
-  // update API call: use multipart/form-data if imageIsNew (or can always use multipart)
-  const handleUpdateMenu = async () => {
-    // validation small
-    if (!itemName.trim() || !price.trim()) {
-      Alert.alert("Error", "Please fill in required fields");
-      return;
+// inside handleUpdateMenu
+const handleUpdateMenu = async () => {
+  if (!itemName.trim() || !price.trim()) {
+    Alert.alert("Error", "Please fill in required fields");
+    return;
+  }
+
+  try {
+    const formattedVariations = variationGroups.map((g) => ({
+      label: g.label,
+      variations: g.variations.map((v) => ({
+        name: v.name,
+        price: Number(v.price) || 0,
+      })),
+    }));
+
+    const formData = new FormData();
+    formData.append("item_name", itemName.trim());
+    formData.append("price", String(price).trim());
+    formData.append("category", category);
+    formData.append("availability", String(availability));
+    formData.append("variations", JSON.stringify(formattedVariations));
+
+    // ✅ Same fix as AddMenu
+    if (imageIsNew && imageAsset?.uri) {
+      formData.append("image", {
+        uri: imageAsset.uri,
+        type: "image/jpeg", // enforce jpeg
+        name: `menu-${Date.now()}.jpg`,
+      } as any);
     }
 
-    try {
-      const formattedVariations = variationGroups.map((g) => ({
-        label: g.label,
-        variations: g.variations.map((v) => ({ name: v.name, price: Number(v.price) || 0 })),
-      }));
+    await api.put(`/menu-item/${item.id}`, formData, {
+      headers: {
+        Accept: "application/json",
+        "Content-Type": "multipart/form-data",
+      },
+    });
 
-      const formData = new FormData();
-      formData.append("item_name", itemName.trim());
-      formData.append("price", String(price).trim());
-      formData.append("category", category);
-      formData.append("availability", String(availability));
-      formData.append("variations", JSON.stringify(formattedVariations));
-
-      if (imageIsNew && imageAsset?.uri) {
-        formData.append("image", {
-          uri: imageAsset.uri,
-          name: imageAsset.fileName || `menu-${Date.now()}.jpg`,
-          type: imageAsset.type || "image/jpeg",
-        } as any);
-      }
-
-      await api.put(`/menu-item/${item.id}`, formData, {
-        headers: { "Content-Type": "multipart/form-data" },
-      });
-
-      Alert.alert("Success", "Menu item updated successfully", [
-        { text: "OK", onPress: () => navigation.goBack() },
-      ]);
-    } catch (err: unknown) {
-      if (axios.isAxiosError(err)) {
-        console.error("UpdateMenu error:", err.response?.data ?? err.message);
-        Alert.alert("Error", err.response?.data?.message ?? "Failed to update item");
-      } else if (err instanceof Error) {
-        console.error(err.message);
-        Alert.alert("Error", err.message);
-      } else {
-        console.error(err);
-        Alert.alert("Error", "Unknown error occurred");
-      }
+    Alert.alert("Success", "Menu item updated successfully", [
+      { text: "OK", onPress: () => navigation.goBack() },
+    ]);
+  } catch (err: unknown) {
+    if (axios.isAxiosError(err)) {
+      console.error("UpdateMenu error:", err.response?.data ?? err.message);
+      Alert.alert("Error", err.response?.data?.message ?? "Failed to update item");
+    } else if (err instanceof Error) {
+      console.error(err.message);
+      Alert.alert("Error", err.message);
+    } else {
+      console.error(err);
+      Alert.alert("Error", "Unknown error occurred");
     }
-  };
+  }
+};
+
 
   const handleDelete = async () => {
     Alert.alert("Confirm Delete", "Are you sure?", [

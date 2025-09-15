@@ -3,8 +3,10 @@ import axios from "axios";
 import useStore from "../store";
 
 const api = axios.create({
-  baseURL: "http://192.168.42.171:5000/api-v1", // adjust to your backend
+  baseURL: "http://192.168.42.171:5000/api-v1",
+  timeout: 10000,
 });
+
 
 // Set token automatically from store
 api.interceptors.request.use(async (config) => {

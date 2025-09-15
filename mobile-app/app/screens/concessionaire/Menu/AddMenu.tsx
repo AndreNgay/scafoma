@@ -93,19 +93,22 @@ const AddMenu: React.FC = () => {
       formData.append("category", category);
 
       if (image && image.uri) {
-        // RN form file
         formData.append("image", {
           uri: image.uri,
-          type: image.type || "image/jpeg",
-          name: image.fileName || `menu-${Date.now()}.jpg`,
+          type: "image/jpeg", // enforce jpeg
+          name: `menu-${Date.now()}.jpg`,
         } as any);
       }
 
       formData.append("variations", JSON.stringify(variationGroups));
 
       await api.post("/menu-item", formData, {
-        headers: { "Content-Type": "multipart/form-data" },
+        headers: {
+          Accept: "application/json",
+          "Content-Type": "multipart/form-data",
+        },
       });
+
 
       Alert.alert("Success", "Menu item added successfully", [
         { text: "OK", onPress: () => navigation.goBack() },
