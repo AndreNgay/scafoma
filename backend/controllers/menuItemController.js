@@ -2,7 +2,7 @@
 import { pool } from "../libs/database.js";
 import multer from "multer";
 
-// multer in-memory storage so we can store file buffer directly in DB
+
 const storage = multer.memoryStorage();
 export const upload = multer({ storage });
 
@@ -18,7 +18,6 @@ const groupVariations = (vRows) => {
       price: Number(v.additional_price),
     });
   }
-  // map: { menu_item_id: { label1: [...], label2: [...] } }
   return map;
 };
 

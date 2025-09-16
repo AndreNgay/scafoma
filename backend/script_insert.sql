@@ -20,7 +20,7 @@ VALUES
 ('Bob’s Meals', 5, 2, decode('bob_meals_img', 'escape'), TRUE, TRUE, '09981234567');
 
 -- Menu Items
-INSERT INTO tblmenuitem (item_name, concession_id, price, image_url, category, available)
+INSERT INTO tblmenuitem (item_name, concession_id, price, image, category, available)
 VALUES 
 ('Cheeseburger', 1, 85.00, decode('cheeseburgerimg', 'escape'), 'Fast Food', TRUE),
 ('Fries', 1, 45.00, decode('friesimg', 'escape'), 'Snacks', TRUE),

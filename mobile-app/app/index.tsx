@@ -13,7 +13,7 @@ import Orders from "./screens/concessionaire/Order/Orders";
 import AddMenu from "./screens/concessionaire/Menu/AddMenu";
 import EditMenu from "./screens/concessionaire/Menu/EditMenu";
 import Concession from "./screens/concessionaire/Concession/Concession";
-import MenuItems from "./screens/customer/MenuItems";
+import MenuItems from "./screens/customer/MenuItems/MenuItems";
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -60,7 +60,7 @@ function CustomerTabs() {
   return (
     <Tab.Navigator screenOptions={{ headerShown: false }}>
       <Tab.Screen name="MenuItems" component={MenuItems} />
-      {/* <Tab.Screen name="Profile" component={Profile} /> */}
+      <Tab.Screen name="Profile" component={Profile} />
     </Tab.Navigator>
   );
 }
