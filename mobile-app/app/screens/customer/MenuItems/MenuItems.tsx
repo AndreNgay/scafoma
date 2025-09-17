@@ -9,7 +9,6 @@ import {
   ActivityIndicator,
   StyleSheet,
 } from "react-native";
-import axios from "axios";
 import { useNavigation } from "@react-navigation/native";
 import api from "../../../libs/apiCall";
 
@@ -23,31 +22,50 @@ interface MenuItem {
 }
 
 const MenuItems = () => {
+  const navigation = useNavigation<any>();
   const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const navigation = useNavigation<any>();
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
+
+  const fetchMenuItems = async (pageNum = 1) => {
+    try {
+      if (pageNum === 1) setLoading(true);
+      else setLoadingMore(true);
+
+      const res = await api.get(`/menu-item/all?page=${pageNum}&limit=10`);
+      const items: MenuItem[] = res.data.data;
+
+      const filtered = items.filter(
+        (item) => item.availability === true && item.concession_name
+      );
+
+      if (pageNum === 1) {
+        setMenuItems(filtered);
+      } else {
+        setMenuItems((prev) => [...prev, ...filtered]);
+      }
+
+      setHasMore(pageNum < res.data.pagination.totalPages);
+      setPage(pageNum);
+    } catch (error) {
+      console.error("Error fetching menu items:", error);
+    } finally {
+      setLoading(false);
+      setLoadingMore(false);
+    }
+  };
 
   useEffect(() => {
-    const fetchMenuItems = async () => {
-      try {
-        const res = await api.get("/menu-item/all");
-        const items: MenuItem[] = res.data.data;
-
-        // filter out unavailable and closed concession items
-        const filtered = items.filter(
-          (item) => item.availability === true && item.concession_name
-        );
-
-        setMenuItems(filtered);
-      } catch (error) {
-        console.error("Error fetching menu items:", error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchMenuItems();
+    fetchMenuItems(1);
   }, []);
+  const loadMore = () => {
+  if (!loadingMore && hasMore) {
+      fetchMenuItems(page + 1);
+    }
+  };
+  
 
   const renderItem = ({ item }: { item: MenuItem }) => (
     <TouchableOpacity
@@ -91,7 +109,17 @@ const MenuItems = () => {
       renderItem={renderItem}
       keyExtractor={(item) => item.id.toString()}
       contentContainerStyle={styles.list}
+      onEndReached={loadMore}
+      onEndReachedThreshold={0.5}
+      ListFooterComponent={
+        loadingMore ? (
+          <View style={{ padding: 10 }}>
+            <ActivityIndicator size="small" color="#A40C2D" />
+          </View>
+        ) : null
+      }
     />
+
   );
 };
 

@@ -31,13 +31,25 @@ const makeImageDataUrl = (imageBuffer, mime = "jpeg") => {
 // =========================
 // Get all menu items (admin) - includes grouped variations + image as data URL
 // =========================
+// controllers/menuItemController.js
 export const getMenuItems = async (req, res) => {
   try {
+    // pagination params from query string
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const offset = (page - 1) * limit;
+
+    // count total
+    const countResult = await pool.query("SELECT COUNT(*) FROM tblmenuitem");
+    const total = parseInt(countResult.rows[0].count);
+
     const result = await pool.query(
       `SELECT mi.*, c.concession_name
        FROM tblmenuitem mi
        JOIN tblconcession c ON mi.concession_id = c.id
-       ORDER BY mi.created_at DESC`
+       ORDER BY mi.created_at DESC
+       LIMIT $1 OFFSET $2`,
+      [limit, offset]
     );
 
     const rows = result.rows;
@@ -45,12 +57,12 @@ export const getMenuItems = async (req, res) => {
 
     let variationsMap = {};
     if (itemIds.length > 0) {
-      const vQuery = `
-        SELECT id, label, variation_name, additional_price, menu_item_id
-        FROM tblitemvariation
-        WHERE menu_item_id = ANY($1::int[])
-      `;
-      const vResult = await pool.query(vQuery, [itemIds]);
+      const vResult = await pool.query(
+        `SELECT id, label, variation_name, additional_price, menu_item_id
+         FROM tblitemvariation
+         WHERE menu_item_id = ANY($1::int[])`,
+        [itemIds]
+      );
       variationsMap = groupVariations(vResult.rows);
     }
 
@@ -61,15 +73,12 @@ export const getMenuItems = async (req, res) => {
         variations: groupedVariations[label],
       }));
 
-      const availability =
-        item.available ?? item.availability ?? item.availabile ?? false;
-
       return {
         id: item.id,
         item_name: item.item_name,
         price: Number(item.price),
         category: item.category,
-        availability,
+        availability: item.available ?? false,
         concession_name: item.concession_name,
         image_url: makeImageDataUrl(item.image),
         variations: formattedGroups,
@@ -80,14 +89,19 @@ export const getMenuItems = async (req, res) => {
       status: "success",
       message: "Menu items retrieved successfully",
       data: menuItems,
+      pagination: {
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit),
+      },
     });
   } catch (error) {
     console.error("Error retrieving menu items:", error);
-    res
-      .status(500)
-      .json({ status: "failed", message: "Internal Server Error" });
+    res.status(500).json({ status: "failed", message: "Internal Server Error" });
   }
 };
+
 
 // =========================
 // Get menu items by concessionaire (same output as above but filtered)
