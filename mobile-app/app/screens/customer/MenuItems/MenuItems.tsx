@@ -9,6 +9,7 @@ import {
   Image,
   StyleSheet,
   ActivityIndicator,
+  TextInput,
 } from "react-native";
 import api from "../../../libs/apiCall"; // axios instance
 
@@ -24,6 +25,7 @@ const MenuItems = () => {
   const [concessionId, setConcessionId] = useState<number | null>(null);
   const [category, setCategory] = useState<string | null>(null);
   const [sortBy, setSortBy] = useState<string>("name");
+  const [searchQuery, setSearchQuery] = useState<string>("");
 
   // ui state
   const [loading, setLoading] = useState(false);
@@ -41,40 +43,39 @@ const MenuItems = () => {
     }
   };
 
-// fetch menu items and extract categories
-const fetchItems = async () => {
-  try {
-    setLoading(true);
+  // fetch menu items and extract categories
+  const fetchItems = async () => {
+    try {
+      setLoading(true);
 
-    const res = await api.get<{ data: any[] }>("/menu-item/all", {
-      params: { cafeteriaId, concessionId, category, sortBy },
-    });
+      const res = await api.get<{ data: any[] }>("/menu-item/all", {
+        params: { cafeteriaId, concessionId, category, sortBy, search: searchQuery },
+      });
 
-    const items = res.data.data as {
-      id: number;
-      item_name: string;
-      concession_name: string;
-      cafeteria_name: string;
-      price: number;
-      category?: string;
-      image_url?: string;
-    }[];
+      const items = res.data.data as {
+        id: number;
+        item_name: string;
+        concession_name: string;
+        cafeteria_name: string;
+        price: number;
+        category?: string;
+        image_url?: string;
+      }[];
 
-    setMenuItems(items);
+      setMenuItems(items);
 
-    // derive categories dynamically
-    const uniqueCategories: string[] = Array.from(
-      new Set(items.map((i) => i.category || "").filter(Boolean))
-    );
+      // derive categories dynamically
+      const uniqueCategories: string[] = Array.from(
+        new Set(items.map((i) => i.category || "").filter(Boolean))
+      );
 
-    setCategories(uniqueCategories);
-  } catch (err) {
-    console.error("Error fetching menu items:", err);
-  } finally {
-    setLoading(false);
-  }
-};
-
+      setCategories(uniqueCategories);
+    } catch (err) {
+      console.error("Error fetching menu items:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
     fetchFilterData();
@@ -83,7 +84,7 @@ const fetchItems = async () => {
 
   useEffect(() => {
     fetchItems();
-  }, [cafeteriaId, concessionId, category, sortBy]);
+  }, [cafeteriaId, concessionId, category, sortBy, searchQuery]);
 
   const renderItem = ({ item }: { item: any }) => (
     <TouchableOpacity style={styles.card}>
@@ -97,6 +98,9 @@ const fetchItems = async () => {
         <Text style={styles.subText}>
           {item.concession_name} • {item.cafeteria_name}
         </Text>
+        {item.category && (
+          <Text style={styles.categoryTag}>{item.category}</Text>
+        )}
         <Text style={styles.price}>₱{item.price.toFixed(2)}</Text>
       </View>
     </TouchableOpacity>
@@ -104,6 +108,14 @@ const fetchItems = async () => {
 
   return (
     <View style={{ flex: 1 }}>
+      {/* Search bar */}
+      <TextInput
+        style={styles.searchInput}
+        placeholder="Search menu items..."
+        value={searchQuery}
+        onChangeText={setSearchQuery}
+      />
+
       {/* Filter button */}
       <TouchableOpacity
         style={styles.filterBtn}
@@ -204,10 +216,19 @@ const fetchItems = async () => {
 };
 
 const styles = StyleSheet.create({
+  searchInput: {
+    borderWidth: 1,
+    borderColor: "#ccc",
+    borderRadius: 8,
+    padding: 10,
+    margin: 10,
+    backgroundColor: "#fff",
+  },
   filterBtn: {
     padding: 10,
     backgroundColor: "#A40C2D",
-    margin: 10,
+    marginHorizontal: 10,
+    marginBottom: 10,
     borderRadius: 8,
   },
   filterText: { color: "#fff", textAlign: "center", fontWeight: "600" },
@@ -229,6 +250,12 @@ const styles = StyleSheet.create({
   },
   itemName: { fontWeight: "bold", fontSize: 16 },
   subText: { fontSize: 12, color: "#555" },
+  categoryTag: {
+    marginTop: 3,
+    fontSize: 12,
+    color: "#A40C2D",
+    fontWeight: "600",
+  },
   price: { marginTop: 5, fontWeight: "600", color: "#A40C2D" },
   filterContainer: { flex: 1, padding: 20, backgroundColor: "#fff" },
   filterHeader: { fontSize: 18, fontWeight: "bold", marginBottom: 10 },

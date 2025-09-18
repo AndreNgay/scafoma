@@ -34,9 +34,8 @@ export const getMenuItems = async (req, res) => {
     const limit = parseInt(req.query.limit) || 10;
     const offset = (page - 1) * limit;
 
-    const { cafeteriaId, concessionId, category, sortBy } = req.query;
+    const { cafeteriaId, concessionId, category, sortBy, search } = req.query;
 
-    // base query
     let whereClauses = [];
     let params = [];
     let i = 1;
@@ -53,6 +52,10 @@ export const getMenuItems = async (req, res) => {
       whereClauses.push(`mi.category ILIKE $${i++}`);
       params.push(`%${category}%`);
     }
+    if (search) {
+      whereClauses.push(`mi.item_name ILIKE $${i++}`);
+      params.push(`%${search}%`);
+    }
 
     const whereSQL = whereClauses.length ? "WHERE " + whereClauses.join(" AND ") : "";
 
@@ -64,7 +67,8 @@ export const getMenuItems = async (req, res) => {
 
     const countResult = await pool.query(
       `SELECT COUNT(*) FROM tblmenuitem mi 
-       JOIN tblconcession c ON mi.concession_id = c.id ${whereSQL}`,
+       JOIN tblconcession c ON mi.concession_id = c.id 
+       ${whereSQL}`,
       params
     );
     const total = parseInt(countResult.rows[0].count);
