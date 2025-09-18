@@ -28,79 +28,85 @@ const makeImageDataUrl = (imageBuffer, mime = "jpeg") => {
   return `data:image/${mime};base64,${base64}`;
 };
 
-// =========================
-// Get all menu items (admin) - includes grouped variations + image as data URL
-// =========================
-// controllers/menuItemController.js
 export const getMenuItems = async (req, res) => {
   try {
-    // pagination params from query string
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 10;
     const offset = (page - 1) * limit;
 
-    // count total
-    const countResult = await pool.query("SELECT COUNT(*) FROM tblmenuitem");
+    const { cafeteriaId, concessionId, category, sortBy } = req.query;
+
+    // base query
+    let whereClauses = [];
+    let params = [];
+    let i = 1;
+
+    if (cafeteriaId) {
+      whereClauses.push(`c.cafeteria_id = $${i++}`);
+      params.push(cafeteriaId);
+    }
+    if (concessionId) {
+      whereClauses.push(`mi.concession_id = $${i++}`);
+      params.push(concessionId);
+    }
+    if (category) {
+      whereClauses.push(`mi.category ILIKE $${i++}`);
+      params.push(`%${category}%`);
+    }
+
+    const whereSQL = whereClauses.length ? "WHERE " + whereClauses.join(" AND ") : "";
+
+    // sorting
+    let orderBy = "mi.created_at DESC";
+    if (sortBy === "price_asc") orderBy = "mi.price ASC";
+    if (sortBy === "price_desc") orderBy = "mi.price DESC";
+    if (sortBy === "name") orderBy = "mi.item_name ASC";
+
+    const countResult = await pool.query(
+      `SELECT COUNT(*) FROM tblmenuitem mi 
+       JOIN tblconcession c ON mi.concession_id = c.id ${whereSQL}`,
+      params
+    );
     const total = parseInt(countResult.rows[0].count);
 
     const result = await pool.query(
-      `SELECT mi.*, c.concession_name
+      `SELECT mi.*, c.concession_name, caf.cafeteria_name
        FROM tblmenuitem mi
        JOIN tblconcession c ON mi.concession_id = c.id
-       ORDER BY mi.created_at DESC
-       LIMIT $1 OFFSET $2`,
-      [limit, offset]
+       JOIN tblcafeteria caf ON c.cafeteria_id = caf.id
+       ${whereSQL}
+       ORDER BY ${orderBy}
+       LIMIT $${i} OFFSET $${i + 1}`,
+      [...params, limit, offset]
     );
 
     const rows = result.rows;
-    const itemIds = rows.map((r) => r.id);
 
-    let variationsMap = {};
-    if (itemIds.length > 0) {
-      const vResult = await pool.query(
-        `SELECT id, label, variation_name, additional_price, menu_item_id
-         FROM tblitemvariation
-         WHERE menu_item_id = ANY($1::int[])`,
-        [itemIds]
-      );
-      variationsMap = groupVariations(vResult.rows);
-    }
-
-    const menuItems = rows.map((item) => {
-      const groupedVariations = variationsMap[item.id] || {};
-      const formattedGroups = Object.keys(groupedVariations).map((label) => ({
-        label,
-        variations: groupedVariations[label],
-      }));
-
-      return {
-        id: item.id,
-        item_name: item.item_name,
-        price: Number(item.price),
-        category: item.category,
-        availability: item.available ?? false,
-        concession_name: item.concession_name,
-        image_url: makeImageDataUrl(item.image),
-        variations: formattedGroups,
-      };
-    });
-
-    res.status(200).json({
+    res.json({
       status: "success",
-      message: "Menu items retrieved successfully",
-      data: menuItems,
+      data: rows.map((r) => ({
+        id: r.id,
+        item_name: r.item_name,
+        price: Number(r.price),
+        category: r.category,
+        availability: r.available,
+        concession_name: r.concession_name,
+        cafeteria_name: r.cafeteria_name,
+        image_url: makeImageDataUrl(r.image),
+      })),
       pagination: {
-        total,
         page,
         limit,
+        total,
         totalPages: Math.ceil(total / limit),
       },
     });
-  } catch (error) {
-    console.error("Error retrieving menu items:", error);
-    res.status(500).json({ status: "failed", message: "Internal Server Error" });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ status: "failed", message: "Server error" });
   }
 };
+
 
 
 // =========================

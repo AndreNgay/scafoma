@@ -1,0 +1,143 @@
+{
+  "designSystem": {
+    "style": {
+      "colorPalette": {
+        "primary": "#E23744", 
+        "secondary": "#FFFFFF",
+        "accent": "#FF4D4F",
+        "neutral": {
+          "light": "#F5F5F5",
+          "medium": "#CCCCCC",
+          "dark": "#333333"
+        }
+      },
+      "typography": {
+        "fontFamily": "Sans-serif, Rounded",
+        "heading": {
+          "weight": "bold",
+          "size": {
+            "large": 24,
+            "medium": 18,
+            "small": 14
+          }
+        },
+        "body": {
+          "weight": "regular",
+          "size": {
+            "default": 14,
+            "small": 12
+          }
+        },
+        "buttonText": {
+          "weight": "semibold",
+          "uppercase": true
+        }
+      },
+      "iconography": {
+        "style": "outlined",
+        "shapes": "rounded",
+        "useCases": ["filters", "search", "sorting", "actions"]
+      },
+      "shapes": {
+        "cornerRadius": "8-12px",
+        "buttons": "rounded-full",
+        "cards": "rounded-lg with shadows"
+      },
+      "spacing": {
+        "xs": 4,
+        "sm": 8,
+        "md": 16,
+        "lg": 24
+      },
+      "visualHierarchy": {
+        "highlight": "Bold typography + accent colors for offers or promotions",
+        "secondaryInfo": "Smaller font, muted colors",
+        "cards": "Image on top, text below"
+      }
+    },
+    "layout": {
+      "navigation": {
+        "bottomTabs": {
+          "style": "icon + label",
+          "activeColor": "primary",
+          "inactiveColor": "neutral.dark"
+        },
+        "topBar": {
+          "position": "fixed",
+          "elements": ["location selector", "search bar", "profile/avatar"]
+        }
+      },
+      "homepage": {
+        "sections": [
+          "searchBar",
+          "promotionsBanner",
+          "categoryScroller",
+          "filterChips",
+          "recommendedList"
+        ],
+        "recommendedList": {
+          "cardType": "image-left + text-right OR stacked-card",
+          "metadata": ["name", "rating", "delivery time", "offers"]
+        }
+      },
+      "filtersAndSorting": {
+        "structure": "left navigation for categories, right pane for options",
+        "controls": "toggle buttons, checkboxes, radio buttons",
+        "primaryAction": "sticky CTA button at bottom"
+      },
+      "productDetail": {
+        "layout": "image-top, title + price, customization options, add-to-cart button",
+        "upsell": "pairing suggestions below main item"
+      }
+    },
+    "components": {
+      "searchBar": {
+        "style": "rounded-pill",
+        "elements": ["placeholder text", "voice input icon", "filter shortcut"]
+      },
+      "banner": {
+        "type": "promotional",
+        "background": "accent/gradient",
+        "textStyle": "bold white"
+      },
+      "filterChips": {
+        "style": "pill buttons",
+        "activeColor": "primary",
+        "inactiveColor": "neutral.medium"
+      },
+      "cards": {
+        "restaurantCard": {
+          "elements": ["image", "title", "rating", "time", "offers"],
+          "interaction": "tap to open details"
+        },
+        "itemCard": {
+          "elements": ["image", "title", "price", "customize/add button"]
+        }
+      },
+      "buttons": {
+        "primary": {
+          "background": "primary",
+          "textColor": "white",
+          "shape": "rounded-full"
+        },
+        "secondary": {
+          "background": "neutral.light",
+          "textColor": "primary",
+          "border": "1px solid primary"
+        }
+      },
+      "modals": {
+        "bottomSheet": {
+          "style": "rounded top corners",
+          "usage": ["filters", "sorting", "customization"]
+        }
+      }
+    },
+    "interactionPatterns": {
+      "scrolling": "vertical scrolling lists with lazy loading",
+      "filtering": "chips + modal",
+      "selection": "increment/decrement counters for items",
+      "navigation": "bottom tab bar + drilldown detail pages"
+    }
+  }
+}

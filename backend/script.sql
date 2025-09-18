@@ -112,6 +112,7 @@ CREATE TABLE IF NOT EXISTS tblorder (
     status VARCHAR(30) DEFAULT 'pending' CHECK (status IN (
         'pending', 'accepted', 'processing', 'declined', 'ready for pickup', 'completed'
     )),
+    --note (this is for special instructions like no onions, etc.)
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 
