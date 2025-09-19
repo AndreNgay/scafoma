@@ -12,6 +12,8 @@ import {
   TextInput,
 } from "react-native";
 import api from "../../../libs/apiCall"; // axios instance
+import { useNavigation } from "@react-navigation/native";
+
 
 const MenuItems = () => {
   // data
@@ -19,6 +21,7 @@ const MenuItems = () => {
   const [cafeterias, setCafeterias] = useState<any[]>([]);
   const [concessions, setConcessions] = useState<any[]>([]);
   const [categories, setCategories] = useState<string[]>([]);
+  const navigation = useNavigation();
 
   // filter state
   const [cafeteriaId, setCafeteriaId] = useState<number | null>(null);
@@ -87,7 +90,13 @@ const MenuItems = () => {
   }, [cafeteriaId, concessionId, category, sortBy, searchQuery]);
 
   const renderItem = ({ item }: { item: any }) => (
-    <TouchableOpacity style={styles.card}>
+    <TouchableOpacity
+      style={styles.card}
+      onPress={() =>
+        (navigation as any).navigate("Menu Item Details", { item }) // pass whole item
+      }
+    >
+
       {item.image_url ? (
         <Image source={{ uri: item.image_url }} style={styles.image} />
       ) : (

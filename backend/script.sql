@@ -68,7 +68,7 @@ CREATE TABLE IF NOT EXISTS tblmenuitem (
     price NUMERIC(10,2) NOT NULL CHECK (price >= 0),
     image BYTEA,
     category VARCHAR(100),
-    available BOOLEAN DEFAULT FALSE, -- ✅ availability (default not available)
+    available BOOLEAN DEFAULT FALSE, -- availability (default not available)
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 
@@ -104,15 +104,12 @@ CREATE TABLE IF NOT EXISTS tblitemvariation (
 CREATE TABLE IF NOT EXISTS tblorder (
     id SERIAL PRIMARY KEY,
     customer_id INT NOT NULL,
-    menu_item_id INT NOT NULL,
     concession_id INT NOT NULL,
-    concessionaire_id INT NOT NULL,
-    quantity INT NOT NULL CHECK (quantity > 0),
-    total_amount NUMERIC(10,2) NOT NULL CHECK (total_amount >= 0),
-    status VARCHAR(30) DEFAULT 'pending' CHECK (status IN (
-        'pending', 'accepted', 'processing', 'declined', 'ready for pickup', 'completed'
+    total_price NUMERIC(10,2) NOT NULL CHECK (total_price >= 0),
+    order_status VARCHAR(30) DEFAULT 'pending' CHECK (order_status IN (
+        'pending', 'accepted', 'declined', 'ready for pickup', 'completed'
     )),
-    --note (this is for special instructions like no onions, etc.)
+    note TEXT, -- Note field for special instructions (no onions, etc.)
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 
@@ -122,27 +119,84 @@ CREATE TABLE IF NOT EXISTS tblorder (
         ON DELETE CASCADE
         ON UPDATE CASCADE,
 
-    CONSTRAINT fk_order_menuitem
-        FOREIGN KEY (menu_item_id)
-        REFERENCES tblmenuitem (id)
-        ON DELETE CASCADE
-        ON UPDATE CASCADE,
-
     CONSTRAINT fk_order_concession
         FOREIGN KEY (concession_id)
         REFERENCES tblconcession (id)
         ON DELETE CASCADE
+        ON UPDATE CASCADE
+);
+
+-- =========================
+-- Order Details Table (for itemized order)
+-- =========================
+CREATE TABLE IF NOT EXISTS tblorderdetail (
+    id SERIAL PRIMARY KEY,
+    order_id INT NOT NULL,
+    item_id INT NOT NULL,
+    quantity INT NOT NULL CHECK (quantity > 0),
+    item_price NUMERIC(10,2) NOT NULL CHECK (item_price >= 0),
+    total_price NUMERIC(10,2) NOT NULL CHECK (total_price >= 0), -- quantity * item_price
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT fk_order
+        FOREIGN KEY (order_id)
+        REFERENCES tblorder (id)
+        ON DELETE CASCADE
         ON UPDATE CASCADE,
 
-    CONSTRAINT fk_order_concessionaire
-        FOREIGN KEY (concessionaire_id)
+    CONSTRAINT fk_order_item
+        FOREIGN KEY (item_id)
+        REFERENCES tblmenuitem (id)
+        ON DELETE CASCADE
+        ON UPDATE CASCADE
+);
+
+-- =========================
+-- Cart Table
+-- =========================
+CREATE TABLE IF NOT EXISTS tblcart (
+    id SERIAL PRIMARY KEY,
+    user_id INT NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT fk_user
+        FOREIGN KEY (user_id)
         REFERENCES tbluser (id)
         ON DELETE CASCADE
         ON UPDATE CASCADE
 );
 
 -- =========================
--- Feedbacks Table ✅
+-- Cart Details Table (for items in the cart)
+-- =========================
+CREATE TABLE IF NOT EXISTS tblcartdetail (
+    id SERIAL PRIMARY KEY,
+    cart_id INT NOT NULL,
+    item_id INT NOT NULL,
+    quantity INT NOT NULL CHECK (quantity > 0),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT fk_cart
+        FOREIGN KEY (cart_id)
+        REFERENCES tblcart (id)
+        ON DELETE CASCADE
+        ON UPDATE CASCADE,
+
+    CONSTRAINT fk_cart_item
+        FOREIGN KEY (item_id)
+        REFERENCES tblmenuitem (id)
+        ON DELETE CASCADE
+        ON UPDATE CASCADE
+);
+
+
+
+
+-- =========================
+-- Feedbacks Table
 -- =========================
 CREATE TABLE IF NOT EXISTS tblfeedback (
     id SERIAL PRIMARY KEY,

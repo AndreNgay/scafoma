@@ -14,12 +14,13 @@ import AddMenu from "./screens/concessionaire/Menu/AddMenu";
 import EditMenu from "./screens/concessionaire/Menu/EditMenu";
 import Concession from "./screens/concessionaire/Concession/Concession";
 import MenuItems from "./screens/customer/MenuItems/MenuItems";
+import MenuItemDetails from "./screens/customer/MenuItems/MenuItemDetails";
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
 const MenuStackNav = createNativeStackNavigator();
 
-function ConsessionaireMenuStack() {
+function MenuManagementStack() {
   return (
     <MenuStackNav.Navigator>
       <MenuStackNav.Screen
@@ -49,8 +50,23 @@ function ConsessionaireConcessionStack() {
         component={Concession}
         options={{ headerShown: false }}
       />
+    </MenuStackNav.Navigator>
+  )
+}
 
-
+function MenuItemsStack() {
+  return (
+    <MenuStackNav.Navigator>
+      <MenuStackNav.Screen
+        name="View Menu Items"
+        component={MenuItems}
+        options={{ headerShown: false }}
+      />
+      <MenuStackNav.Screen
+        name="Menu Item Details"
+        component={MenuItemDetails}
+        options={{ headerShown: false }}
+      />
     </MenuStackNav.Navigator>
   )
 }
@@ -59,7 +75,7 @@ function ConsessionaireConcessionStack() {
 function CustomerTabs() {
   return (
     <Tab.Navigator screenOptions={{ headerShown: false }}>
-      <Tab.Screen name="MenuItems" component={MenuItems} />
+      <Tab.Screen name="Menu Items" component={MenuItemsStack} />
       <Tab.Screen name="Profile" component={Profile} />
     </Tab.Navigator>
   );
@@ -69,7 +85,7 @@ function ConcessionaireTabs() {
   return (
     <Tab.Navigator screenOptions={{ headerShown: false }}>
       <Tab.Screen name="Orders" component={Orders} />
-      <Tab.Screen name="Menu" component={ConsessionaireMenuStack} />
+      <Tab.Screen name="Menu" component={MenuManagementStack} />
       <Tab.Screen name="Concession" component={ConsessionaireConcessionStack} />
       <Tab.Screen name="Profile" component={Profile} />
     </Tab.Navigator>

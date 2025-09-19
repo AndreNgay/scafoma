@@ -6,6 +6,8 @@ import concessionRoutes from './concessionRoutes.js';
 import concessionaireRoutes from './concessionaireRoutes.js';
 import menuItemRoutes from './menuItemRoutes.js';
 import orderRoutes from './orderRoutes.js';
+import itemVariationRoutes from './itemVariationRoutes.js';
+import feedbackRoutes from './feedbackRoutes.js';
 
 
 const router = express.Router();
@@ -17,5 +19,7 @@ router.use('/cafeteria', cafeteriaRoutes);
 router.use('/concession', concessionRoutes); 
 router.use('/menu-item', menuItemRoutes); 
 router.use('/concessionaire', concessionaireRoutes); 
+router.use('/item-variation', itemVariationRoutes)
+router.use('/feedback', feedbackRoutes)
 
 export default router;
