@@ -17,6 +17,8 @@ import MenuItems from "./screens/customer/MenuItems/MenuItems";
 import MenuItemDetails from "./screens/customer/MenuItems/MenuItemDetails";
 import Cart from "./screens/customer/Cart";
 import ViewConcession from "./screens/customer/ViewConcession";
+import ViewOrder from "./screens/customer/Orders/ViewOrder";
+import CustomerOrders from "./screens/customer/Orders/CustomerOrders";
 
 
 const Stack = createNativeStackNavigator();
@@ -79,13 +81,26 @@ function MenuItemsStack() {
   )
 }
 
+function OrdersStack() {
+  return (
+    <MenuStackNav.Navigator>
+      <MenuStackNav.Screen
+        name="Customer Orders"
+        component={CustomerOrders}
+        options={{ headerShown: false }}
+      />
+    </MenuStackNav.Navigator>
+  )
+}
+
+
 
 function CustomerTabs() {
   return (
     <Tab.Navigator screenOptions={{ headerShown: false }}>
       <Tab.Screen name="Menu Items" component={MenuItemsStack} />
       <Tab.Screen name="Cart" component={Cart} />
-      <Tab.Screen name="Orders" component={Orders} />
+      <Tab.Screen name="Orders" component={OrdersStack} />
       <Tab.Screen name="Profile" component={Profile} />
     </Tab.Navigator>
   );

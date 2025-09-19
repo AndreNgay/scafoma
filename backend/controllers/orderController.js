@@ -46,12 +46,21 @@ export const getOrdersByCustomerId = async (req, res) => {
        ORDER BY o.created_at DESC`,
       [id]
     );
-    res.json(result.rows);
+
+    const orders = result.rows.map(order => {
+      if (order.payment_proof) {
+        order.payment_proof = makeImageDataUrl(order.payment_proof);
+      }
+      return order;
+    });
+
+    res.json(orders);
   } catch (err) {
     console.error("Error fetching customer orders:", err);
     res.status(500).json({ error: "Failed to fetch customer orders" });
   }
 };
+
 
 // ==========================
 // Update order status

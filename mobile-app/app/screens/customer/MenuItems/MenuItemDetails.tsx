@@ -19,7 +19,7 @@ import useStore from "../../../store";
 const MenuItemDetails = () => {
   const route = useRoute<any>();
   const navigation = useNavigation<any>();
-  const { item } = route.params; // receiving full item
+  const { item } = route.params;
 
   const [groupedVariations, setGroupedVariations] = useState<any>({});
   const [selectedVariations, setSelectedVariations] = useState<any[]>([]);
@@ -28,7 +28,8 @@ const MenuItemDetails = () => {
   const [loadingFeedbacks, setLoadingFeedbacks] = useState(false);
   const [placingOrder, setPlacingOrder] = useState(false);
   const [note, setNote] = useState("");
-  const [finalPrice, setFinalPrice] = useState(item.price);
+  const [quantity, setQuantity] = useState(1);
+  const [displayPrice, setDisplayPrice] = useState(Number(item.price) || 0);
 
   // 🔹 Fetch variations and groups
   const fetchVariations = async () => {
@@ -79,24 +80,23 @@ const MenuItemDetails = () => {
         }
       });
     } else {
-      // Replace existing selection for this group
       setSelectedVariations((prev) => [
         ...prev.filter((v) => v.group_id !== group.id),
         { ...variation, group_id: group.id },
       ]);
     }
   };
+
+  // 🔹 Auto-update displayed price
   useEffect(() => {
     const base = Number(item.price) || 0;
     const extras = selectedVariations.reduce(
       (sum, v) => sum + Number(v.additional_price || 0),
       0
     );
-    setFinalPrice(base + extras);
-  }, [selectedVariations, item.price]);
+    setDisplayPrice((base + extras) * quantity);
+  }, [selectedVariations, item.price, quantity]);
 
-
-  // 🔹 Initial fetch
   useEffect(() => {
     fetchVariations();
     fetchFeedbacks();
@@ -112,27 +112,24 @@ const MenuItemDetails = () => {
         return;
       }
 
-      // Step 1: create tblorder
       const orderRes = await api.post("/order", {
         customer_id: user.id,
         concession_id: item.concession_id,
         status: "pending",
         note: note,
-        total_price: 0, // ✅ DB will recalc
+        total_price: 0,
       });
       const orderId = orderRes.data.id;
 
-      // Step 2: add tblorderdetail
       const detailRes = await api.post("/order-detail", {
         order_id: orderId,
         item_id: item.id,
-        quantity: 1,
+        quantity,
         item_price: item.price,
-        total_price: item.price,
+        total_price: displayPrice,
       });
       const orderDetailId = detailRes.data.id;
 
-      // Step 3: add variations
       for (const v of selectedVariations) {
         await api.post("/order-item-variation", {
           order_detail_id: orderDetailId,
@@ -140,7 +137,6 @@ const MenuItemDetails = () => {
         });
       }
 
-      // Step 4: recalc total in backend
       await api.put(`/order/${orderId}/recalculate`);
 
       Alert.alert("Success", "Order placed successfully!");
@@ -156,9 +152,20 @@ const MenuItemDetails = () => {
     }
   };
 
+  // 🔹 Format feedback date
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString);
+    return date.toLocaleDateString("en-US", {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  };
+
   return (
     <ScrollView style={styles.container}>
-      {/* Item Info */}
       {item.image_url ? (
         <Image source={{ uri: item.image_url }} style={styles.image} />
       ) : (
@@ -166,7 +173,6 @@ const MenuItemDetails = () => {
       )}
       <Text style={styles.itemName}>{item.item_name}</Text>
 
-      {/* 🔗 Concession Name Clickable */}
       <TouchableOpacity
         onPress={() =>
           navigation.navigate("View Concession", { concession: item })
@@ -180,9 +186,26 @@ const MenuItemDetails = () => {
       {item.category && (
         <Text style={styles.categoryTag}>{item.category}</Text>
       )}
-      <Text style={styles.price}>₱{Number(item.price).toFixed(2)}</Text>
+      {/* 🔹 This price updates automatically */}
+      <Text style={styles.price}>₱{Number(displayPrice).toFixed(2)}</Text>
 
-      {/* Variations */}
+      {/* Quantity Selector */}
+      <View style={styles.quantityRow}>
+        <TouchableOpacity
+          style={styles.qtyButton}
+          onPress={() => setQuantity((q) => Math.max(1, q - 1))}
+        >
+          <Text style={styles.qtyButtonText}>-</Text>
+        </TouchableOpacity>
+        <Text style={styles.qtyText}>{quantity}</Text>
+        <TouchableOpacity
+          style={styles.qtyButton}
+          onPress={() => setQuantity((q) => q + 1)}
+        >
+          <Text style={styles.qtyButtonText}>+</Text>
+        </TouchableOpacity>
+      </View>
+
       <Text style={styles.sectionHeader}>Variations</Text>
       {loadingVariations ? (
         <ActivityIndicator color="#A40C2D" size="large" />
@@ -228,10 +251,6 @@ const MenuItemDetails = () => {
         onChangeText={setNote}
       />
 
-      <Text style={styles.finalPrice}>
-        Final Price: ₱{Number(finalPrice).toFixed(2)}
-      </Text>
-
       {/* Feedbacks */}
       <Text style={styles.sectionHeader}>Customer Feedbacks</Text>
       {loadingFeedbacks ? (
@@ -249,13 +268,15 @@ const MenuItemDetails = () => {
               </Text>
               <Text style={styles.feedbackRating}>⭐ {item.rating}/5</Text>
               <Text style={styles.feedbackComment}>{item.comment}</Text>
+              <Text style={styles.feedbackDate}>
+                {formatDate(item.created_at)}
+              </Text>
             </View>
           )}
           scrollEnabled={false}
         />
       )}
 
-      {/* Order Button */}
       <View style={{ marginVertical: 20 }}>
         <Button
           title={placingOrder ? "Placing Order..." : "Place Order"}
@@ -323,6 +344,7 @@ const styles = StyleSheet.create({
   feedbackAuthor: { fontWeight: "600" },
   feedbackRating: { fontSize: 13, color: "#A40C2D" },
   feedbackComment: { marginTop: 5, fontSize: 13 },
+  feedbackDate: { marginTop: 3, fontSize: 12, color: "#666" },
   noteInput: {
     borderWidth: 1,
     borderColor: "#ccc",
@@ -330,12 +352,25 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     marginBottom: 15,
   },
-  finalPrice: {
-    fontSize: 18,
-    fontWeight: "bold",
-    color: "#A40C2D",
-    marginTop: 10,
+  quantityRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: 15,
+    marginBottom: 10,
   },
+  qtyButton: {
+    borderWidth: 1,
+    borderColor: "#A40C2D",
+    borderRadius: 6,
+    padding: 8,
+    marginHorizontal: 10,
+  },
+  qtyButtonText: {
+    fontSize: 18,
+    color: "#A40C2D",
+    fontWeight: "bold",
+  },
+  qtyText: { fontSize: 16, fontWeight: "600" },
 });
 
 export default MenuItemDetails;

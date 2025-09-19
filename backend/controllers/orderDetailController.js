@@ -32,7 +32,7 @@ export const addOrderDetail = async (req, res) => {
   try {
     const result = await pool.query(
       `INSERT INTO tblorderdetail (order_id, item_id, quantity, item_price, total_price)
-       VALUES ($1, $2, $3, $4, $5) RETURNING *`,
+      VALUES ($1, $2, $3, $4, $5) RETURNING *`,
       [order_id, item_id, quantity, item_price, total_price]
     );
     res.status(201).json(result.rows[0]);

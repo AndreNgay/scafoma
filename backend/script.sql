@@ -88,6 +88,7 @@ CREATE TABLE IF NOT EXISTS tblitemvariationgroup (
     variation_group_name VARCHAR(100) NOT NULL,
     menu_item_id INT NOT NULL,
     multiple_selection BOOLEAN DEFAULT FALSE,
+    required_selection BOOLEAN DEFAULT FALSE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 
