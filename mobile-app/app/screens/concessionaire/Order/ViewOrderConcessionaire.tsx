@@ -38,48 +38,50 @@ const ViewOrderConcessionaire = () => {
   }
 
   return (
-    <ScrollView style={styles.container}>
-      <Text style={styles.header}>Order #{order.id}</Text>
-      <Text>Status: <Text style={styles.status}>{order.order_status}</Text></Text>
-      <Text>Total: ₱{Number(order.total_price).toFixed(2)}</Text>
-      {order.note ? <Text>Note: {String(order.note)}</Text> : null}
+<ScrollView style={styles.container}>
+  <Text style={styles.header}>Order #{order.id}</Text>
+  <Text>Status: <Text style={styles.status}>{order.order_status}</Text></Text>
+  <Text>Total: ₱{Number(order.total_price).toFixed(2)}</Text>
 
-      <Text>Date: {new Date(order.created_at).toLocaleString()}</Text>
+  {order.payment_method && (
+    <Text>Payment Method: {order.payment_method === 'gcash' ? 'GCash' : 'On-Counter'}</Text>
+  )}
 
-      {order.payment_proof && (
-        <Image source={{ uri: order.payment_proof }} style={styles.paymentProof} />
-      )}
+  {order.note ? <Text>Note: {String(order.note)}</Text> : null}
+  <Text>Date: {new Date(order.created_at).toLocaleString()}</Text>
 
-      <Text style={styles.sectionHeader}>Items</Text>
-      <FlatList
-        data={order.items || []}
-        keyExtractor={(item) => item.id.toString()}
-        renderItem={({ item }) => (
-          <View style={styles.itemCard}>
-            <Text style={styles.itemName}>
-              {item.item_name} x{item.quantity}  {/* Quantity displayed here */}
-            </Text>
-            <Text>₱{Number(item.total_price).toFixed(2)}</Text>
-            
-            {item.note ? <Text style={styles.note}>Note: {item.note}</Text> : null} {/* Note displayed here */}
+  {order.payment_proof && (
+    <Image source={{ uri: order.payment_proof }} style={styles.paymentProof} />
+  )}
 
-            {item.variations && item.variations.length > 0 && (
-              <View style={{ marginTop: 5 }}>
-                {item.variations.map((v: any) => (
-                  <Text key={v.id} style={styles.variation}>
-                    • {String(v.variation_name)} (+₱{Number(v.additional_price || 0).toFixed(2)})
-                  </Text>
-                ))}
-              </View>
-            )}
+  <Text style={styles.sectionHeader}>Items</Text>
+  <FlatList
+    data={order.items || []}
+    keyExtractor={(item) => item.id.toString()}
+    renderItem={({ item }) => (
+      <View style={styles.itemCard}>
+        <Text style={styles.itemName}>
+          {item.item_name} x{item.quantity}
+        </Text>
+        <Text>₱{Number(item.total_price).toFixed(2)}</Text>
+        
+        {item.note ? <Text style={styles.note}>Note: {item.note}</Text> : null}
 
-
+        {item.variations && item.variations.length > 0 && (
+          <View style={{ marginTop: 5 }}>
+            {item.variations.map((v: any) => (
+              <Text key={v.id} style={styles.variation}>
+                • {String(v.variation_name)} (+₱{Number(v.additional_price || 0).toFixed(2)})
+              </Text>
+            ))}
           </View>
         )}
-        scrollEnabled={false}
-      />
+      </View>
+    )}
+    scrollEnabled={false}
+  />
+</ScrollView>
 
-    </ScrollView>
   );
 };
 

@@ -60,15 +60,16 @@ export const getMenuItems = async (req, res) => {
     const total = parseInt(countResult.rows[0].count);
 
     const result = await pool.query(
-      `SELECT mi.*, c.concession_name, caf.cafeteria_name
-       FROM tblmenuitem mi
-       JOIN tblconcession c ON mi.concession_id = c.id
-       JOIN tblcafeteria caf ON c.cafeteria_id = caf.id
-       ${whereSQL}
-       ORDER BY ${orderBy}
-       LIMIT $${i} OFFSET $${i + 1}`,
+      `SELECT mi.*, c.concession_name, c.gcash_payment_available, c.oncounter_payment_available, caf.cafeteria_name
+      FROM tblmenuitem mi
+      JOIN tblconcession c ON mi.concession_id = c.id
+      JOIN tblcafeteria caf ON c.cafeteria_id = caf.id
+      ${whereSQL}
+      ORDER BY ${orderBy}
+      LIMIT $${i} OFFSET $${i + 1}`,
       [...params, limit, offset]
     );
+
 
     const menuItems = result.rows;
 
@@ -111,6 +112,8 @@ export const getMenuItems = async (req, res) => {
             variations: variationsMap[r.id][label]
           }))
         : [],
+        gcash_payment_available: r.gcash_payment_available,
+        oncounter_payment_available: r.oncounter_payment_available,
     }));
 
     res.json({

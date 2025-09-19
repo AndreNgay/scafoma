@@ -4,7 +4,6 @@ import {
   Text,
   StyleSheet,
   ActivityIndicator,
-  FlatList,
   ScrollView,
   Image,
   TouchableOpacity,
@@ -13,8 +12,9 @@ import {
   TextInput,
 } from "react-native";
 import { useRoute, useNavigation } from "@react-navigation/native";
-import api from "../../../libs/apiCall"; // axios instance
+import api from "../../../libs/apiCall";
 import useStore from "../../../store";
+import { Picker } from "@react-native-picker/picker";
 
 const MenuItemDetails = () => {
   const route = useRoute<any>();
@@ -30,14 +30,23 @@ const MenuItemDetails = () => {
   const [note, setNote] = useState("");
   const [quantity, setQuantity] = useState(1);
   const [displayPrice, setDisplayPrice] = useState(Number(item.price) || 0);
+  const [paymentMethod, setPaymentMethod] = useState<"gcash" | "on-counter">("on-counter");
 
-  // 🔹 Fetch variations and groups
+  // Set default payment method based on availability
+  useEffect(() => {
+    if (item.oncounter_payment_available) {
+      setPaymentMethod("on-counter");
+    } else if (item.gcash_payment_available) {
+      setPaymentMethod("gcash");
+    }
+  }, [item.gcash_payment_available, item.oncounter_payment_available]);
+
+  // Fetch variations
   const fetchVariations = async () => {
     try {
       setLoadingVariations(true);
       const resGroups = await api.get(`/item-variation-group/${item.id}`);
       const groups = resGroups.data.data || [];
-
       const grouped: any = {};
       for (const group of groups) {
         const resVars = await api.get(`/item-variation/group/${group.id}`);
@@ -47,7 +56,6 @@ const MenuItemDetails = () => {
           variations: resVars.data.data || [],
         };
       }
-
       setGroupedVariations(grouped);
     } catch (err) {
       console.error("Error fetching variations:", err);
@@ -55,60 +63,8 @@ const MenuItemDetails = () => {
       setLoadingVariations(false);
     }
   };
-  // 🔹 Add to Cart
-const addToCart = async () => {
-  try {
-    setPlacingOrder(true);
-    const user = useStore.getState().user;
-    if (!user) {
-      Alert.alert("Error", "You must be logged in to add items to cart.");
-      return;
-    }
 
-    const orderRes = await api.post("/order", {
-      customer_id: user.id,
-      concession_id: item.concession_id,
-      status: "pending",
-      total_price: 0,
-      in_cart: true,
-    });
-
-    const orderId = orderRes.data.id;
-
-    // inside addToCart
-    const detailRes = await api.post("/order-detail", {
-      order_id: orderId,
-      item_id: item.id,
-      quantity,
-      item_price: item.price,
-      total_price: displayPrice,
-      note, // <-- must be here too
-    });
-
-
-    const orderDetailId = detailRes.data.id;
-
-    for (const v of selectedVariations) {
-      await api.post("/order-item-variation", {
-        order_detail_id: orderDetailId,
-        variation_id: v.id,
-      });
-    }
-
-    await api.put(`/order/${orderId}/recalculate`);
-
-    Alert.alert("Success", "Item added to cart!");
-    navigation.navigate("Cart"); // 🔹 Create Cart screen if not yet
-  } catch (err: any) {
-    console.error("Error adding to cart:", err.response?.data || err);
-    Alert.alert("Error", err.response?.data?.message ?? "Failed to add to cart.");
-  } finally {
-    setPlacingOrder(false);
-  }
-};
-
-
-  // 🔹 Fetch feedbacks
+  // Fetch feedbacks
   const fetchFeedbacks = async () => {
     try {
       setLoadingFeedbacks(true);
@@ -121,25 +77,7 @@ const addToCart = async () => {
     }
   };
 
-  // 🔹 Handle selecting variations
-  const toggleVariation = (variation: any, group: any) => {
-    if (group.multiple) {
-      setSelectedVariations((prev) => {
-        if (prev.find((v) => v.id === variation.id)) {
-          return prev.filter((v) => v.id !== variation.id);
-        } else {
-          return [...prev, variation];
-        }
-      });
-    } else {
-      setSelectedVariations((prev) => [
-        ...prev.filter((v) => v.group_id !== group.id),
-        { ...variation, group_id: group.id },
-      ]);
-    }
-  };
-
-  // 🔹 Auto-update displayed price
+  // Auto-update displayed price
   useEffect(() => {
     const base = Number(item.price) || 0;
     const extras = selectedVariations.reduce(
@@ -154,22 +92,37 @@ const addToCart = async () => {
     fetchFeedbacks();
   }, [item.id]);
 
-  // 🔹 Place Order
-  const placeOrder = async () => {
+  // Toggle variation
+  const toggleVariation = (variation: any, group: any) => {
+    if (group.multiple) {
+      setSelectedVariations((prev) =>
+        prev.find((v) => v.id === variation.id)
+          ? prev.filter((v) => v.id !== variation.id)
+          : [...prev, variation]
+      );
+    } else {
+      setSelectedVariations((prev) => [
+        ...prev.filter((v) => v.group_id !== group.id),
+        { ...variation, group_id: group.id },
+      ]);
+    }
+  };
+
+  // Add to cart / Place order
+  const submitOrder = async (inCart: boolean) => {
     try {
       setPlacingOrder(true);
       const user = useStore.getState().user;
-      if (!user) {
-        Alert.alert("Error", "You must be logged in to place an order.");
-        return;
-      }
+      if (!user) return Alert.alert("Error", "You must be logged in to place an order.");
 
       const orderRes = await api.post("/order", {
         customer_id: user.id,
         concession_id: item.concession_id,
         status: "pending",
-        note: note,
+        note,
         total_price: 0,
+        in_cart: inCart,
+        payment_method: paymentMethod,
       });
       const orderId = orderRes.data.id;
 
@@ -179,7 +132,7 @@ const addToCart = async () => {
         quantity,
         item_price: item.price,
         total_price: displayPrice,
-        note, // <-- must be here too
+        note,
       });
 
       const orderDetailId = detailRes.data.id;
@@ -193,29 +146,14 @@ const addToCart = async () => {
 
       await api.put(`/order/${orderId}/recalculate`);
 
-      Alert.alert("Success", "Order placed successfully!");
-      navigation.navigate("Orders");
+      Alert.alert("Success", inCart ? "Item added to cart!" : "Order placed successfully!");
+      navigation.navigate(inCart ? "Cart" : "Orders");
     } catch (err: any) {
-      console.error("Error placing order:", err.response?.data || err);
-      Alert.alert(
-        "Error",
-        err.response?.data?.message ?? "Failed to place order."
-      );
+      console.error(err.response?.data || err);
+      Alert.alert("Error", err.response?.data?.message ?? "Failed to submit order.");
     } finally {
       setPlacingOrder(false);
     }
-  };
-
-  // 🔹 Format feedback date
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    return date.toLocaleDateString("en-US", {
-      year: "numeric",
-      month: "short",
-      day: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
   };
 
   return (
@@ -225,22 +163,17 @@ const addToCart = async () => {
       ) : (
         <View style={styles.placeholder} />
       )}
+
       <Text style={styles.itemName}>{item.item_name}</Text>
 
       <TouchableOpacity
-        onPress={() =>
-          navigation.navigate("View Concession", { concession: item })
-        }
+        onPress={() => navigation.navigate("View Concession", { concession: item })}
       >
         <Text style={styles.linkText}>
           {item.concession_name} • {item.cafeteria_name}
         </Text>
       </TouchableOpacity>
 
-      {item.category && (
-        <Text style={styles.categoryTag}>{item.category}</Text>
-      )}
-      {/* 🔹 This price updates automatically */}
       <Text style={styles.price}>₱{Number(displayPrice).toFixed(2)}</Text>
 
       {/* Quantity Selector */}
@@ -252,14 +185,32 @@ const addToCart = async () => {
           <Text style={styles.qtyButtonText}>-</Text>
         </TouchableOpacity>
         <Text style={styles.qtyText}>{quantity}</Text>
-        <TouchableOpacity
-          style={styles.qtyButton}
-          onPress={() => setQuantity((q) => q + 1)}
-        >
+        <TouchableOpacity style={styles.qtyButton} onPress={() => setQuantity((q) => q + 1)}>
           <Text style={styles.qtyButtonText}>+</Text>
         </TouchableOpacity>
       </View>
 
+      {/* Payment Method */}
+      <Text style={styles.sectionHeader}>Payment Method</Text>
+      {item.gcash_payment_available || item.oncounter_payment_available ? (
+        <View style={styles.pickerContainer}>
+          <Picker
+            selectedValue={paymentMethod}
+            onValueChange={(val: string) => setPaymentMethod(val as "gcash" | "on-counter")}
+          >
+            {item.oncounter_payment_available && (
+              <Picker.Item label="On-Counter" value="on-counter" />
+            )}
+            {item.gcash_payment_available && (
+              <Picker.Item label="GCash" value="gcash" />
+            )}
+          </Picker>
+        </View>
+      ) : (
+        <Text style={{ color: "red" }}>No payment methods available</Text>
+      )}
+
+      {/* Variations */}
       <Text style={styles.sectionHeader}>Variations</Text>
       {loadingVariations ? (
         <ActivityIndicator color="#A40C2D" size="large" />
@@ -271,20 +222,14 @@ const addToCart = async () => {
           return (
             <View key={groupName} style={styles.group}>
               <Text style={styles.groupLabel}>
-                {groupName}{" "}
-                {group.multiple ? "(Can Choose multiple)" : "(Choose one)"}
+                {groupName} {group.multiple ? "(Can Choose multiple)" : "(Choose one)"}
               </Text>
               {group.variations.map((v: any) => {
-                const isSelected = selectedVariations.some(
-                  (sv) => sv.id === v.id
-                );
+                const isSelected = selectedVariations.some((sv) => sv.id === v.id);
                 return (
                   <TouchableOpacity
                     key={v.id}
-                    style={[
-                      styles.card,
-                      isSelected && { borderColor: "#A40C2D", borderWidth: 2 },
-                    ]}
+                    style={[styles.card, isSelected && { borderColor: "#A40C2D", borderWidth: 2 }]}
                     onPress={() => toggleVariation(v, group)}
                   >
                     <Text style={styles.variationName}>{v.variation_name}</Text>
@@ -297,7 +242,7 @@ const addToCart = async () => {
         })
       )}
 
-      <Text style={styles.sectionHeader}>Notes for concessionaire</Text>
+      <Text style={styles.sectionHeader}>Notes for Concessionaire</Text>
       <TextInput
         style={styles.noteInput}
         placeholder="e.g., No onion, extra sauce"
@@ -306,49 +251,45 @@ const addToCart = async () => {
       />
 
       {/* Feedbacks */}
-      <Text style={styles.sectionHeader}>Customer Feedbacks</Text>
+      <Text style={styles.sectionHeader}>Feedbacks</Text>
       {loadingFeedbacks ? (
         <ActivityIndicator color="#A40C2D" size="large" />
       ) : feedbacks.length === 0 ? (
-        <Text style={styles.emptyText}>No feedback yet</Text>
+        <Text style={styles.emptyText}>No feedbacks yet</Text>
       ) : (
-        <FlatList
-          data={feedbacks}
-          keyExtractor={(f) => f.id.toString()}
-          renderItem={({ item }) => (
-            <View style={styles.feedbackCard}>
-              <Text style={styles.feedbackAuthor}>
-                {item.first_name} {item.last_name}
-              </Text>
-              <Text style={styles.feedbackRating}>⭐ {item.rating}/5</Text>
-              <Text style={styles.feedbackComment}>{item.comment}</Text>
-              <Text style={styles.feedbackDate}>
-                {formatDate(item.created_at)}
-              </Text>
+        feedbacks.map((f) => (
+          <View key={f.id} style={styles.feedbackCard}>
+            <Text style={styles.feedbackUser}>{`${f.first_name} ${f.last_name}`}</Text>
+            <View style={{ flexDirection: "row", marginBottom: 4 }}>
+              {Array.from({ length: 5 }).map((_, i) => (
+                <Text key={i} style={{ color: "#FFD700", fontSize: 20, marginRight: 2 }}>
+                  {i < Number(f.rating) ? "★" : "☆"}
+                </Text>
+              ))}
             </View>
-          )}
-          scrollEnabled={false}
-        />
+            <Text style={styles.feedbackText}>{f.comment}</Text>
+          </View>
+        ))
       )}
 
-<View style={{ marginVertical: 20 }}>
-  <Button
-    title={placingOrder ? "Placing Order..." : "Place Order"}
-    color="#A40C2D"
-    onPress={placeOrder}
-    disabled={placingOrder}
-  />
-</View>
+      {/* Action Buttons */}
+      <View style={{ marginVertical: 20 }}>
+        <Button
+          title={placingOrder ? "Placing Order..." : "Place Order"}
+          color="#A40C2D"
+          onPress={() => submitOrder(false)}
+          disabled={placingOrder}
+        />
+      </View>
 
-<View style={{ marginVertical: 10 }}>
-  <Button
-    title={placingOrder ? "Adding to Cart..." : "Add to Cart"}
-    color="#A40C2D"
-    onPress={addToCart}
-    disabled={placingOrder}
-  />
-</View>
-
+      <View style={{ marginVertical: 10 }}>
+        <Button
+          title={placingOrder ? "Adding to Cart..." : "Add to Cart"}
+          color="#A40C2D"
+          onPress={() => submitOrder(true)}
+          disabled={placingOrder}
+        />
+      </View>
     </ScrollView>
   );
 };
@@ -356,85 +297,25 @@ const addToCart = async () => {
 const styles = StyleSheet.create({
   container: { flex: 1, padding: 15, backgroundColor: "#fff" },
   image: { width: "100%", height: 200, borderRadius: 10, marginBottom: 15 },
-  placeholder: {
-    width: "100%",
-    height: 200,
-    borderRadius: 10,
-    backgroundColor: "#ddd",
-    marginBottom: 15,
-  },
+  placeholder: { width: "100%", height: 200, borderRadius: 10, backgroundColor: "#ddd", marginBottom: 15 },
   itemName: { fontSize: 20, fontWeight: "bold" },
-  linkText: {
-    fontSize: 14,
-    color: "#A40C2D",
-    marginTop: 3,
-    fontWeight: "600",
-  },
-  categoryTag: {
-    marginTop: 3,
-    fontSize: 14,
-    color: "#A40C2D",
-    fontWeight: "600",
-  },
+  linkText: { fontSize: 14, color: "#A40C2D", marginTop: 3, fontWeight: "600" },
   price: { marginTop: 5, fontWeight: "600", color: "#A40C2D", fontSize: 16 },
-  sectionHeader: {
-    fontSize: 16,
-    fontWeight: "600",
-    marginTop: 20,
-    marginBottom: 10,
-    color: "#A40C2D",
-  },
-  emptyText: { color: "#888", fontStyle: "italic" },
-  group: { marginBottom: 15 },
-  groupLabel: {
-    fontSize: 15,
-    fontWeight: "600",
-    marginBottom: 8,
-    color: "#333",
-  },
-  card: {
-    backgroundColor: "#f9f9f9",
-    padding: 12,
-    marginBottom: 8,
-    borderRadius: 8,
-  },
-  variationName: { fontSize: 14, fontWeight: "500" },
-  feedbackCard: {
-    backgroundColor: "#f1f1f1",
-    padding: 12,
-    marginBottom: 8,
-    borderRadius: 8,
-  },
-  feedbackAuthor: { fontWeight: "600" },
-  feedbackRating: { fontSize: 13, color: "#A40C2D" },
-  feedbackComment: { marginTop: 5, fontSize: 13 },
-  feedbackDate: { marginTop: 3, fontSize: 12, color: "#666" },
-  noteInput: {
-    borderWidth: 1,
-    borderColor: "#ccc",
-    padding: 10,
-    borderRadius: 8,
-    marginBottom: 15,
-  },
-  quantityRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginTop: 15,
-    marginBottom: 10,
-  },
-  qtyButton: {
-    borderWidth: 1,
-    borderColor: "#A40C2D",
-    borderRadius: 6,
-    padding: 8,
-    marginHorizontal: 10,
-  },
-  qtyButtonText: {
-    fontSize: 18,
-    color: "#A40C2D",
-    fontWeight: "bold",
-  },
+  sectionHeader: { fontSize: 16, fontWeight: "600", marginTop: 20, marginBottom: 10, color: "#A40C2D" },
+  quantityRow: { flexDirection: "row", alignItems: "center", marginTop: 15, marginBottom: 10 },
+  qtyButton: { borderWidth: 1, borderColor: "#A40C2D", borderRadius: 6, padding: 8, marginHorizontal: 10 },
+  qtyButtonText: { fontSize: 18, color: "#A40C2D", fontWeight: "bold" },
   qtyText: { fontSize: 16, fontWeight: "600" },
+  pickerContainer: { borderWidth: 1, borderColor: "#ccc", borderRadius: 8 },
+  noteInput: { borderWidth: 1, borderColor: "#ccc", padding: 10, borderRadius: 8, marginBottom: 15 },
+  group: { marginBottom: 15 },
+  groupLabel: { fontSize: 15, fontWeight: "600", marginBottom: 8, color: "#333" },
+  card: { backgroundColor: "#f9f9f9", padding: 12, marginBottom: 8, borderRadius: 8 },
+  variationName: { fontSize: 14, fontWeight: "500" },
+  emptyText: { color: "#888", fontStyle: "italic" },
+  feedbackCard: { backgroundColor: "#f1f1f1", padding: 10, borderRadius: 6, marginBottom: 8 },
+  feedbackUser: { fontWeight: "600", marginBottom: 2 },
+  feedbackText: { fontSize: 14 },
 });
 
 export default MenuItemDetails;

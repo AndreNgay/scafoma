@@ -145,36 +145,27 @@ export const updatePaymentProof = async (req, res) => {
 // Add a new order
 // ==========================
 export const addOrder = async (req, res) => {
-  const { customer_id, concession_id, status, total_price, in_cart } = req.body;
-
+  const { customer_id, concession_id, status, total_price, in_cart, payment_method } = req.body;
   try {
-    // 🔹 1. Check if an in-cart order already exists for this customer + concession
     const existing = await pool.query(
-      `SELECT * FROM tblorder 
-       WHERE customer_id = $1 AND concession_id = $2 AND in_cart = TRUE
-       LIMIT 1`,
+      `SELECT * FROM tblorder WHERE customer_id=$1 AND concession_id=$2 AND in_cart=TRUE LIMIT 1`,
       [customer_id, concession_id]
     );
+    if (existing.rows.length > 0) return res.status(200).json(existing.rows[0]);
 
-    if (existing.rows.length > 0) {
-      // 🔹 Reuse existing order
-      return res.status(200).json(existing.rows[0]);
-    }
-
-    // 🔹 2. Otherwise, create new order
     const result = await pool.query(
-      `INSERT INTO tblorder (customer_id, concession_id, order_status, total_price, in_cart)
-        VALUES ($1, $2, $3, $4, $5)
-       RETURNING *`,
-      [customer_id, concession_id, status, total_price, in_cart ?? false]
+      `INSERT INTO tblorder (customer_id, concession_id, order_status, total_price, in_cart, payment_method)
+       VALUES ($1,$2,$3,$4,$5,$6) RETURNING *`,
+      [customer_id, concession_id, status, total_price, in_cart ?? false, payment_method]
     );
-
     res.status(201).json(result.rows[0]);
   } catch (err) {
-    console.error("Error adding order:", err);
+    console.error(err);
     res.status(500).json({ error: "Failed to add order" });
   }
 };
+
+
 
 
 // ==========================
