@@ -16,10 +16,12 @@ import Concession from "./screens/concessionaire/Concession/Concession";
 import MenuItems from "./screens/customer/MenuItems/MenuItems";
 import MenuItemDetails from "./screens/customer/MenuItems/MenuItemDetails";
 import ViewConcession from "./screens/customer/ViewConcession";
-import ViewOrder from "./screens/ViewOrder";
+import ViewOrder from "./screens/concessionaire/Order/ViewOrderConcessionaire";
 import CustomerOrders from "./screens/customer/Orders/CustomerOrders";
 import Cart from "./screens/customer/Cart/Cart";
 import OrderList from "./screens/concessionaire/Order/OrderList";
+import ViewOrderCustomer from "./screens/customer/Orders/ViewOrderCustomer";
+import ViewOrderConcessionaire from "./screens/concessionaire/Order/ViewOrderConcessionaire";
 
 
 const Stack = createNativeStackNavigator();
@@ -92,7 +94,7 @@ function OrdersStack() {
       />
       <MenuStackNav.Screen
         name="View Order"
-        component={ViewOrder}
+        component={ViewOrderCustomer}
         options={{ headerShown: false }}
       />
     </MenuStackNav.Navigator>
@@ -109,7 +111,7 @@ function OrderListStack() {
       />
       <MenuStackNav.Screen
         name="View Order"
-        component={ViewOrder}
+        component={ViewOrderConcessionaire}
         options={{ headerShown: false }}
       />
     </MenuStackNav.Navigator>

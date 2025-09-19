@@ -1,9 +1,9 @@
 import React, { useEffect, useState } from "react";
 import { View, Text, StyleSheet, ActivityIndicator, FlatList, Image, ScrollView } from "react-native";
 import { useRoute } from "@react-navigation/native";
-import api from "../libs/apiCall";
+import api from "../../../libs/apiCall";
 
-const ViewOrder = () => {
+const ViewOrderConcessionaire = () => {
   const route = useRoute<any>();
   const { orderId } = route.params;
   const [order, setOrder] = useState<any>(null);
@@ -42,7 +42,8 @@ const ViewOrder = () => {
       <Text style={styles.header}>Order #{order.id}</Text>
       <Text>Status: <Text style={styles.status}>{order.order_status}</Text></Text>
       <Text>Total: ₱{Number(order.total_price).toFixed(2)}</Text>
-      {order.note ? <Text>Note: {order.note}</Text> : null}
+      {order.note ? <Text>Note: {String(order.note)}</Text> : null}
+
       <Text>Date: {new Date(order.created_at).toLocaleString()}</Text>
 
       {order.payment_proof && (
@@ -56,24 +57,28 @@ const ViewOrder = () => {
         renderItem={({ item }) => (
           <View style={styles.itemCard}>
             <Text style={styles.itemName}>
-              {item.item_name} x{item.quantity}
+              {item.item_name} x{item.quantity}  {/* Quantity displayed here */}
             </Text>
             <Text>₱{Number(item.total_price).toFixed(2)}</Text>
-            {item.note ? <Text>Note: {item.note}</Text> : null}
+            
+            {item.note ? <Text style={styles.note}>Note: {item.note}</Text> : null} {/* Note displayed here */}
 
             {item.variations && item.variations.length > 0 && (
               <View style={{ marginTop: 5 }}>
                 {item.variations.map((v: any) => (
                   <Text key={v.id} style={styles.variation}>
-                    • {v.variation_name} (+₱{v.additional_price})
+                    • {String(v.variation_name)} (+₱{Number(v.additional_price || 0).toFixed(2)})
                   </Text>
                 ))}
               </View>
             )}
+
+
           </View>
         )}
         scrollEnabled={false}
       />
+
     </ScrollView>
   );
 };
@@ -88,6 +93,8 @@ const styles = StyleSheet.create({
   variation: { fontSize: 13, color: "#444" },
   paymentProof: { marginTop: 15, width: "100%", height: 200, borderRadius: 10 },
   emptyText: { textAlign: "center", color: "#888", marginTop: 20 },
+  note: { fontSize: 13, color: "#555", fontStyle: "italic", marginTop: 2 },
+  
 });
 
-export default ViewOrder;
+export default ViewOrderConcessionaire;

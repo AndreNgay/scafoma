@@ -16,9 +16,11 @@ interface Order {
   order_status: string;
   total_price: number;
   created_at: string;
-  customer_name: string;
+  first_name: string;
+  last_name: string;
   concession_name: string;
 }
+
 
 const OrderList = () => {
   const navigation = useNavigation<any>();
@@ -53,7 +55,10 @@ const OrderList = () => {
       onPress={() => navigation.navigate("View Order", { orderId: item.id })}
     >
       <Text style={styles.orderId}>Order #{item.id}</Text>
-      <Text style={styles.customer}>Customer: {item.customer_name}</Text>
+      <Text style={styles.customer}>
+        Customer: {item.first_name} {item.last_name}
+      </Text>
+
       <Text style={styles.concession}>Concession: {item.concession_name}</Text>
       <Text>Status: <Text style={styles.status}>{item.order_status}</Text></Text>
       <Text>Total: ₱{Number(item.total_price).toFixed(2)}</Text>
