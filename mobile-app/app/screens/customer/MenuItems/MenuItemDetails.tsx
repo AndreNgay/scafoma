@@ -15,29 +15,33 @@ import api from "../../../libs/apiCall"; // axios instance
 const MenuItemDetails = () => {
   const route = useRoute<any>();
   const navigation = useNavigation<any>();
-  const { item } = route.params; // now receiving full item
+  const { item } = route.params; // receiving full item
 
-  const [variations, setVariations] = useState<any[]>([]);
   const [groupedVariations, setGroupedVariations] = useState<any>({});
   const [feedbacks, setFeedbacks] = useState<any[]>([]);
   const [loadingVariations, setLoadingVariations] = useState(false);
   const [loadingFeedbacks, setLoadingFeedbacks] = useState(false);
 
-  // Fetch variations
+  // Fetch variations and groups
   const fetchVariations = async () => {
     try {
       setLoadingVariations(true);
-      const res = await api.get(`/item-variation/${item.id}`);
-      const data = res.data.data || [];
 
-      // Group by label
-      const grouped = data.reduce((acc: any, curr: any) => {
-        if (!acc[curr.label]) acc[curr.label] = [];
-        acc[curr.label].push(curr);
-        return acc;
-      }, {});
+      const resGroups = await api.get(
+        `/item-variation-group/menu-item/${item.id}`
+      );
+      const groups = resGroups.data.data || [];
 
-      setVariations(data);
+      const grouped: any = {};
+
+      for (const group of groups) {
+        const resVars = await api.get(`/item-variation/group/${group.id}`);
+        grouped[group.variation_group_name] = {
+          multiple: group.multiple_selection,
+          variations: resVars.data.data || [],
+        };
+      }
+
       setGroupedVariations(grouped);
     } catch (err) {
       console.error("Error fetching variations:", err);
@@ -76,7 +80,9 @@ const MenuItemDetails = () => {
 
       {/* 🔗 Concession Name Clickable */}
       <TouchableOpacity
-        onPress={() => navigation.navigate("View Concession", { concession: item })}
+        onPress={() =>
+          navigation.navigate("View Concession", { concession: item })
+        }
       >
         <Text style={styles.linkText}>
           {item.concession_name} • {item.cafeteria_name}
@@ -92,20 +98,26 @@ const MenuItemDetails = () => {
       <Text style={styles.sectionHeader}>Variations</Text>
       {loadingVariations ? (
         <ActivityIndicator color="#A40C2D" size="large" />
-      ) : variations.length === 0 ? (
+      ) : Object.keys(groupedVariations).length === 0 ? (
         <Text style={styles.emptyText}>No variations available</Text>
       ) : (
-        Object.keys(groupedVariations).map((label) => (
-          <View key={label} style={styles.group}>
-            <Text style={styles.groupLabel}>{label}</Text>
-            {groupedVariations[label].map((v: any) => (
-              <View key={v.id} style={styles.card}>
-                <Text style={styles.variationName}>{v.variation_name}</Text>
-                <Text style={styles.price}>+ ₱{v.additional_price}</Text>
-              </View>
-            ))}
-          </View>
-        ))
+        Object.keys(groupedVariations).map((groupName) => {
+          const group = groupedVariations[groupName];
+          return (
+            <View key={groupName} style={styles.group}>
+              <Text style={styles.groupLabel}>
+                {groupName}{" "}
+                {group.multiple ? "(Choose multiple)" : "(Choose one)"}
+              </Text>
+              {group.variations.map((v: any) => (
+                <View key={v.id} style={styles.card}>
+                  <Text style={styles.variationName}>{v.variation_name}</Text>
+                  <Text style={styles.price}>+ ₱{v.additional_price}</Text>
+                </View>
+              ))}
+            </View>
+          );
+        })
       )}
 
       {/* Feedbacks */}

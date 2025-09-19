@@ -9,6 +9,7 @@ import orderRoutes from './orderRoutes.js';
 import itemVariationRoutes from './itemVariationRoutes.js';
 import feedbackRoutes from './feedbackRoutes.js';
 import cartRoutes from './cartRoutes.js';
+import itemVariationGroupRoutes from './itemVariationGroupRoutes.js';
 
 
 const router = express.Router();
@@ -21,7 +22,9 @@ router.use('/concession', concessionRoutes);
 router.use('/menu-item', menuItemRoutes); 
 router.use('/concessionaire', concessionaireRoutes); 
 router.use('/item-variation', itemVariationRoutes)
+router.use('/item-variation-group', itemVariationGroupRoutes)
 router.use('/feedback', feedbackRoutes)
 router.use('/cart', cartRoutes)
+
 
 export default router;
