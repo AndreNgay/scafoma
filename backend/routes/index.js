@@ -8,6 +8,7 @@ import menuItemRoutes from './menuItemRoutes.js';
 import orderRoutes from './orderRoutes.js';
 import itemVariationRoutes from './itemVariationRoutes.js';
 import feedbackRoutes from './feedbackRoutes.js';
+import cartRoutes from './cartRoutes.js';
 
 
 const router = express.Router();
@@ -21,5 +22,6 @@ router.use('/menu-item', menuItemRoutes);
 router.use('/concessionaire', concessionaireRoutes); 
 router.use('/item-variation', itemVariationRoutes)
 router.use('/feedback', feedbackRoutes)
+router.use('/cart', cartRoutes)
 
 export default router;

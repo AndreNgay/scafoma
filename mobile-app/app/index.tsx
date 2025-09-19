@@ -15,6 +15,9 @@ import EditMenu from "./screens/concessionaire/Menu/EditMenu";
 import Concession from "./screens/concessionaire/Concession/Concession";
 import MenuItems from "./screens/customer/MenuItems/MenuItems";
 import MenuItemDetails from "./screens/customer/MenuItems/MenuItemDetails";
+import Cart from "./screens/customer/Cart";
+import ViewConcession from "./screens/customer/ViewConcession";
+
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -67,6 +70,11 @@ function MenuItemsStack() {
         component={MenuItemDetails}
         options={{ headerShown: false }}
       />
+      <MenuStackNav.Screen
+        name="View Concession"
+        component={ViewConcession}
+        options={{ headerShown: false }}
+      />
     </MenuStackNav.Navigator>
   )
 }
@@ -76,6 +84,7 @@ function CustomerTabs() {
   return (
     <Tab.Navigator screenOptions={{ headerShown: false }}>
       <Tab.Screen name="Menu Items" component={MenuItemsStack} />
+      <Tab.Screen name="Cart" component={Cart} />
       <Tab.Screen name="Profile" component={Profile} />
     </Tab.Navigator>
   );

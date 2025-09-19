@@ -109,6 +109,7 @@ CREATE TABLE IF NOT EXISTS tblorder (
     order_status VARCHAR(30) DEFAULT 'pending' CHECK (order_status IN (
         'pending', 'accepted', 'declined', 'ready for pickup', 'completed'
     )),
+    --gcash screenshot BYTEA, -- Optional: GCash payment screenshot
     note TEXT, -- Note field for special instructions (no onions, etc.)
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -153,6 +154,30 @@ CREATE TABLE IF NOT EXISTS tblorderdetail (
 );
 
 -- =========================
+-- Order Item Variations Table (for multiple variations per order item)
+-- =========================
+CREATE TABLE IF NOT EXISTS tblorderitemvariation (
+    id SERIAL PRIMARY KEY,
+    order_detail_id INT NOT NULL,   -- Reference to tblorderdetail (which is an order item)
+    variation_id INT NOT NULL,      -- Reference to tblitemvariation (the selected variation)
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT fk_orderdetail_variation
+        FOREIGN KEY (order_detail_id)
+        REFERENCES tblorderdetail (id)
+        ON DELETE CASCADE
+        ON UPDATE CASCADE,
+
+    CONSTRAINT fk_variation
+        FOREIGN KEY (variation_id)
+        REFERENCES tblitemvariation (id)
+        ON DELETE CASCADE
+        ON UPDATE CASCADE
+);
+
+
+-- =========================
 -- Cart Table
 -- =========================
 CREATE TABLE IF NOT EXISTS tblcart (
@@ -192,7 +217,28 @@ CREATE TABLE IF NOT EXISTS tblcartdetail (
         ON UPDATE CASCADE
 );
 
+-- =========================
+-- Cart Item Variations Table (for multiple variations per cart item)
+-- =========================
+CREATE TABLE IF NOT EXISTS tblcartitemvariation (
+    id SERIAL PRIMARY KEY,
+    cart_detail_id INT NOT NULL,   -- Reference to tblcartdetail (which is a cart item)
+    variation_id INT NOT NULL,     -- Reference to tblitemvariation (the selected variation)
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 
+    CONSTRAINT fk_cartdetail_variation
+        FOREIGN KEY (cart_detail_id)
+        REFERENCES tblcartdetail (id)
+        ON DELETE CASCADE
+        ON UPDATE CASCADE,
+
+    CONSTRAINT fk_variation
+        FOREIGN KEY (variation_id)
+        REFERENCES tblitemvariation (id)
+        ON DELETE CASCADE
+        ON UPDATE CASCADE
+);
 
 
 -- =========================
@@ -218,3 +264,23 @@ CREATE TABLE IF NOT EXISTS tblfeedback (
         ON DELETE CASCADE
         ON UPDATE CASCADE
 );
+
+-- =========================
+-- Notifications Table
+-- =========================
+CREATE TABLE IF NOT EXISTS tblnotification (
+    id SERIAL PRIMARY KEY,
+    user_id INT NOT NULL,  -- The user to whom the notification is sent (customer, concessionaire, etc.)
+    notification_type VARCHAR(50) NOT NULL,  -- e.g., 'order_status', 'payment_received'
+    message TEXT NOT NULL,  -- The notification message
+    is_read BOOLEAN DEFAULT FALSE,  -- Whether the notification has been read
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT fk_user_notification
+        FOREIGN KEY (user_id)
+        REFERENCES tbluser (id)
+        ON DELETE CASCADE
+        ON UPDATE CASCADE
+);
+
