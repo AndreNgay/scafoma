@@ -11,119 +11,101 @@ import {
   Image,
 } from "react-native";
 import { useNavigation } from "@react-navigation/native";
-import { Picker } from "@react-native-picker/picker";
 import * as ImagePicker from "expo-image-picker";
+import { Picker } from "@react-native-picker/picker";
 import api from "../../../libs/apiCall";
-import axios from "axios";
+
+type Variation = { name: string; price: string };
+type VariationGroup = { label: string; variations: Variation[] };
 
 const AddMenu: React.FC = () => {
   const [itemName, setItemName] = useState("");
   const [price, setPrice] = useState("");
-  const [image, setImage] = useState<any>(null); // new image asset
   const [category, setCategory] = useState("Beverage");
-  const [variationGroups, setVariationGroups] = useState<
-    { label: string; variations: { name: string; price: string }[] }[]
-  >([]);
+  const [image, setImage] = useState<any>(null);
+  const [variationGroups, setVariationGroups] = useState<VariationGroup[]>([]);
+  const [loading, setLoading] = useState(false);
 
   const navigation = useNavigation<any>();
 
-  // pick image
+  // Pick image from gallery
   const pickImage = async () => {
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       quality: 0.8,
     });
 
-    if (!result.canceled) {
-      setImage(result.assets[0]);
-    }
+    if (!result.canceled) setImage(result.assets[0]);
   };
 
-  // === Variation handlers (same as edit)
-  const handleAddVariationGroup = () => {
+  // Variation handlers
+  const addVariationGroup = () =>
     setVariationGroups([...variationGroups, { label: "", variations: [] }]);
-  };
-
-  const handleRemoveVariationGroup = (groupIndex: number) => {
+  const removeVariationGroup = (i: number) => {
     const updated = [...variationGroups];
-    updated.splice(groupIndex, 1);
+    updated.splice(i, 1);
     setVariationGroups(updated);
   };
-
-  const handleAddVariation = (groupIndex: number) => {
+  const addVariation = (gIndex: number) => {
     const updated = [...variationGroups];
-    updated[groupIndex].variations.push({ name: "", price: "" });
+    updated[gIndex].variations.push({ name: "", price: "" });
     setVariationGroups(updated);
   };
-
-  const handleRemoveVariation = (groupIndex: number, variationIndex: number) => {
+  const removeVariation = (gIndex: number, vIndex: number) => {
     const updated = [...variationGroups];
-    updated[groupIndex].variations.splice(variationIndex, 1);
+    updated[gIndex].variations.splice(vIndex, 1);
     setVariationGroups(updated);
   };
-
-  const handleUpdateGroupLabel = (index: number, text: string) => {
+  const updateGroupLabel = (index: number, value: string) => {
     const updated = [...variationGroups];
-    updated[index].label = text;
+    updated[index].label = value;
     setVariationGroups(updated);
   };
-
-  const handleUpdateVariation = (
-    groupIndex: number,
-    variationIndex: number,
-    field: "name" | "price",
+  const updateVariation = (
+    gIndex: number,
+    vIndex: number,
+    key: "name" | "price",
     value: string
   ) => {
     const updated = [...variationGroups];
-    updated[groupIndex].variations[variationIndex][field] = value;
+    updated[gIndex].variations[vIndex][key] = value;
     setVariationGroups(updated);
   };
 
-  // submit
+  // Submit new menu item
   const handleAddMenu = async () => {
     if (!itemName.trim() || !price.trim()) {
       Alert.alert("Error", "Please fill in item name and price.");
       return;
     }
 
+    const formData = new FormData();
+    formData.append("item_name", itemName.trim());
+    formData.append("price", price.trim());
+    formData.append("category", category);
+    formData.append("variations", JSON.stringify(variationGroups));
+
+    if (image?.uri) {
+      formData.append("image", {
+        uri: image.uri,
+        type: "image/jpeg",
+        name: `menu-${Date.now()}.jpg`,
+      } as any);
+    }
+
     try {
-      const formData = new FormData();
-      formData.append("item_name", itemName.trim());
-      formData.append("price", String(price).trim());
-      formData.append("category", category);
-
-      if (image && image.uri) {
-        formData.append("image", {
-          uri: image.uri,
-          type: "image/jpeg", // enforce jpeg
-          name: `menu-${Date.now()}.jpg`,
-        } as any);
-      }
-
-      formData.append("variations", JSON.stringify(variationGroups));
-
+      setLoading(true);
       await api.post("/menu-item", formData, {
-        headers: {
-          Accept: "application/json",
-          "Content-Type": "multipart/form-data",
-        },
+        headers: { "Content-Type": "multipart/form-data" },
       });
-
-
       Alert.alert("Success", "Menu item added successfully", [
         { text: "OK", onPress: () => navigation.goBack() },
       ]);
     } catch (err: unknown) {
-      if (axios.isAxiosError(err)) {
-        console.error("AddMenu error:", err.response?.data ?? err.message);
-        Alert.alert("Error", err.response?.data?.message ?? "Failed to add item");
-      } else if (err instanceof Error) {
-        console.error(err.message);
-        Alert.alert("Error", err.message);
-      } else {
-        console.error(err);
-        Alert.alert("Error", "Unknown error occurred");
-      }
+      console.error(err);
+      Alert.alert("Error", "Failed to add menu item.");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -161,33 +143,33 @@ const AddMenu: React.FC = () => {
 
       {/* Variations UI */}
       <Text style={[styles.label, { marginTop: 18 }]}>Variations</Text>
-      {variationGroups.map((group, groupIndex) => (
-        <View key={groupIndex} style={styles.groupBox}>
+      {variationGroups.map((group, gIndex) => (
+        <View key={gIndex} style={styles.groupBox}>
           <TextInput
             style={styles.input}
             placeholder="Group label (e.g. Size)"
             value={group.label}
-            onChangeText={(t) => handleUpdateGroupLabel(groupIndex, t)}
+            onChangeText={(t) => updateGroupLabel(gIndex, t)}
           />
 
-          {group.variations.map((v, i) => (
-            <View key={i} style={styles.variationRow}>
+          {group.variations.map((v, vIndex) => (
+            <View key={vIndex} style={styles.variationRow}>
               <TextInput
                 style={[styles.input, styles.variationInput]}
                 placeholder="Name"
                 value={v.name}
-                onChangeText={(t) => handleUpdateVariation(groupIndex, i, "name", t)}
+                onChangeText={(t) => updateVariation(gIndex, vIndex, "name", t)}
               />
               <TextInput
                 style={[styles.input, styles.priceInput]}
                 placeholder="Additional price"
                 keyboardType="numeric"
                 value={v.price}
-                onChangeText={(t) => handleUpdateVariation(groupIndex, i, "price", t)}
+                onChangeText={(t) => updateVariation(gIndex, vIndex, "price", t)}
               />
               <TouchableOpacity
                 style={styles.removeButton}
-                onPress={() => handleRemoveVariation(groupIndex, i)}
+                onPress={() => removeVariation(gIndex, vIndex)}
               >
                 <Text style={styles.removeButtonText}>✕</Text>
               </TouchableOpacity>
@@ -195,22 +177,31 @@ const AddMenu: React.FC = () => {
           ))}
 
           <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
-            <TouchableOpacity style={styles.smallButton} onPress={() => handleAddVariation(groupIndex)}>
+            <TouchableOpacity style={styles.smallButton} onPress={() => addVariation(gIndex)}>
               <Text style={styles.smallButtonText}>+ Add Variation</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.removeGroupButton} onPress={() => handleRemoveVariationGroup(groupIndex)}>
+            <TouchableOpacity
+              style={styles.removeGroupButton}
+              onPress={() => removeVariationGroup(gIndex)}
+            >
               <Text style={styles.removeGroupButtonText}>Remove Group</Text>
             </TouchableOpacity>
           </View>
         </View>
       ))}
 
-      <TouchableOpacity style={styles.buttonOutline} onPress={handleAddVariationGroup}>
+      <TouchableOpacity style={styles.buttonOutline} onPress={addVariationGroup}>
         <Text style={styles.buttonOutlineText}>+ Add Variation Group</Text>
       </TouchableOpacity>
 
-      <TouchableOpacity style={styles.button} onPress={handleAddMenu}>
-        <Text style={styles.buttonText}>Add Menu Item</Text>
+      <TouchableOpacity
+        style={styles.button}
+        onPress={handleAddMenu}
+        disabled={loading}
+      >
+        <Text style={styles.buttonText}>
+          {loading ? "Saving..." : "Add Menu Item"}
+        </Text>
       </TouchableOpacity>
     </ScrollView>
   );
@@ -229,12 +220,7 @@ const styles = StyleSheet.create({
     marginTop: 6,
     backgroundColor: "#fff",
   },
-  pickerWrapper: {
-    borderWidth: 1,
-    borderColor: "#ccc",
-    borderRadius: 8,
-    marginTop: 6,
-  },
+  pickerWrapper: { borderWidth: 1, borderColor: "#ccc", borderRadius: 8, marginTop: 6 },
   imagePicker: {
     borderWidth: 1,
     borderColor: "#ccc",
@@ -245,14 +231,7 @@ const styles = StyleSheet.create({
     marginTop: 6,
   },
   previewImage: { width: 120, height: 120, borderRadius: 10 },
-  groupBox: {
-    borderWidth: 1,
-    borderColor: "#aaa",
-    borderRadius: 8,
-    padding: 10,
-    marginTop: 12,
-    backgroundColor: "#f9f9f9",
-  },
+  groupBox: { borderWidth: 1, borderColor: "#aaa", borderRadius: 8, padding: 10, marginTop: 12, backgroundColor: "#f9f9f9" },
   variationRow: { flexDirection: "row", alignItems: "center", marginTop: 6 },
   variationInput: { flex: 2, marginRight: 6 },
   priceInput: { flex: 1, marginRight: 6 },

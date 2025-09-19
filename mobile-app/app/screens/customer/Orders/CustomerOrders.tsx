@@ -10,8 +10,11 @@ import {
 import { useFocusEffect } from "@react-navigation/native";
 import useStore from "../../../store";
 import api from "../../../libs/apiCall"; // axios instance
+import { TouchableOpacity } from "react-native";
+import { useNavigation } from "@react-navigation/native";
 
 const CustomerOrders = () => {
+    const navigation = useNavigation<any>();
   const user = useStore((state: any) => state.user);
   const [orders, setOrders] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
@@ -36,27 +39,31 @@ const CustomerOrders = () => {
     }, [user?.id])
   );
 
-  const renderItem = ({ item }: any) => (
-    <View style={styles.card}>
-      <Text style={styles.title}>
-        {item.cafeteria_name} • {item.concession_name}
-      </Text>
-      <Text>
-        Status: <Text style={styles.status}>{item.order_status}</Text>
-      </Text>
-      <Text>Total: ₱{Number(item.total_price).toFixed(2)}</Text>
-      {item.note ? <Text>Note: {item.note}</Text> : null}
-      <Text style={styles.date}>
-        {new Date(item.created_at).toLocaleString()}
-      </Text>
-      {item.payment_proof ? (
-        <Image
-          source={{ uri: item.payment_proof }}
-          style={styles.paymentProof}
-        />
-      ) : null}
-    </View>
-  );
+    const renderItem = ({ item }: any) => (
+    <TouchableOpacity
+        onPress={() => navigation.navigate("View Order", { orderId: item.id })}
+    >
+        <View style={styles.card}>
+        <Text style={styles.title}>
+            {item.cafeteria_name} • {item.concession_name}
+        </Text>
+        <Text>
+            Status: <Text style={styles.status}>{item.order_status}</Text>
+        </Text>
+        <Text>Total: ₱{Number(item.total_price).toFixed(2)}</Text>
+        {item.note ? <Text>Note: {item.note}</Text> : null}
+        <Text style={styles.date}>
+            {new Date(item.created_at).toLocaleString()}
+        </Text>
+        {item.payment_proof ? (
+            <Image
+            source={{ uri: item.payment_proof }}
+            style={styles.paymentProof}
+            />
+        ) : null}
+        </View>
+    </TouchableOpacity>
+    );
 
   return (
     <View style={styles.container}>

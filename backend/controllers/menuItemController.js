@@ -2,32 +2,19 @@
 import { pool } from "../libs/database.js";
 import multer from "multer";
 
-
 const storage = multer.memoryStorage();
 export const upload = multer({ storage });
 
-// Helper: convert rows + variations into grouped variations array
-const groupVariations = (vRows) => {
-  // vRows: [{ id, label, variation_name, additional_price, menu_item_id }]
-  const map = {};
-  for (const v of vRows) {
-    if (!map[v.menu_item_id]) map[v.menu_item_id] = {};
-    if (!map[v.menu_item_id][v.label]) map[v.menu_item_id][v.label] = [];
-    map[v.menu_item_id][v.label].push({
-      name: v.variation_name,
-      price: Number(v.additional_price),
-    });
-  }
-  return map;
-};
-
-// Convert DB image (BYTEA) to data URL (base64) if present
+// Helper: convert BYTEA image to base64 data URL
 const makeImageDataUrl = (imageBuffer, mime = "jpeg") => {
   if (!imageBuffer) return null;
   const base64 = Buffer.from(imageBuffer).toString("base64");
   return `data:image/${mime};base64,${base64}`;
 };
 
+// =========================
+// Get all menu items (with optional filters, pagination, sorting)
+// =========================
 export const getMenuItems = async (req, res) => {
   try {
     const page = parseInt(req.query.page) || 1;
@@ -59,7 +46,6 @@ export const getMenuItems = async (req, res) => {
 
     const whereSQL = whereClauses.length ? "WHERE " + whereClauses.join(" AND ") : "";
 
-    // sorting
     let orderBy = "mi.created_at DESC";
     if (sortBy === "price_asc") orderBy = "mi.price ASC";
     if (sortBy === "price_desc") orderBy = "mi.price DESC";
@@ -74,7 +60,7 @@ export const getMenuItems = async (req, res) => {
     const total = parseInt(countResult.rows[0].count);
 
     const result = await pool.query(
-      `SELECT mi.*, c.concession_name, caf.cafeteria_name  
+      `SELECT mi.*, c.concession_name, caf.cafeteria_name
        FROM tblmenuitem mi
        JOIN tblconcession c ON mi.concession_id = c.id
        JOIN tblcafeteria caf ON c.cafeteria_id = caf.id
@@ -84,21 +70,52 @@ export const getMenuItems = async (req, res) => {
       [...params, limit, offset]
     );
 
-    const rows = result.rows;
+    const menuItems = result.rows;
+
+    // Fetch variation groups and variations
+    const menuItemIds = menuItems.map(mi => mi.id);
+    let variationsMap = {};
+    if (menuItemIds.length > 0) {
+      const vRes = await pool.query(
+        `SELECT ivg.menu_item_id, ivg.variation_group_name AS label,
+                iv.variation_name, iv.additional_price
+         FROM tblitemvariation iv
+         JOIN tblitemvariationgroup ivg ON iv.item_variation_group_id = ivg.id
+         WHERE ivg.menu_item_id = ANY($1::int[])`,
+        [menuItemIds]
+      );
+
+      for (const v of vRes.rows) {
+        if (!variationsMap[v.menu_item_id]) variationsMap[v.menu_item_id] = {};
+        if (!variationsMap[v.menu_item_id][v.label]) variationsMap[v.menu_item_id][v.label] = [];
+        variationsMap[v.menu_item_id][v.label].push({
+          name: v.variation_name,
+          price: Number(v.additional_price),
+        });
+      }
+    }
+
+    const formattedItems = menuItems.map(r => ({
+      id: r.id,
+      item_name: r.item_name,
+      price: Number(r.price),
+      category: r.category,
+      availability: r.available,
+      concession_name: r.concession_name,
+      concession_id: r.concession_id,
+      cafeteria_name: r.cafeteria_name,
+      image_url: makeImageDataUrl(r.image),
+      variations: variationsMap[r.id]
+        ? Object.keys(variationsMap[r.id]).map(label => ({
+            label,
+            variations: variationsMap[r.id][label]
+          }))
+        : [],
+    }));
 
     res.json({
       status: "success",
-      data: rows.map((r) => ({
-        id: r.id,
-        item_name: r.item_name,
-        price: Number(r.price),
-        category: r.category,
-        availability: r.available,
-        concession_name: r.concession_name,
-        concession_id: r.concession_id,
-        cafeteria_name: r.cafeteria_name,
-        image_url: makeImageDataUrl(r.image),
-      })),
+      data: formattedItems,
       pagination: {
         page,
         limit,
@@ -112,74 +129,117 @@ export const getMenuItems = async (req, res) => {
   }
 };
 
-
-
 // =========================
-// Get menu items by concessionaire (same output as above but filtered)
+// Get menu items by concessionaire
 // =========================
 export const getMenuItemsByConcessionaire = async (req, res) => {
   const concessionaireId = req.user.id;
-
   try {
-    const query = `
-      SELECT mi.*, c.concession_name
-      FROM tblmenuitem mi
-      JOIN tblconcession c ON mi.concession_id = c.id
-      WHERE c.concessionaire_id = $1
-      ORDER BY mi.created_at DESC
-    `;
-    const result = await pool.query(query, [concessionaireId]);
-    const rows = result.rows;
-    const itemIds = rows.map((r) => r.id);
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const offset = (page - 1) * limit;
 
-    let variationsMap = {};
-    if (itemIds.length > 0) {
-      const vQuery = `
-        SELECT id, label, variation_name, additional_price, menu_item_id
-        FROM tblitemvariation
-        WHERE menu_item_id = ANY($1::int[])
-      `;
-      const vResult = await pool.query(vQuery, [itemIds]);
-      variationsMap = groupVariations(vResult.rows);
+    const { category, search, sortBy } = req.query;
+
+    let whereClauses = [`c.concessionaire_id = $1`];
+    let params = [concessionaireId];
+    let i = 2;
+
+    if (category) {
+      whereClauses.push(`mi.category ILIKE $${i++}`);
+      params.push(`%${category}%`);
+    }
+    if (search) {
+      whereClauses.push(`mi.item_name ILIKE $${i++}`);
+      params.push(`%${search}%`);
     }
 
-    const menuItems = rows.map((item) => {
-      const groupedVariations = variationsMap[item.id] || {};
-      const formattedGroups = Object.keys(groupedVariations).map((label) => ({
-        label,
-        variations: groupedVariations[label],
-      }));
+    const whereSQL = whereClauses.length ? "WHERE " + whereClauses.join(" AND ") : "";
 
-      const availability =
-        item.available ?? item.availability ?? item.availabile ?? false;
+    let orderBy = "mi.created_at DESC";
+    if (sortBy === "price_asc") orderBy = "mi.price ASC";
+    if (sortBy === "price_desc") orderBy = "mi.price DESC";
+    if (sortBy === "name") orderBy = "mi.item_name ASC";
 
-      return {
-        id: item.id,
-        item_name: item.item_name,
-        price: Number(item.price),
-        category: item.category,
-        availability,
-        concession_name: item.concession_name,
-        image_url: makeImageDataUrl(item.image),
-        variations: formattedGroups,
-      };
-    });
+    const countResult = await pool.query(
+      `SELECT COUNT(*) FROM tblmenuitem mi
+       JOIN tblconcession c ON mi.concession_id = c.id
+       ${whereSQL}`,
+      params
+    );
+    const total = parseInt(countResult.rows[0].count);
 
-    res.status(200).json({
+    const result = await pool.query(
+      `SELECT mi.*, c.concession_name, caf.cafeteria_name
+       FROM tblmenuitem mi
+       JOIN tblconcession c ON mi.concession_id = c.id
+       JOIN tblcafeteria caf ON c.cafeteria_id = caf.id
+       ${whereSQL}
+       ORDER BY ${orderBy}
+       LIMIT $${i} OFFSET $${i + 1}`,
+      [...params, limit, offset]
+    );
+
+    const menuItems = result.rows;
+
+    const menuItemIds = menuItems.map(mi => mi.id);
+    let variationsMap = {};
+    if (menuItemIds.length > 0) {
+      const vRes = await pool.query(
+        `SELECT ivg.menu_item_id, ivg.variation_group_name AS label,
+                iv.variation_name, iv.additional_price
+         FROM tblitemvariation iv
+         JOIN tblitemvariationgroup ivg ON iv.item_variation_group_id = ivg.id
+         WHERE ivg.menu_item_id = ANY($1::int[])`,
+        [menuItemIds]
+      );
+
+      for (const v of vRes.rows) {
+        if (!variationsMap[v.menu_item_id]) variationsMap[v.menu_item_id] = {};
+        if (!variationsMap[v.menu_item_id][v.label]) variationsMap[v.menu_item_id][v.label] = [];
+        variationsMap[v.menu_item_id][v.label].push({
+          name: v.variation_name,
+          price: Number(v.additional_price),
+        });
+      }
+    }
+
+    const formattedItems = menuItems.map(r => ({
+      id: r.id,
+      item_name: r.item_name,
+      price: Number(r.price),
+      category: r.category,
+      availability: r.available,
+      concession_name: r.concession_name,
+      concession_id: r.concession_id,
+      cafeteria_name: r.cafeteria_name,
+      image_url: makeImageDataUrl(r.image),
+      variations: variationsMap[r.id]
+        ? Object.keys(variationsMap[r.id]).map(label => ({
+            label,
+            variations: variationsMap[r.id][label]
+          }))
+        : [],
+    }));
+
+    res.json({
       status: "success",
-      message: "Menu items retrieved successfully",
-      data: menuItems,
+      data: formattedItems,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+      },
     });
-  } catch (error) {
-    console.error("Error retrieving menu items by concessionaire:", error);
-    res
-      .status(500)
-      .json({ status: "failed", message: "Internal Server Error" });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ status: "failed", message: "Server error" });
   }
 };
 
 // =========================
-// Add new menu item (image buffer via multer memory)
+// Add new menu item
 // =========================
 export const addMenuItem = async (req, res) => {
   const concessionaireId = req.user.id;
@@ -187,24 +247,20 @@ export const addMenuItem = async (req, res) => {
   let variations = [];
 
   if (!item_name || !price || !category) {
-    return res
-      .status(400)
-      .json({ status: "failed", message: "Missing required fields" });
+    return res.status(400).json({ status: "failed", message: "Missing required fields" });
   }
 
   if (req.body.variations) {
     try {
       variations = JSON.parse(req.body.variations);
-    } catch (err) {
-      return res
-        .status(400)
-        .json({ status: "failed", message: "Invalid variations JSON" });
+    } catch {
+      return res.status(400).json({ status: "failed", message: "Invalid variations JSON" });
     }
   }
 
   const imageData = req.file ? req.file.buffer : null;
-
   const client = await pool.connect();
+
   try {
     await client.query("BEGIN");
 
@@ -213,7 +269,7 @@ export const addMenuItem = async (req, res) => {
       [concessionaireId]
     );
 
-    if (concessionResult.rows.length === 0) {
+    if (!concessionResult.rows.length) {
       throw new Error("No concession found for this concessionaire");
     }
 
@@ -224,49 +280,45 @@ export const addMenuItem = async (req, res) => {
        VALUES ($1, $2, $3, $4, $5) RETURNING id`,
       [item_name, concessionId, parseFloat(price), imageData, category]
     );
-
     const menuItemId = insertMenu.rows[0].id;
 
-    if (variations.length > 0) {
-      for (const group of variations) {
-        for (const v of group.variations) {
-          if (!v.name) continue;
-          await client.query(
-            `INSERT INTO tblitemvariation (label, variation_name, additional_price, menu_item_id)
-             VALUES ($1, $2, $3, $4)`,
-            [group.label || "Default", v.name, v.price || 0, menuItemId]
-          );
-        }
+    // Insert variation groups & variations
+    for (const group of variations) {
+      const insertGroup = await client.query(
+        `INSERT INTO tblitemvariationgroup (variation_group_name, menu_item_id) VALUES ($1, $2) RETURNING id`,
+        [group.label || "Default", menuItemId]
+      );
+      const groupId = insertGroup.rows[0].id;
+
+      for (const v of group.variations) {
+        if (!v.name) continue;
+        await client.query(
+          `INSERT INTO tblitemvariation (item_variation_group_id, variation_name, additional_price)
+           VALUES ($1, $2, $3)`,
+          [groupId, v.name, v.price || 0]
+        );
       }
     }
 
     await client.query("COMMIT");
 
-    res.status(201).json({
-      status: "success",
-      message: "Menu item created successfully",
-    });
-  } catch (error) {
+    res.status(201).json({ status: "success", message: "Menu item created successfully" });
+  } catch (err) {
     await client.query("ROLLBACK");
-    console.error("Error adding menu item:", error);
-    res
-      .status(500)
-      .json({ status: "failed", message: "Internal Server Error" });
+    console.error(err);
+    res.status(500).json({ status: "failed", message: "Internal Server Error" });
   } finally {
     client.release();
   }
 };
 
 // =========================
-// Update menu item (supports image buffer via multer memory) — uses same logic for image handling as addMenuItem
+// Update menu item
 // =========================
 export const updateMenuItem = async (req, res) => {
   const { id } = req.params;
   const concessionaireId = req.user.id;
-
-  // Because this will be multipart/form-data the fields are strings
   const { item_name, price, category } = req.body;
-  // availability may come as 'true'/'false' string in multipart
   let availability = undefined;
   if (typeof req.body.availability !== "undefined") {
     const v = req.body.availability;
@@ -277,117 +329,103 @@ export const updateMenuItem = async (req, res) => {
   if (req.body.variations) {
     try {
       variations = JSON.parse(req.body.variations);
-    } catch (err) {
-      return res
-        .status(400)
-        .json({ status: "failed", message: "Invalid variations JSON" });
+    } catch {
+      return res.status(400).json({ status: "failed", message: "Invalid variations JSON" });
     }
   }
 
   const imageData = req.file ? req.file.buffer : null;
-
   const client = await pool.connect();
+
   try {
     await client.query("BEGIN");
 
-    // Verify ownership
-    const checkQuery = `
-      SELECT mi.id
-      FROM tblmenuitem mi
-      JOIN tblconcession c ON mi.concession_id = c.id
-      WHERE mi.id = $1 AND c.concessionaire_id = $2
-    `;
-    const checkResult = await client.query(checkQuery, [id, concessionaireId]);
-    if (checkResult.rowCount === 0) {
-      await client.query("ROLLBACK");
-      return res.status(403).json({
-        status: "failed",
-        message: "You are not authorized to update this menu item",
-      });
+    const checkResult = await client.query(
+      `SELECT mi.id FROM tblmenuitem mi
+       JOIN tblconcession c ON mi.concession_id = c.id
+       WHERE mi.id = $1 AND c.concessionaire_id = $2`,
+      [id, concessionaireId]
+    );
+    if (!checkResult.rows.length) {
+      throw new Error("Menu item not found or unauthorized");
     }
 
-    const updateQuery = `
-      UPDATE tblmenuitem
-      SET item_name = $1,
-          price = $2,
-          image = COALESCE($3, image),
-          category = $4,
-          available = COALESCE($5, available),
-          updated_at = NOW()
-      WHERE id = $6
-      RETURNING *
-    `;
+    // Update menu item
+    let updateFields = [];
+    let updateParams = [];
+    let idx = 1;
 
-    const updateResult = await client.query(updateQuery, [
-      item_name ?? null,
-      typeof price !== "undefined" ? parseFloat(price) : null,
-      imageData,
-      category ?? null,
-      availability,
-      id,
-    ]);
+    if (item_name) {
+      updateFields.push(`item_name = $${idx++}`);
+      updateParams.push(item_name);
+    }
+    if (price) {
+      updateFields.push(`price = $${idx++}`);
+      updateParams.push(parseFloat(price));
+    }
+    if (category) {
+      updateFields.push(`category = $${idx++}`);
+      updateParams.push(category);
+    }
+    if (availability !== null && availability !== undefined) {
+      updateFields.push(`available = $${idx++}`);
+      updateParams.push(availability);
+    }
+    if (imageData) {
+      updateFields.push(`image = $${idx++}`);
+      updateParams.push(imageData);
+    }
 
-    const updatedItem = updateResult.rows[0];
+    if (updateFields.length) {
+      await client.query(
+        `UPDATE tblmenuitem SET ${updateFields.join(", ")} WHERE id = $${idx}`,
+        [...updateParams, id]
+      );
+    }
 
-    // Replace variations
-    await client.query("DELETE FROM tblitemvariation WHERE menu_item_id = $1", [
-      id,
-    ]);
+    // Delete existing variation groups & variations
+    const existingGroups = await client.query(
+      `SELECT id FROM tblitemvariationgroup WHERE menu_item_id = $1`,
+      [id]
+    );
+    const groupIds = existingGroups.rows.map(g => g.id);
 
-    if (variations.length > 0) {
-      for (const group of variations) {
-        for (const v of group.variations) {
-          if (!v.name) continue;
-          await client.query(
-            `INSERT INTO tblitemvariation (label, variation_name, additional_price, menu_item_id)
-             VALUES ($1, $2, $3, $4)`,
-            [group.label || "Default", v.name, v.price || 0, id]
-          );
-        }
+    if (groupIds.length > 0) {
+      await client.query(
+        `DELETE FROM tblitemvariation WHERE item_variation_group_id = ANY($1::int[])`,
+        [groupIds]
+      );
+      await client.query(
+        `DELETE FROM tblitemvariationgroup WHERE id = ANY($1::int[])`,
+        [groupIds]
+      );
+    }
+
+    // Insert new variation groups & variations
+    for (const group of variations) {
+      const insertGroup = await client.query(
+        `INSERT INTO tblitemvariationgroup (variation_group_name, menu_item_id) VALUES ($1, $2) RETURNING id`,
+        [group.label || "Default", id]
+      );
+      const groupId = insertGroup.rows[0].id;
+
+      for (const v of group.variations) {
+        if (!v.name) continue;
+        await client.query(
+          `INSERT INTO tblitemvariation (item_variation_group_id, variation_name, additional_price)
+           VALUES ($1, $2, $3)`,
+          [groupId, v.name, v.price || 0]
+        );
       }
     }
 
     await client.query("COMMIT");
 
-    // Build response (include variations and base64 image)
-    // Fetch variations for this item to return
-    const vQuery = `
-      SELECT label, variation_name, additional_price
-      FROM tblitemvariation
-      WHERE menu_item_id = $1
-    `;
-    const vRes = await pool.query(vQuery, [id]);
-    // group by label
-    const grouped = {};
-    for (const v of vRes.rows) {
-      if (!grouped[v.label]) grouped[v.label] = [];
-      grouped[v.label].push({ name: v.variation_name, price: Number(v.additional_price) });
-    }
-    const formattedGroups = Object.keys(grouped).map((label) => ({
-      label,
-      variations: grouped[label],
-    }));
-
-    // convert image to data url
-    const imageUrl = makeImageDataUrl(updatedItem.image);
-
-    res.status(200).json({
-      status: "success",
-      message: "Menu item updated successfully",
-      data: {
-        ...updatedItem,
-        price: Number(updatedItem.price),
-        availability: updatedItem.available ?? false,
-        image_url: imageUrl,
-        variations: formattedGroups,
-      },
-    });
-  } catch (error) {
+    res.json({ status: "success", message: "Menu item updated successfully" });
+  } catch (err) {
     await client.query("ROLLBACK");
-    console.error("Error updating menu item:", error);
-    res
-      .status(500)
-      .json({ status: "failed", message: "Internal Server Error" });
+    console.error(err);
+    res.status(500).json({ status: "failed", message: "Internal Server Error" });
   } finally {
     client.release();
   }
@@ -399,36 +437,47 @@ export const updateMenuItem = async (req, res) => {
 export const deleteMenuItem = async (req, res) => {
   const { id } = req.params;
   const concessionaireId = req.user.id;
+  const client = await pool.connect();
 
   try {
-    // Verify ownership
-    const checkQuery = `
-      SELECT mi.id
-      FROM tblmenuitem mi
-      JOIN tblconcession c ON mi.concession_id = c.id
-      WHERE mi.id = $1 AND c.concessionaire_id = $2
-    `;
-    const checkResult = await pool.query(checkQuery, [id, concessionaireId]);
-    if (checkResult.rowCount === 0) {
-      return res.status(403).json({
-        status: "failed",
-        message: "You are not authorized to delete this menu item",
-      });
+    await client.query("BEGIN");
+
+    const checkResult = await client.query(
+      `SELECT mi.id FROM tblmenuitem mi
+       JOIN tblconcession c ON mi.concession_id = c.id
+       WHERE mi.id = $1 AND c.concessionaire_id = $2`,
+      [id, concessionaireId]
+    );
+    if (!checkResult.rows.length) {
+      throw new Error("Menu item not found or unauthorized");
     }
 
-    await pool.query("DELETE FROM tblitemvariation WHERE menu_item_id = $1", [
-      id,
-    ]);
-    await pool.query("DELETE FROM tblmenuitem WHERE id = $1", [id]);
+    const existingGroups = await client.query(
+      `SELECT id FROM tblitemvariationgroup WHERE menu_item_id = $1`,
+      [id]
+    );
+    const groupIds = existingGroups.rows.map(g => g.id);
 
-    res.status(200).json({
-      status: "success",
-      message: "Menu item deleted successfully",
-    });
-  } catch (error) {
-    console.error("Error deleting menu item:", error);
-    res
-      .status(500)
-      .json({ status: "failed", message: "Internal Server Error" });
+    if (groupIds.length > 0) {
+      await client.query(
+        `DELETE FROM tblitemvariation WHERE item_variation_group_id = ANY($1::int[])`,
+        [groupIds]
+      );
+      await client.query(
+        `DELETE FROM tblitemvariationgroup WHERE id = ANY($1::int[])`,
+        [groupIds]
+      );
+    }
+
+    await client.query(`DELETE FROM tblmenuitem WHERE id = $1`, [id]);
+
+    await client.query("COMMIT");
+    res.json({ status: "success", message: "Menu item deleted successfully" });
+  } catch (err) {
+    await client.query("ROLLBACK");
+    console.error(err);
+    res.status(500).json({ status: "failed", message: "Internal Server Error" });
+  } finally {
+    client.release();
   }
 };

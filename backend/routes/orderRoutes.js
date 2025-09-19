@@ -1,5 +1,5 @@
 import express from "express";
-import { getOrdersByConcessionaireId, getOrdersByCustomerId, updateOrderStatus, updateOrderTotal, addOrder, deleteOrder, updatePaymentProof } from "../controllers/orderController.js";
+import { getOrdersByConcessionaireId, getOrdersByCustomerId, updateOrderStatus, updateOrderTotal, addOrder, deleteOrder, updatePaymentProof, getCartByCustomerId, checkoutCart } from "../controllers/orderController.js";
 import { upload } from "./concessionRoutes.js";
 import authMiddleware from "../middleware/authMiddleware.js";
 
@@ -12,5 +12,7 @@ router.put("/:id/recalculate", updateOrderTotal);
 router.put("/gcash-screenshot/:id", upload.single("gcash_screenshot"), updatePaymentProof)
 router.post("/", authMiddleware, addOrder);
 router.delete("/:id", deleteOrder)
+router.get("/cart/:id", getCartByCustomerId) //fetch cart
+router.put("/checkout/:id", checkoutCart) 
 
 export default router;

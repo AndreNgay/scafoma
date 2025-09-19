@@ -125,8 +125,8 @@ CREATE TABLE IF NOT EXISTS tblorder (
     order_status VARCHAR(30) DEFAULT 'pending' CHECK (order_status IN (
         'pending', 'accepted', 'declined', 'ready for pickup', 'completed'
     )),
+    in_cart BOOLEAN DEFAULT FALSE,
     gcash_screenshot BYTEA,
-    note TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 
@@ -153,6 +153,7 @@ CREATE TABLE IF NOT EXISTS tblorderdetail (
     quantity INT NOT NULL CHECK (quantity > 0),
     item_price NUMERIC(10,2) NOT NULL CHECK (item_price >= 0),
     total_price NUMERIC(10,2) NOT NULL CHECK (total_price >= 0),
+    note TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 

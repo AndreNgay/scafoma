@@ -1,237 +1,181 @@
-// screens/Menu/EditMenu.tsx
+// screens/EditMenu.tsx
 import React, { useState } from "react";
-import {
-  View,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  StyleSheet,
-  Alert,
-  ScrollView,
-  Image,
-  Switch,
-} from "react-native";
+import { View, Text, TextInput, Button, ScrollView, TouchableOpacity, Image, Alert, StyleSheet } from "react-native";
 import { useNavigation, useRoute } from "@react-navigation/native";
-import { Picker } from "@react-native-picker/picker";
 import * as ImagePicker from "expo-image-picker";
 import api from "../../../libs/apiCall";
-import axios from "axios";
 
-const EditMenu: React.FC = () => {
+
+type Variation = { name: string; price: string };
+type VariationGroup = { label: string; variations: Variation[] };
+
+const EditMenu = () => {
   const route = useRoute<any>();
-  const navigation = useNavigation<any>();
-  const { item } = route.params;
+  const { menuItem } = route.params;
+  const navigation = useNavigation();
+    const [loading, setLoading] = useState(false);
 
-  // initial values from item
-  const [itemName, setItemName] = useState(item.item_name || "");
-  const [price, setPrice] = useState(String(item.price ?? ""));
-  const [category, setCategory] = useState(item.category || "Beverage");
-  const [availability, setAvailability] = useState<boolean>(item.availability ?? true);
+  
 
-  // image state: initial is data url from server (image_url). When user picks new image, set image asset and mark isNew true.
-  const [imageUri, setImageUri] = useState<string | null>(item.image_url ?? null);
-  const [imageIsNew, setImageIsNew] = useState(false);
-  const [imageAsset, setImageAsset] = useState<any>(null);
+  const [itemName, setItemName] = useState(menuItem?.item_name || "");
+  const [price, setPrice] = useState(menuItem?.price?.toString() || "");
+  const [category, setCategory] = useState(menuItem?.category || "");
+  const [availability, setAvailability] = useState(menuItem?.availability || true);
+  const [image, setImage] = useState<any>(menuItem?.image_url || null);
+  const [variationGroups, setVariationGroups] = useState<VariationGroup[]>(menuItem?.variations || []);
 
-  // variations start from item.variations (already grouped)
-  const [variationGroups, setVariationGroups] = useState<
-    { label: string; variations: { name: string; price: string }[] }[]
-  >(
-    (item.variations || []).map((g: any) => ({
-      label: g.label || "",
-      variations: (g.variations || []).map((v: any) => ({
-        name: v.name,
-        price: String(v.price ?? 0),
-      })),
-    }))
-  );
-
-  // pick a new image (same as AddMenu)
   const pickImage = async () => {
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      quality: 0.8,
+      quality: 0.5,
+      base64: true,
     });
-
-    if (!result.canceled) {
-      const asset = result.assets[0];
-      setImageAsset(asset);
-      setImageUri(asset.uri);
-      setImageIsNew(true);
-    }
+    if (!result.canceled) setImage(result.assets[0]);
   };
 
-  // variation handlers (same as Add)
-  const handleAddVariationGroup = () => setVariationGroups([...variationGroups, { label: "", variations: [] }]);
-  const handleRemoveVariationGroup = (gi: number) => {
-    const updated = [...variationGroups];
-    updated.splice(gi, 1);
-    setVariationGroups(updated);
+  const addVariationGroup = () => {
+    setVariationGroups([...variationGroups, { label: "", variations: [{ name: "", price: "" }] }]);
   };
-  const handleAddVariation = (gi: number) => {
+
+  const removeVariationGroup = (index: number) => {
     const updated = [...variationGroups];
-    updated[gi].variations.push({ name: "", price: "" });
-    setVariationGroups(updated);
-  };
-  const handleRemoveVariation = (gi: number, vi: number) => {
-    const updated = [...variationGroups];
-    updated[gi].variations.splice(vi, 1);
-    setVariationGroups(updated);
-  };
-  const handleUpdateGroupLabel = (index: number, text: string) => {
-    const updated = [...variationGroups];
-    updated[index].label = text;
-    setVariationGroups(updated);
-  };
-  const handleUpdateVariation = (gi: number, vi: number, field: "name" | "price", value: string) => {
-    const updated = [...variationGroups];
-    updated[gi].variations[vi][field] = value;
+    updated.splice(index, 1);
     setVariationGroups(updated);
   };
 
-// inside handleUpdateMenu
-const handleUpdateMenu = async () => {
-  if (!itemName.trim() || !price.trim()) {
-    Alert.alert("Error", "Please fill in required fields");
+  const addVariation = (groupIndex: number) => {
+    const updated = [...variationGroups];
+    updated[groupIndex].variations.push({ name: "", price: "" });
+    setVariationGroups(updated);
+  };
+
+  const removeVariation = (groupIndex: number, varIndex: number) => {
+    const updated = [...variationGroups];
+    updated[groupIndex].variations.splice(varIndex, 1);
+    setVariationGroups(updated);
+  };
+
+  const updateVariation = (groupIndex: number, varIndex: number, key: "name" | "price", value: string) => {
+    const updated = [...variationGroups];
+    updated[groupIndex].variations[varIndex][key] = value;
+    setVariationGroups(updated);
+  };
+
+const handleSubmit = async () => {
+  if (!itemName || !price || !category) {
+    Alert.alert("Please fill all required fields");
     return;
   }
 
+  const formData = new FormData();
+  formData.append("item_name", itemName);
+  formData.append("price", price);
+  formData.append("category", category);
+  formData.append("availability", availability ? "true" : "false");
+  formData.append("variations", JSON.stringify(variationGroups));
+
+  if (image && image.base64) {
+    formData.append("image", {
+      uri: image.uri,
+      name: "menuitem.jpg",
+      type: "image/jpeg",
+    } as any);
+  }
+
   try {
-    const formattedVariations = variationGroups.map((g) => ({
-      label: g.label,
-      variations: g.variations.map((v) => ({
-        name: v.name,
-        price: Number(v.price) || 0,
-      })),
-    }));
-
-    const formData = new FormData();
-    formData.append("item_name", itemName.trim());
-    formData.append("price", String(price).trim());
-    formData.append("category", category);
-    formData.append("availability", String(availability));
-    formData.append("variations", JSON.stringify(formattedVariations));
-
-    // ✅ Same fix as AddMenu
-    if (imageIsNew && imageAsset?.uri) {
-      formData.append("image", {
-        uri: imageAsset.uri,
-        type: "image/jpeg", // enforce jpeg
-        name: `menu-${Date.now()}.jpg`,
-      } as any);
-    }
-
-    await api.put(`/menu-item/${item.id}`, formData, {
-      headers: {
-        Accept: "application/json",
-        "Content-Type": "multipart/form-data",
-      },
+    setLoading(true);
+    await api.put(`/menu-item/${menuItem.id}`, formData, {
+      headers: { "Content-Type": "multipart/form-data" },
     });
-
-    Alert.alert("Success", "Menu item updated successfully", [
-      { text: "OK", onPress: () => navigation.goBack() },
-    ]);
-  } catch (err: unknown) {
-    if (axios.isAxiosError(err)) {
-      console.error("UpdateMenu error:", err.response?.data ?? err.message);
-      Alert.alert("Error", err.response?.data?.message ?? "Failed to update item");
-    } else if (err instanceof Error) {
-      console.error(err.message);
-      Alert.alert("Error", err.message);
-    } else {
-      console.error(err);
-      Alert.alert("Error", "Unknown error occurred");
-    }
+    Alert.alert("Success", "Menu item updated successfully");
+    navigation.goBack();
+  } catch (err) {
+    console.error(err);
+    Alert.alert("Error", "Failed to update menu item");
+  } finally {
+    setLoading(false);
   }
 };
 
 
-  const handleDelete = async () => {
-    Alert.alert("Confirm Delete", "Are you sure?", [
-      { text: "Cancel", style: "cancel" },
-      {
-        text: "Delete",
-        style: "destructive",
-        onPress: async () => {
-          try {
-            await api.delete(`/menu-item/${item.id}`);
-            Alert.alert("Deleted", "Menu item deleted", [{ text: "OK", onPress: () => navigation.goBack() }]);
-          } catch (err) {
-            console.error(err);
-            Alert.alert("Error", "Failed to delete item");
-          }
-        },
-      },
-    ]);
-  };
-
   return (
-    <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: 120 }}>
+    <ScrollView style={styles.container}>
       <TouchableOpacity onPress={pickImage}>
-        <Image
-          source={{
-            uri: imageUri ?? "https://cdn-icons-png.flaticon.com/512/9417/9417083.png",
-          }}
-          style={styles.image}
-        />
+        <Image source={{ uri: image?.uri || image }} style={styles.image} />
       </TouchableOpacity>
 
-      <Text style={styles.label}>Item Name *</Text>
+      <Text style={styles.label}>Item Name</Text>
       <TextInput style={styles.input} value={itemName} onChangeText={setItemName} />
 
-      <Text style={styles.label}>Price *</Text>
-      <TextInput style={styles.input} value={price} keyboardType="numeric" onChangeText={setPrice} />
+      <Text style={styles.label}>Price</Text>
+      <TextInput style={styles.input} value={price} onChangeText={setPrice} keyboardType="numeric" />
 
       <Text style={styles.label}>Category</Text>
-      <View style={styles.pickerWrapper}>
-        <Picker selectedValue={category} onValueChange={setCategory}>
-          <Picker.Item label="Beverage" value="Beverage" />
-          <Picker.Item label="Snack" value="Snack" />
-          <Picker.Item label="Meal" value="Meal" />
-          <Picker.Item label="Dessert" value="Dessert" />
-        </Picker>
-      </View>
+      <TextInput style={styles.input} value={category} onChangeText={setCategory} />
 
       <View style={styles.toggleRow}>
         <Text style={styles.label}>Availability</Text>
-        <Switch value={availability} onValueChange={setAvailability} trackColor={{ true: "darkred" }} />
+        <TouchableOpacity onPress={() => setAvailability(!availability)}>
+          <Text>{availability ? "Available" : "Not Available"}</Text>
+        </TouchableOpacity>
       </View>
 
-      <Text style={[styles.label, { marginTop: 18 }]}>Variations</Text>
-      {variationGroups.map((group, gi) => (
-        <View key={gi} style={styles.groupBox}>
-          <TextInput style={styles.input} placeholder="Group label" value={group.label} onChangeText={(t) => handleUpdateGroupLabel(gi, t)} />
+      <Text style={[styles.label, { marginTop: 20 }]}>Variation Groups</Text>
+      {variationGroups.map((group, gIndex) => (
+        <View key={gIndex} style={styles.groupBox}>
+          <TextInput
+            style={styles.input}
+            value={group.label}
+            onChangeText={(val) => {
+              const updated = [...variationGroups];
+              updated[gIndex].label = val;
+              setVariationGroups(updated);
+            }}
+          />
 
-          {group.variations.map((v, vi) => (
-            <View key={vi} style={styles.variationRow}>
-              <TextInput style={[styles.input, styles.variationInput]} placeholder="Name" value={v.name} onChangeText={(t) => handleUpdateVariation(gi, vi, "name", t)} />
-              <TextInput style={[styles.input, styles.priceInput]} placeholder="Price" keyboardType="numeric" value={v.price} onChangeText={(t) => handleUpdateVariation(gi, vi, "price", t)} />
-              <TouchableOpacity style={styles.removeButton} onPress={() => handleRemoveVariation(gi, vi)}>
-                <Text style={styles.removeButtonText}>✕</Text>
+          {group.variations.map((v, vIndex) => (
+            <View key={vIndex} style={styles.variationRow}>
+              <TextInput
+                style={[styles.input, styles.variationInput]}
+                placeholder="Variation Name"
+                value={v.name}
+                onChangeText={(val) => updateVariation(gIndex, vIndex, "name", val)}
+              />
+              <TextInput
+                style={[styles.input, styles.priceInput]}
+                placeholder="Price"
+                keyboardType="numeric"
+                value={v.price.toString()}
+                onChangeText={(val) => updateVariation(gIndex, vIndex, "price", val)}
+              />
+              <TouchableOpacity style={styles.removeButton} onPress={() => removeVariation(gIndex, vIndex)}>
+                <Text style={styles.removeButtonText}>X</Text>
               </TouchableOpacity>
             </View>
           ))}
 
-          <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
-            <TouchableOpacity style={styles.smallButton} onPress={() => handleAddVariation(gi)}>
-              <Text style={styles.smallButtonText}>+ Add Variation</Text>
-            </TouchableOpacity>
+          <TouchableOpacity style={styles.smallButton} onPress={() => addVariation(gIndex)}>
+            <Text style={styles.smallButtonText}>Add Variation</Text>
+          </TouchableOpacity>
 
-            <TouchableOpacity style={styles.removeGroupButton} onPress={() => handleRemoveVariationGroup(gi)}>
-              <Text style={styles.removeGroupButtonText}>Remove Group</Text>
-            </TouchableOpacity>
-          </View>
+          <TouchableOpacity style={styles.removeGroupButton} onPress={() => removeVariationGroup(gIndex)}>
+            <Text style={styles.removeGroupButtonText}>Remove Group</Text>
+          </TouchableOpacity>
         </View>
       ))}
 
-      <TouchableOpacity style={styles.buttonOutline} onPress={handleAddVariationGroup}>
-        <Text style={styles.buttonOutlineText}>+ Add Variation Group</Text>
+      <TouchableOpacity style={styles.smallButton} onPress={addVariationGroup}>
+        <Text style={styles.smallButtonText}>Add Variation Group</Text>
       </TouchableOpacity>
 
-      <View style={styles.buttonRow}>
-        <TouchableOpacity style={styles.button} onPress={handleUpdateMenu}><Text style={styles.buttonText}>Update</Text></TouchableOpacity>
-        <TouchableOpacity style={[styles.button, { backgroundColor: "gray" }]} onPress={handleDelete}><Text style={styles.buttonText}>Delete</Text></TouchableOpacity>
-      </View>
+<TouchableOpacity
+  style={styles.button}
+  onPress={handleSubmit}
+  disabled={loading}
+>
+  <Text style={styles.buttonText}>{loading ? "Saving..." : "Save Changes"}</Text>
+</TouchableOpacity>
+
     </ScrollView>
   );
 };
@@ -258,6 +202,6 @@ const styles = StyleSheet.create({
   buttonOutline: { borderWidth: 1, borderColor: "darkred", padding: 14, borderRadius: 8, marginTop: 16, alignItems: "center" },
   buttonOutlineText: { color: "darkred", fontWeight: "600", fontSize: 14 },
   buttonRow: { flexDirection: "row", justifyContent: "space-between", marginTop: 20 },
-  button: { flex: 1, backgroundColor: "darkred", padding: 14, borderRadius: 8, alignItems: "center", marginHorizontal: 5 },
+  button: { flex: 1, backgroundColor: "darkred", padding: 14, borderRadius: 8, alignItems: "center", marginVertical: 10 },
   buttonText: { color: "white", fontWeight: "600", fontSize: 16 },
 });

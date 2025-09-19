@@ -9,4 +9,5 @@ router.post("/", authMiddleware, addOrderDetail);
 router.put("/:id", updateOrderDetail);
 router.delete("/:id", deleteOrderDetail);
 
+
 export default router;

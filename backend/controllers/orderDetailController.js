@@ -6,34 +6,50 @@ import { pool } from "../libs/database.js";
 export const getOrderDetailsById = async (req, res) => {
   const { id } = req.params;
   try {
-    const result = await pool.query(
-      `SELECT od.*, mi.item_name, mi.image,
-              json_agg(json_build_object('variation_id', iv.id, 'variation_name', iv.variation_name, 'additional_price', iv.additional_price)) AS variations
-       FROM tblorderdetail od
-       JOIN tblmenuitem mi ON od.item_id = mi.id
-       LEFT JOIN tblorderitemvariation oiv ON od.id = oiv.order_detail_id
-       LEFT JOIN tblitemvariation iv ON oiv.variation_id = iv.id
-       WHERE od.order_id = $1
-       GROUP BY od.id, mi.item_name, mi.image`,
-      [id]
+    const orderRes = await pool.query(
+      `SELECT * FROM tblorder WHERE id = $1`, [id]
     );
-    res.json(result.rows);
+    if (orderRes.rows.length === 0) {
+      return res.status(404).json({ message: "Order not found" });
+    }
+    const order = orderRes.rows[0];
+
+    const detailsRes = await pool.query(
+      `SELECT d.*, m.item_name
+       FROM tblorderdetail d
+       JOIN tblmenuitem m ON d.item_id = m.id
+       WHERE d.order_id = $1`, [id]
+    );
+    order.items = detailsRes.rows;
+
+    for (const item of order.items) {
+      const varsRes = await pool.query(
+        `SELECT v.*
+         FROM tblorderitemvariation oiv
+         JOIN tblitemvariation v ON oiv.variation_id = v.id
+         WHERE oiv.order_detail_id = $1`, [item.id]
+      );
+      item.variations = varsRes.rows;
+    }
+
+    res.json(order);
   } catch (err) {
     console.error("Error fetching order details:", err);
-    res.status(500).json({ error: "Failed to fetch order details" });
+    res.status(500).json({ message: "Server error" });
   }
 };
+
 
 // ==========================
 // Add order detail
 // ==========================
 export const addOrderDetail = async (req, res) => {
-  const { order_id, item_id, quantity, item_price, total_price } = req.body;
+  const { order_id, item_id, quantity, item_price, total_price, note } = req.body;
   try {
     const result = await pool.query(
-      `INSERT INTO tblorderdetail (order_id, item_id, quantity, item_price, total_price)
-      VALUES ($1, $2, $3, $4, $5) RETURNING *`,
-      [order_id, item_id, quantity, item_price, total_price]
+      `INSERT INTO tblorderdetail (order_id, item_id, quantity, item_price, total_price, note)
+       VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
+      [order_id, item_id, quantity, item_price, total_price, note]
     );
     res.status(201).json(result.rows[0]);
   } catch (err) {
@@ -41,6 +57,7 @@ export const addOrderDetail = async (req, res) => {
     res.status(500).json({ error: "Failed to add order detail" });
   }
 };
+
 
 // ==========================
 // Update order detail

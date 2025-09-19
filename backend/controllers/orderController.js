@@ -30,6 +30,7 @@ export const getOrdersByConcessionaireId = async (req, res) => {
   }
 };
 
+
 // ==========================
 // Get orders for a customer
 // ==========================
@@ -144,26 +145,95 @@ export const updatePaymentProof = async (req, res) => {
 // Add a new order
 // ==========================
 export const addOrder = async (req, res) => {
-  try {
-    const customer_id = req.user?.id;
-    const { concession_id, total_price = 0, status = "pending", note = null } = req.body;
+  const { customer_id, concession_id, status, total_price, in_cart } = req.body;
 
-    if (!customer_id) {
-      return res.status(400).json({ message: "Customer ID missing (not logged in)" });
+  try {
+    // 🔹 1. Check if an in-cart order already exists for this customer + concession
+    const existing = await pool.query(
+      `SELECT * FROM tblorder 
+       WHERE customer_id = $1 AND concession_id = $2 AND in_cart = TRUE
+       LIMIT 1`,
+      [customer_id, concession_id]
+    );
+
+    if (existing.rows.length > 0) {
+      // 🔹 Reuse existing order
+      return res.status(200).json(existing.rows[0]);
     }
 
-    const query = `
-      INSERT INTO tblorder (customer_id, concession_id, total_price, order_status, note, created_at, updated_at)
-      VALUES ($1, $2, $3, $4, $5, NOW(), NOW())
-      RETURNING *;
-    `;
-    const values = [customer_id, concession_id, total_price, status, note];
-    const result = await pool.query(query, values);
+    // 🔹 2. Otherwise, create new order
+    const result = await pool.query(
+      `INSERT INTO tblorder (customer_id, concession_id, order_status, total_price, in_cart)
+        VALUES ($1, $2, $3, $4, $5)
+       RETURNING *`,
+      [customer_id, concession_id, status, total_price, in_cart ?? false]
+    );
 
-    return res.status(201).json(result.rows[0]);
+    res.status(201).json(result.rows[0]);
   } catch (err) {
     console.error("Error adding order:", err);
-    return res.status(500).json({ message: "Server error while adding order" });
+    res.status(500).json({ error: "Failed to add order" });
+  }
+};
+
+
+// ==========================
+// Get items in cart for a customer
+// ==========================
+// ==========================
+// Get items in cart for a customer
+// ==========================
+export const getCartByCustomerId = async (req, res) => {
+  const { id } = req.params; // customer_id
+  try {
+    const query = `
+      SELECT o.id AS order_id,
+             o.total_price,
+             od.id AS order_detail_id,
+             od.quantity,
+             od.total_price AS order_detail_total,
+             m.item_name,
+             m.price AS base_price,
+             c.concession_name,
+             caf.cafeteria_name,
+             ARRAY_AGG(iv.variation_name) FILTER (WHERE iv.id IS NOT NULL) AS variations
+      FROM tblorder o
+      JOIN tblorderdetail od ON o.id = od.order_id
+      JOIN tblmenuitem m ON od.item_id = m.id   -- ✅ FIXED (was tblitem)
+      JOIN tblconcession c ON o.concession_id = c.id
+      JOIN tblcafeteria caf ON c.cafeteria_id = caf.id
+      LEFT JOIN tblorderitemvariation oiv ON od.id = oiv.order_detail_id
+      LEFT JOIN tblitemvariation iv ON oiv.variation_id = iv.id
+      WHERE o.customer_id = $1 AND o.in_cart = TRUE
+      GROUP BY o.id, od.id, m.item_name, m.price, c.concession_name, caf.cafeteria_name
+      ORDER BY o.created_at DESC;
+    `;
+    const result = await pool.query(query, [id]);
+    res.json(result.rows);
+  } catch (err) {
+    console.error("Error fetching cart:", err);
+    res.status(500).json({ error: "Failed to fetch cart" });
+  }
+};
+
+// ==========================
+// Checkout (convert cart items to real orders)
+// ==========================
+export const checkoutCart = async (req, res) => {
+  const { id } = req.params; // customer_id
+  try {
+    const result = await pool.query(
+      `UPDATE tblorder
+       SET in_cart = FALSE, order_status = 'pending', updated_at = NOW()
+       WHERE customer_id = $1 AND in_cart = TRUE
+       RETURNING *`,
+      [id]
+    );
+
+    res.json({ message: "Checkout successful", orders: result.rows });
+  } catch (err) {
+    console.error("Error during checkout:", err);
+    res.status(500).json({ error: "Checkout failed" });
   }
 };
 

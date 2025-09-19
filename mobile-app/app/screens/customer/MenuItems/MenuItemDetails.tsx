@@ -55,6 +55,58 @@ const MenuItemDetails = () => {
       setLoadingVariations(false);
     }
   };
+  // 🔹 Add to Cart
+const addToCart = async () => {
+  try {
+    setPlacingOrder(true);
+    const user = useStore.getState().user;
+    if (!user) {
+      Alert.alert("Error", "You must be logged in to add items to cart.");
+      return;
+    }
+
+    const orderRes = await api.post("/order", {
+      customer_id: user.id,
+      concession_id: item.concession_id,
+      status: "pending",
+      total_price: 0,
+      in_cart: true,
+    });
+
+    const orderId = orderRes.data.id;
+
+    // inside addToCart
+    const detailRes = await api.post("/order-detail", {
+      order_id: orderId,
+      item_id: item.id,
+      quantity,
+      item_price: item.price,
+      total_price: displayPrice,
+      note, // <-- must be here too
+    });
+
+
+    const orderDetailId = detailRes.data.id;
+
+    for (const v of selectedVariations) {
+      await api.post("/order-item-variation", {
+        order_detail_id: orderDetailId,
+        variation_id: v.id,
+      });
+    }
+
+    await api.put(`/order/${orderId}/recalculate`);
+
+    Alert.alert("Success", "Item added to cart!");
+    navigation.navigate("Cart"); // 🔹 Create Cart screen if not yet
+  } catch (err: any) {
+    console.error("Error adding to cart:", err.response?.data || err);
+    Alert.alert("Error", err.response?.data?.message ?? "Failed to add to cart.");
+  } finally {
+    setPlacingOrder(false);
+  }
+};
+
 
   // 🔹 Fetch feedbacks
   const fetchFeedbacks = async () => {
@@ -127,7 +179,9 @@ const MenuItemDetails = () => {
         quantity,
         item_price: item.price,
         total_price: displayPrice,
+        note, // <-- must be here too
       });
+
       const orderDetailId = detailRes.data.id;
 
       for (const v of selectedVariations) {
@@ -277,14 +331,24 @@ const MenuItemDetails = () => {
         />
       )}
 
-      <View style={{ marginVertical: 20 }}>
-        <Button
-          title={placingOrder ? "Placing Order..." : "Place Order"}
-          color="#A40C2D"
-          onPress={placeOrder}
-          disabled={placingOrder}
-        />
-      </View>
+<View style={{ marginVertical: 20 }}>
+  <Button
+    title={placingOrder ? "Placing Order..." : "Place Order"}
+    color="#A40C2D"
+    onPress={placeOrder}
+    disabled={placingOrder}
+  />
+</View>
+
+<View style={{ marginVertical: 10 }}>
+  <Button
+    title={placingOrder ? "Adding to Cart..." : "Add to Cart"}
+    color="#A40C2D"
+    onPress={addToCart}
+    disabled={placingOrder}
+  />
+</View>
+
     </ScrollView>
   );
 };
