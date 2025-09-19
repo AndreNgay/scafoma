@@ -10,13 +10,11 @@ import {
   TouchableOpacity,
   Button,
   Alert,
+  TextInput,
 } from "react-native";
 import { useRoute, useNavigation } from "@react-navigation/native";
 import api from "../../../libs/apiCall"; // axios instance
 import useStore from "../../../store";
-import { TextInput } from "react-native";
-
-
 
 const MenuItemDetails = () => {
   const route = useRoute<any>();
@@ -32,12 +30,10 @@ const MenuItemDetails = () => {
   const [note, setNote] = useState("");
   const [finalPrice, setFinalPrice] = useState(item.price);
 
-
-  // Fetch variations and groups
+  // 🔹 Fetch variations and groups
   const fetchVariations = async () => {
     try {
       setLoadingVariations(true);
-
       const resGroups = await api.get(`/item-variation-group/${item.id}`);
       const groups = resGroups.data.data || [];
 
@@ -59,7 +55,7 @@ const MenuItemDetails = () => {
     }
   };
 
-  // Fetch feedbacks
+  // 🔹 Fetch feedbacks
   const fetchFeedbacks = async () => {
     try {
       setLoadingFeedbacks(true);
@@ -72,7 +68,7 @@ const MenuItemDetails = () => {
     }
   };
 
-  // Handle selecting variations
+  // 🔹 Handle selecting variations
   const toggleVariation = (variation: any, group: any) => {
     if (group.multiple) {
       setSelectedVariations((prev) => {
@@ -90,71 +86,75 @@ const MenuItemDetails = () => {
       ]);
     }
   };
-
-// Place Order
-const placeOrder = async () => {
-  try {
-    setPlacingOrder(true);
-    console.log("DEBUG item:", item);
-
-    const user = useStore.getState().user; // ✅ access current user from store
-    if (!user) {
-      Alert.alert("Error", "You must be logged in to place an order.");
-      return;
-    }
-
-    // Step 1: create tblorder with note + finalPrice = 0 for now
-    const orderRes = await api.post("/order", {
-      customer_id: user.id,
-      concession_id: item.concession_id,
-      status: "pending",
-      note: note,
-      total_price: 0, // will be recalculated later
-    });
-    const orderId = orderRes.data.id;
-
-    // Step 2: add tblorderdetail
-    const detailRes = await api.post("/order-detail", {
-      order_id: orderId,
-      item_id: item.id,
-      quantity: 1,
-      item_price: item.price,
-      total_price: item.price,
-    });
-    const orderDetailId = detailRes.data.id;
-
-    // Step 3: add variations
-    for (const v of selectedVariations) {
-      await api.post("/order-item-variation", {
-        order_detail_id: orderDetailId,
-        variation_id: v.id,
-      });
-    }
-
-    // Step 4: recalc total
-    await api.put(`/order/${orderId}/recalculate`);
-
-
-
-    Alert.alert("Success", "Order placed successfully!");
-    navigation.navigate("Orders");
-  } catch (err: any) {
-    console.error("Error placing order:", err.response?.data || err);
-    Alert.alert("Error", err.response?.data?.message ?? "Failed to place order.");
-  } finally {
-    setPlacingOrder(false);
-  }
-};
-
-
-
   useEffect(() => {
-    let base = item.price;
-    let extras = selectedVariations.reduce((sum, v) => sum + (v.additional_price || 0), 0);
+    const base = Number(item.price) || 0;
+    const extras = selectedVariations.reduce(
+      (sum, v) => sum + Number(v.additional_price || 0),
+      0
+    );
     setFinalPrice(base + extras);
+  }, [selectedVariations, item.price]);
+
+
+  // 🔹 Initial fetch
+  useEffect(() => {
     fetchVariations();
     fetchFeedbacks();
   }, [item.id]);
+
+  // 🔹 Place Order
+  const placeOrder = async () => {
+    try {
+      setPlacingOrder(true);
+      const user = useStore.getState().user;
+      if (!user) {
+        Alert.alert("Error", "You must be logged in to place an order.");
+        return;
+      }
+
+      // Step 1: create tblorder
+      const orderRes = await api.post("/order", {
+        customer_id: user.id,
+        concession_id: item.concession_id,
+        status: "pending",
+        note: note,
+        total_price: 0, // ✅ DB will recalc
+      });
+      const orderId = orderRes.data.id;
+
+      // Step 2: add tblorderdetail
+      const detailRes = await api.post("/order-detail", {
+        order_id: orderId,
+        item_id: item.id,
+        quantity: 1,
+        item_price: item.price,
+        total_price: item.price,
+      });
+      const orderDetailId = detailRes.data.id;
+
+      // Step 3: add variations
+      for (const v of selectedVariations) {
+        await api.post("/order-item-variation", {
+          order_detail_id: orderDetailId,
+          variation_id: v.id,
+        });
+      }
+
+      // Step 4: recalc total in backend
+      await api.put(`/order/${orderId}/recalculate`);
+
+      Alert.alert("Success", "Order placed successfully!");
+      navigation.navigate("Orders");
+    } catch (err: any) {
+      console.error("Error placing order:", err.response?.data || err);
+      Alert.alert(
+        "Error",
+        err.response?.data?.message ?? "Failed to place order."
+      );
+    } finally {
+      setPlacingOrder(false);
+    }
+  };
 
   return (
     <ScrollView style={styles.container}>
@@ -180,7 +180,7 @@ const placeOrder = async () => {
       {item.category && (
         <Text style={styles.categoryTag}>{item.category}</Text>
       )}
-      <Text style={styles.price}>₱{item.price.toFixed(2)}</Text>
+      <Text style={styles.price}>₱{Number(item.price).toFixed(2)}</Text>
 
       {/* Variations */}
       <Text style={styles.sectionHeader}>Variations</Text>
@@ -229,9 +229,8 @@ const placeOrder = async () => {
       />
 
       <Text style={styles.finalPrice}>
-        Final Price: ₱{finalPrice.toFixed(2)}
+        Final Price: ₱{Number(finalPrice).toFixed(2)}
       </Text>
-
 
       {/* Feedbacks */}
       <Text style={styles.sectionHeader}>Customer Feedbacks</Text>
@@ -325,19 +324,18 @@ const styles = StyleSheet.create({
   feedbackRating: { fontSize: 13, color: "#A40C2D" },
   feedbackComment: { marginTop: 5, fontSize: 13 },
   noteInput: {
-  borderWidth: 1,
-  borderColor: "#ccc",
-  padding: 10,
-  borderRadius: 8,
-  marginBottom: 15,
-},
-finalPrice: {
-  fontSize: 18,
-  fontWeight: "bold",
-  color: "#A40C2D",
-  marginTop: 10,
-},
-
+    borderWidth: 1,
+    borderColor: "#ccc",
+    padding: 10,
+    borderRadius: 8,
+    marginBottom: 15,
+  },
+  finalPrice: {
+    fontSize: 18,
+    fontWeight: "bold",
+    color: "#A40C2D",
+    marginTop: 10,
+  },
 });
 
 export default MenuItemDetails;
