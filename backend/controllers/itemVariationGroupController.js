@@ -1,7 +1,7 @@
 import { pool } from "../libs/database.js";
 
-// get groups by menu item
-export const getGroupsByMenuItemId = async (req, res) => {
+// get groups by id
+export const getVariationGroupsById = async (req, res) => {
   const { id } = req.params;
 
   try {

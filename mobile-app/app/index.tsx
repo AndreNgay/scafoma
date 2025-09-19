@@ -9,7 +9,7 @@ import SignIn from "./screens/auth/SignIn";
 import SignUp from "./screens/auth/SignUp";
 import Menu from "./screens/concessionaire/Menu/Menu";
 import Profile from "./screens/Profile";
-import Orders from "./screens/concessionaire/Order/Orders";
+import Orders from "./screens/concessionaire/Order/OrderList";
 import AddMenu from "./screens/concessionaire/Menu/AddMenu";
 import EditMenu from "./screens/concessionaire/Menu/EditMenu";
 import Concession from "./screens/concessionaire/Concession/Concession";
@@ -85,6 +85,7 @@ function CustomerTabs() {
     <Tab.Navigator screenOptions={{ headerShown: false }}>
       <Tab.Screen name="Menu Items" component={MenuItemsStack} />
       <Tab.Screen name="Cart" component={Cart} />
+      <Tab.Screen name="Orders" component={Orders} />
       <Tab.Screen name="Profile" component={Profile} />
     </Tab.Navigator>
   );
@@ -93,7 +94,7 @@ function CustomerTabs() {
 function ConcessionaireTabs() {
   return (
     <Tab.Navigator screenOptions={{ headerShown: false }}>
-      <Tab.Screen name="Orders" component={Orders} />
+      <Tab.Screen name="Order List" component={Orders} />
       <Tab.Screen name="Menu" component={MenuManagementStack} />
       <Tab.Screen name="Concession" component={ConsessionaireConcessionStack} />
       <Tab.Screen name="Profile" component={Profile} />

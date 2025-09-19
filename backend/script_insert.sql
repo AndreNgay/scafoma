@@ -98,3 +98,30 @@ INSERT INTO tblfeedback (customer_id, menu_item_id, rating, comment) VALUES
 
   ((SELECT id FROM tbluser WHERE email='cust3@example.com'), (SELECT id FROM tblmenuitem WHERE item_name='Banana Shake'), 4, 'Sweet and creamy.'),
   ((SELECT id FROM tbluser WHERE email='cust4@example.com'), (SELECT id FROM tblmenuitem WHERE item_name='Banana Shake'), 5, 'Refreshing drink!');
+
+-- Allow multiple toppings for Cheeseburger Deluxe
+INSERT INTO tblitemvariationgroup (variation_group_name, menu_item_id, multiple_selection) VALUES
+  ('Toppings', (SELECT id FROM tblmenuitem WHERE item_name = 'Cheeseburger Deluxe' AND concession_id = (SELECT id FROM tblconcession WHERE concession_name = 'Alice’s Snacks')), TRUE);
+
+INSERT INTO tblitemvariation (item_variation_group_id, variation_name, additional_price) VALUES
+  ((SELECT id FROM tblitemvariationgroup WHERE variation_group_name='Toppings' AND menu_item_id=(SELECT id FROM tblmenuitem WHERE item_name='Cheeseburger Deluxe')), 'Cheese', 10.00),
+  ((SELECT id FROM tblitemvariationgroup WHERE variation_group_name='Toppings' AND menu_item_id=(SELECT id FROM tblmenuitem WHERE item_name='Cheeseburger Deluxe')), 'Bacon', 20.00),
+  ((SELECT id FROM tblitemvariationgroup WHERE variation_group_name='Toppings' AND menu_item_id=(SELECT id FROM tblmenuitem WHERE item_name='Cheeseburger Deluxe')), 'Egg', 15.00);
+
+-- Allow multiple dips for Crispy Fries
+INSERT INTO tblitemvariationgroup (variation_group_name, menu_item_id, multiple_selection) VALUES
+  ('Dips', (SELECT id FROM tblmenuitem WHERE item_name = 'Crispy Fries' AND concession_id = (SELECT id FROM tblconcession WHERE concession_name = 'Alice’s Snacks')), TRUE);
+
+INSERT INTO tblitemvariation (item_variation_group_id, variation_name, additional_price) VALUES
+  ((SELECT id FROM tblitemvariationgroup WHERE variation_group_name='Dips' AND menu_item_id=(SELECT id FROM tblmenuitem WHERE item_name='Crispy Fries')), 'Cheese Dip', 12.00),
+  ((SELECT id FROM tblitemvariationgroup WHERE variation_group_name='Dips' AND menu_item_id=(SELECT id FROM tblmenuitem WHERE item_name='Crispy Fries')), 'Garlic Mayo', 10.00),
+  ((SELECT id FROM tblitemvariationgroup WHERE variation_group_name='Dips' AND menu_item_id=(SELECT id FROM tblmenuitem WHERE item_name='Crispy Fries')), 'BBQ Sauce', 8.00);
+
+-- Allow multiple add-ons for Banana Shake
+INSERT INTO tblitemvariationgroup (variation_group_name, menu_item_id, multiple_selection) VALUES
+  ('Add-ons', (SELECT id FROM tblmenuitem WHERE item_name = 'Banana Shake' AND concession_id = (SELECT id FROM tblconcession WHERE concession_name = 'Bob’s Meals')), TRUE);
+
+INSERT INTO tblitemvariation (item_variation_group_id, variation_name, additional_price) VALUES
+  ((SELECT id FROM tblitemvariationgroup WHERE variation_group_name='Add-ons' AND menu_item_id=(SELECT id FROM tblmenuitem WHERE item_name='Banana Shake')), 'Choco Chips', 10.00),
+  ((SELECT id FROM tblitemvariationgroup WHERE variation_group_name='Add-ons' AND menu_item_id=(SELECT id FROM tblmenuitem WHERE item_name='Banana Shake')), 'Whipped Cream', 8.00),
+  ((SELECT id FROM tblitemvariationgroup WHERE variation_group_name='Add-ons' AND menu_item_id=(SELECT id FROM tblmenuitem WHERE item_name='Banana Shake')), 'Caramel Drizzle', 12.00);

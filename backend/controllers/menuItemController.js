@@ -74,7 +74,7 @@ export const getMenuItems = async (req, res) => {
     const total = parseInt(countResult.rows[0].count);
 
     const result = await pool.query(
-      `SELECT mi.*, c.concession_name, caf.cafeteria_name
+      `SELECT mi.*, c.concession_name, caf.cafeteria_name  
        FROM tblmenuitem mi
        JOIN tblconcession c ON mi.concession_id = c.id
        JOIN tblcafeteria caf ON c.cafeteria_id = caf.id
@@ -95,6 +95,7 @@ export const getMenuItems = async (req, res) => {
         category: r.category,
         availability: r.available,
         concession_name: r.concession_name,
+        concession_id: r.concession_id,
         cafeteria_name: r.cafeteria_name,
         image_url: makeImageDataUrl(r.image),
       })),

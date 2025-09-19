@@ -15,6 +15,7 @@ import api from "../../../libs/apiCall"; // axios instance
 import { useNavigation } from "@react-navigation/native";
 
 
+
 const MenuItems = () => {
   // data
   const [menuItems, setMenuItems] = useState<any[]>([]);
@@ -59,6 +60,7 @@ const MenuItems = () => {
         id: number;
         item_name: string;
         concession_name: string;
+        concession_id: number;
         cafeteria_name: string;
         price: number;
         category?: string;
