@@ -14,7 +14,7 @@ export const MenuItems = () => {
 
   const fetchMenuItems = async () => {
     try {
-      const { data } = await api.get(`/menu-item/all`);
+      const { data } = await api.get(`/menu-item/admin`);
       const formatted = (data.data || []).map((item) => ({
         id: item.id,
         ...item,

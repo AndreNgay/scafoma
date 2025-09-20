@@ -134,6 +134,118 @@ export const getMenuItems = async (req, res) => {
   }
 };
 
+
+// controllers/menuItemController.js
+export const getMenuItemsByAdmin = async (req, res) => {
+  try {
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 50; // default 50 items per page for admin
+    const offset = (page - 1) * limit;
+    const { search, category, sortBy } = req.query;
+
+    let whereClauses = [];
+    let params = [];
+    let i = 1;
+
+    if (category) {
+      whereClauses.push(`mi.category ILIKE $${i++}`);
+      params.push(`%${category}%`);
+    }
+
+    if (search) {
+      whereClauses.push(`mi.item_name ILIKE $${i++}`);
+      params.push(`%${search}%`);
+    }
+
+    const whereSQL = whereClauses.length ? "WHERE " + whereClauses.join(" AND ") : "";
+
+    let orderBy = "mi.created_at DESC";
+    if (sortBy === "price_asc") orderBy = "mi.price ASC";
+    if (sortBy === "price_desc") orderBy = "mi.price DESC";
+    if (sortBy === "name") orderBy = "mi.item_name ASC";
+
+    // Get total count
+    const countResult = await pool.query(
+      `SELECT COUNT(*) FROM tblmenuitem mi
+       JOIN tblconcession c ON mi.concession_id = c.id
+       JOIN tblcafeteria caf ON c.cafeteria_id = caf.id
+       ${whereSQL}`,
+      params
+    );
+    const total = parseInt(countResult.rows[0].count);
+
+    // Get menu items
+    const result = await pool.query(
+      `SELECT mi.*, c.concession_name, caf.cafeteria_name
+       FROM tblmenuitem mi
+       JOIN tblconcession c ON mi.concession_id = c.id
+       JOIN tblcafeteria caf ON c.cafeteria_id = caf.id
+       ${whereSQL}
+       ORDER BY ${orderBy}
+       LIMIT $${i} OFFSET $${i + 1}`,
+      [...params, limit, offset]
+    );
+
+    const menuItems = result.rows;
+
+    // Fetch variations
+    const menuItemIds = menuItems.map(mi => mi.id);
+    let variationsMap = {};
+    if (menuItemIds.length > 0) {
+      const vRes = await pool.query(
+        `SELECT ivg.menu_item_id, ivg.variation_group_name AS label,
+                iv.variation_name, iv.additional_price
+         FROM tblitemvariation iv
+         JOIN tblitemvariationgroup ivg ON iv.item_variation_group_id = ivg.id
+         WHERE ivg.menu_item_id = ANY($1::int[])`,
+        [menuItemIds]
+      );
+
+      for (const v of vRes.rows) {
+        if (!variationsMap[v.menu_item_id]) variationsMap[v.menu_item_id] = {};
+        if (!variationsMap[v.menu_item_id][v.label]) variationsMap[v.menu_item_id][v.label] = [];
+        variationsMap[v.menu_item_id][v.label].push({
+          name: v.variation_name,
+          price: Number(v.additional_price),
+        });
+      }
+    }
+
+    // Format response
+    const formattedItems = menuItems.map(r => ({
+      id: r.id,
+      item_name: r.item_name,
+      price: Number(r.price),
+      category: r.category,
+      availability: r.available,
+      concession_name: r.concession_name,
+      concession_id: r.concession_id,
+      cafeteria_name: r.cafeteria_name,
+      image_url: r.image ? `data:image/jpeg;base64,${r.image.toString("base64")}` : null,
+      variations: variationsMap[r.id]
+        ? Object.keys(variationsMap[r.id]).map(label => ({
+            label,
+            variations: variationsMap[r.id][label]
+          }))
+        : [],
+    }));
+
+    res.json({
+      status: "success",
+      data: formattedItems,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+      },
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ status: "failed", message: "Server error" });
+  }
+};
+
 // =========================
 // Get menu items by concessionaire
 // =========================

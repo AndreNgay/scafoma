@@ -6,14 +6,16 @@ import {
   addMenuItem,
   updateMenuItem,
   deleteMenuItem,
+  getMenuItemsByAdmin,
   upload,
 } from "../controllers/menuItemController.js";
 import authMiddleware from "../middleware/authMiddleware.js";
 
 const router = express.Router();
 
-// Public: all items (admin)
 router.get("/all", getMenuItems);
+
+router.get("/admin",getMenuItemsByAdmin)
 
 // Concessionaire-specific (requires auth)
 router.get("/", authMiddleware, getMenuItemsByConcessionaire);
