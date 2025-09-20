@@ -4,6 +4,8 @@ import { View, Text, TextInput, Button, ScrollView, TouchableOpacity, Image, Ale
 import { useNavigation, useRoute } from "@react-navigation/native";
 import * as ImagePicker from "expo-image-picker";
 import api from "../../../libs/apiCall";
+import { Switch } from "react-native";
+
 
 
 type Variation = { name: string; price: string };
@@ -20,7 +22,10 @@ const EditMenu = () => {
   const [itemName, setItemName] = useState(menuItem?.item_name || "");
   const [price, setPrice] = useState(menuItem?.price?.toString() || "");
   const [category, setCategory] = useState(menuItem?.category || "");
-  const [availability, setAvailability] = useState(menuItem?.availability || true);
+  const [availability, setAvailability] = useState(
+  menuItem?.availability !== undefined ? menuItem.availability : true
+);
+
   const [image, setImage] = useState<any>(menuItem?.image_url || null);
   const [variationGroups, setVariationGroups] = useState<VariationGroup[]>(menuItem?.variations || []);
 
@@ -112,13 +117,16 @@ const handleSubmit = async () => {
 
       <Text style={styles.label}>Category</Text>
       <TextInput style={styles.input} value={category} onChangeText={setCategory} />
-
       <View style={styles.toggleRow}>
         <Text style={styles.label}>Availability</Text>
-        <TouchableOpacity onPress={() => setAvailability(!availability)}>
-          <Text>{availability ? "Available" : "Not Available"}</Text>
-        </TouchableOpacity>
+        <Switch
+          value={availability}
+          onValueChange={setAvailability}
+          trackColor={{ false: "#ccc", true: "#A40C2D" }}
+          thumbColor="#fff"
+        />
       </View>
+
 
       <Text style={[styles.label, { marginTop: 20 }]}>Variation Groups</Text>
       {variationGroups.map((group, gIndex) => (

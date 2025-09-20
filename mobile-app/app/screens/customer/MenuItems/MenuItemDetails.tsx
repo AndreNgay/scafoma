@@ -30,16 +30,8 @@ const MenuItemDetails = () => {
   const [note, setNote] = useState("");
   const [quantity, setQuantity] = useState(1);
   const [displayPrice, setDisplayPrice] = useState(Number(item.price) || 0);
-  const [paymentMethod, setPaymentMethod] = useState<"gcash" | "on-counter">("on-counter");
 
-  // Set default payment method based on availability
-  useEffect(() => {
-    if (item.oncounter_payment_available) {
-      setPaymentMethod("on-counter");
-    } else if (item.gcash_payment_available) {
-      setPaymentMethod("gcash");
-    }
-  }, [item.gcash_payment_available, item.oncounter_payment_available]);
+
 
   // Fetch variations
   const fetchVariations = async () => {
@@ -122,7 +114,6 @@ const MenuItemDetails = () => {
         note,
         total_price: 0,
         in_cart: inCart,
-        payment_method: paymentMethod,
       });
       const orderId = orderRes.data.id;
 
@@ -190,25 +181,6 @@ const MenuItemDetails = () => {
         </TouchableOpacity>
       </View>
 
-      {/* Payment Method */}
-      <Text style={styles.sectionHeader}>Payment Method</Text>
-      {item.gcash_payment_available || item.oncounter_payment_available ? (
-        <View style={styles.pickerContainer}>
-          <Picker
-            selectedValue={paymentMethod}
-            onValueChange={(val: string) => setPaymentMethod(val as "gcash" | "on-counter")}
-          >
-            {item.oncounter_payment_available && (
-              <Picker.Item label="On-Counter" value="on-counter" />
-            )}
-            {item.gcash_payment_available && (
-              <Picker.Item label="GCash" value="gcash" />
-            )}
-          </Picker>
-        </View>
-      ) : (
-        <Text style={{ color: "red" }}>No payment methods available</Text>
-      )}
 
       {/* Variations */}
       <Text style={styles.sectionHeader}>Variations</Text>

@@ -39,12 +39,17 @@ export const getOrdersByCustomerId = async (req, res) => {
   try {
     const result = await pool.query(
       `SELECT o.*, 
-              c.concession_name, caf.cafeteria_name
-       FROM tblorder o
-       JOIN tblconcession c ON o.concession_id = c.id
-       JOIN tblcafeteria caf ON c.cafeteria_id = caf.id
-       WHERE o.customer_id = $1
-       ORDER BY o.created_at DESC`,
+       o.payment_method,
+       c.concession_name, 
+       caf.cafeteria_name,
+       COALESCE(c.gcash_payment_available, FALSE) AS gcash_payment_available,
+       COALESCE(c.oncounter_payment_available, FALSE) AS oncounter_payment_available
+FROM tblorder o
+JOIN tblconcession c ON o.concession_id = c.id
+JOIN tblcafeteria caf ON c.cafeteria_id = caf.id
+WHERE o.customer_id = $1
+ORDER BY o.created_at DESC
+`,
       [id]
     );
 
@@ -61,6 +66,8 @@ export const getOrdersByCustomerId = async (req, res) => {
     res.status(500).json({ error: "Failed to fetch customer orders" });
   }
 };
+
+
 
 
 // ==========================
@@ -138,6 +145,25 @@ export const updatePaymentProof = async (req, res) => {
   } catch (err) {
     console.error("Error uploading payment proof:", err);
     res.status(500).json({ error: "Failed to upload payment proof" });
+  }
+};
+
+export const updatePaymentMethod = async (req, res) => {
+  const { id } = req.params;
+  const { payment_method } = req.body;
+  try {
+    const result = await pool.query(
+      `UPDATE tblorder
+       SET payment_method = $1, updated_at = NOW()
+       WHERE id = $2
+       RETURNING *`,
+      [payment_method, id]
+    );
+    if (result.rowCount === 0) return res.status(404).json({ error: "Order not found" });
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Failed to update payment method" });
   }
 };
 

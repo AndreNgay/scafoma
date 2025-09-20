@@ -9,6 +9,7 @@ import {
   Alert,
   ScrollView,
   Image,
+  Switch,
 } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import * as ImagePicker from "expo-image-picker";
@@ -22,23 +23,26 @@ const AddMenu: React.FC = () => {
   const [itemName, setItemName] = useState("");
   const [price, setPrice] = useState("");
   const [category, setCategory] = useState("Beverage");
+  const [availability, setAvailability] = useState(true);
   const [image, setImage] = useState<any>(null);
   const [variationGroups, setVariationGroups] = useState<VariationGroup[]>([]);
   const [loading, setLoading] = useState(false);
 
+  // Tooltip states
+  const [showTooltipPrice, setShowTooltipPrice] = useState(false);
+  const [showTooltipAvailability, setShowTooltipAvailability] = useState(false);
+  const [showTooltipVariations, setShowTooltipVariations] = useState(false);
+
   const navigation = useNavigation<any>();
 
-  // Pick image from gallery
   const pickImage = async () => {
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       quality: 0.8,
     });
-
     if (!result.canceled) setImage(result.assets[0]);
   };
 
-  // Variation handlers
   const addVariationGroup = () =>
     setVariationGroups([...variationGroups, { label: "", variations: [] }]);
   const removeVariationGroup = (i: number) => {
@@ -72,7 +76,6 @@ const AddMenu: React.FC = () => {
     setVariationGroups(updated);
   };
 
-  // Submit new menu item
   const handleAddMenu = async () => {
     if (!itemName.trim() || !price.trim()) {
       Alert.alert("Error", "Please fill in item name and price.");
@@ -83,6 +86,7 @@ const AddMenu: React.FC = () => {
     formData.append("item_name", itemName.trim());
     formData.append("price", price.trim());
     formData.append("category", category);
+    formData.append("availability", availability ? "true" : "false");
     formData.append("variations", JSON.stringify(variationGroups));
 
     if (image?.uri) {
@@ -109,12 +113,24 @@ const AddMenu: React.FC = () => {
     }
   };
 
+  const Tooltip = ({ visible, text }: { visible: boolean; text: string }) =>
+    visible ? <Text style={styles.tooltipText}>{text}</Text> : null;
+
   return (
     <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: 120 }}>
       <Text style={styles.label}>Item Name *</Text>
       <TextInput style={styles.input} value={itemName} onChangeText={setItemName} />
 
-      <Text style={styles.label}>Price *</Text>
+      <View style={styles.labelRow}>
+        <Text style={styles.label}>Base Price *</Text>
+        <TouchableOpacity onPress={() => setShowTooltipPrice(!showTooltipPrice)}>
+          <Text style={styles.infoIcon}>ℹ️</Text>
+        </TouchableOpacity>
+      </View>
+      <Tooltip
+        visible={showTooltipPrice}
+        text="This is the base price of the menu item."
+      />
       <TextInput
         style={styles.input}
         value={price}
@@ -141,8 +157,36 @@ const AddMenu: React.FC = () => {
         </Picker>
       </View>
 
-      {/* Variations UI */}
-      <Text style={[styles.label, { marginTop: 18 }]}>Variations</Text>
+      <View style={styles.labelRow}>
+        <Text style={styles.label}>Availability</Text>
+        <TouchableOpacity onPress={() => setShowTooltipAvailability(!showTooltipAvailability)}>
+          <Text style={styles.infoIcon}>ℹ️</Text>
+        </TouchableOpacity>
+      </View>
+      <Tooltip
+        visible={showTooltipAvailability}
+        text="Toggle to set if this menu item is available for ordering."
+      />
+      <View style={styles.toggleRow}>
+        <Switch
+          value={availability}
+          onValueChange={setAvailability}
+          trackColor={{ false: "#ccc", true: "#A40C2D" }}
+          thumbColor="#fff"
+        />
+      </View>
+
+      <View style={styles.labelRow}>
+        <Text style={[styles.label, { marginTop: 18 }]}>Variations</Text>
+        <TouchableOpacity onPress={() => setShowTooltipVariations(!showTooltipVariations)}>
+          <Text style={styles.infoIcon}>ℹ️</Text>
+        </TouchableOpacity>
+      </View>
+      <Tooltip
+        visible={showTooltipVariations}
+        text="Add groups and variations like sizes or flavors with additional prices."
+      />
+
       {variationGroups.map((group, gIndex) => (
         <View key={gIndex} style={styles.groupBox}>
           <TextInput
@@ -212,6 +256,9 @@ export default AddMenu;
 const styles = StyleSheet.create({
   container: { flex: 1, padding: 16, backgroundColor: "#fff" },
   label: { marginTop: 12, fontSize: 14, fontWeight: "600" },
+  labelRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  infoIcon: { fontSize: 16, color: "#555" },
+  tooltipText: { fontSize: 12, color: "#555", marginTop: 2, marginBottom: 4 },
   input: {
     borderWidth: 1,
     borderColor: "#ccc",
@@ -231,6 +278,12 @@ const styles = StyleSheet.create({
     marginTop: 6,
   },
   previewImage: { width: 120, height: 120, borderRadius: 10 },
+  toggleRow: {
+    flexDirection: "row",
+    justifyContent: "flex-start",
+    alignItems: "center",
+    marginTop: 6,
+  },
   groupBox: { borderWidth: 1, borderColor: "#aaa", borderRadius: 8, padding: 10, marginTop: 12, backgroundColor: "#f9f9f9" },
   variationRow: { flexDirection: "row", alignItems: "center", marginTop: 6 },
   variationInput: { flex: 2, marginRight: 6 },
