@@ -23,7 +23,7 @@ export const getMenuItems = async (req, res) => {
 
     const { cafeteriaId, concessionId, category, sortBy, search } = req.query;
 
-    let whereClauses = [];
+    let whereClauses = ["mi.available = TRUE", "c.status = 'open'"];
     let params = [];
     let i = 1;
 
@@ -51,29 +51,30 @@ export const getMenuItems = async (req, res) => {
     if (sortBy === "price_desc") orderBy = "mi.price DESC";
     if (sortBy === "name") orderBy = "mi.item_name ASC";
 
+    // Get total count
     const countResult = await pool.query(
       `SELECT COUNT(*) FROM tblmenuitem mi 
-       JOIN tblconcession c ON mi.concession_id = c.id 
+       JOIN tblconcession c ON mi.concession_id = c.id
        ${whereSQL}`,
       params
     );
     const total = parseInt(countResult.rows[0].count);
 
+    // Get menu items
     const result = await pool.query(
       `SELECT mi.*, c.concession_name, c.gcash_payment_available, c.oncounter_payment_available, caf.cafeteria_name
-      FROM tblmenuitem mi
-      JOIN tblconcession c ON mi.concession_id = c.id
-      JOIN tblcafeteria caf ON c.cafeteria_id = caf.id
-      ${whereSQL}
-      ORDER BY ${orderBy}
-      LIMIT $${i} OFFSET $${i + 1}`,
+       FROM tblmenuitem mi
+       JOIN tblconcession c ON mi.concession_id = c.id
+       JOIN tblcafeteria caf ON c.cafeteria_id = caf.id
+       ${whereSQL}
+       ORDER BY ${orderBy}
+       LIMIT $${i} OFFSET $${i + 1}`,
       [...params, limit, offset]
     );
 
-
     const menuItems = result.rows;
 
-    // Fetch variation groups and variations
+    // Fetch variations
     const menuItemIds = menuItems.map(mi => mi.id);
     let variationsMap = {};
     if (menuItemIds.length > 0) {
@@ -96,6 +97,7 @@ export const getMenuItems = async (req, res) => {
       }
     }
 
+    // Format response
     const formattedItems = menuItems.map(r => ({
       id: r.id,
       item_name: r.item_name,
@@ -112,8 +114,8 @@ export const getMenuItems = async (req, res) => {
             variations: variationsMap[r.id][label]
           }))
         : [],
-        gcash_payment_available: r.gcash_payment_available,
-        oncounter_payment_available: r.oncounter_payment_available,
+      gcash_payment_available: r.gcash_payment_available,
+      oncounter_payment_available: r.oncounter_payment_available,
     }));
 
     res.json({
