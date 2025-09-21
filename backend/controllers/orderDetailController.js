@@ -84,13 +84,66 @@ export const updateOrderDetail = async (req, res) => {
 // Delete order detail
 // ==========================
 export const deleteOrderDetail = async (req, res) => {
-  const { id } = req.params;
+  const { id } = req.params; // order_detail_id
   try {
-    const result = await pool.query(`DELETE FROM tblorderdetail WHERE id = $1 RETURNING *`, [id]);
+    const result = await pool.query(
+      `DELETE FROM tblorderdetail WHERE id = $1 RETURNING *`,
+      [id]
+    );
     if (result.rowCount === 0) return res.status(404).json({ error: "Order detail not found" });
-    res.json({ message: "Order detail deleted successfully" });
+    res.json({ message: "Item removed from cart" });
   } catch (err) {
     console.error("Error deleting order detail:", err);
-    res.status(500).json({ error: "Failed to delete order detail" });
+    res.status(500).json({ error: "Failed to remove item" });
+  }
+};
+
+
+export const updateOrderDetailQuantity = async (req, res) => {
+  const { orderDetailId } = req.params;
+  const { quantity } = req.body;
+
+  if (!quantity || quantity < 1) {
+    return res.status(400).json({ error: "Quantity must be at least 1" });
+  }
+
+  try {
+    // Fetch base price of this order detail
+    const result = await pool.query(
+      `
+      SELECT od.id AS order_detail_id, od.item_price, mi.price AS base_price
+      FROM tblorderdetail od
+      JOIN tblmenuitem mi ON od.item_id = mi.id
+      WHERE od.id = $1
+      `,
+      [orderDetailId]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: "Order detail not found" });
+    }
+
+    const { base_price } = result.rows[0];
+
+    const itemPrice = Number(base_price);
+    const totalPrice = itemPrice * quantity;
+
+    // Update order detail with new qty + recomputed totals
+    await pool.query(
+      `
+      UPDATE tblorderdetail
+      SET quantity = $1,
+          item_price = $2,
+          total_price = $3,
+          updated_at = NOW()
+      WHERE id = $4
+      `,
+      [quantity, itemPrice, totalPrice, orderDetailId]
+    );
+
+    res.json({ message: "Quantity updated successfully" });
+  } catch (err) {
+    console.error("Error updating order detail:", err);
+    res.status(500).json({ error: "Server error" });
   }
 };

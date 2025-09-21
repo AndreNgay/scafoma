@@ -110,11 +110,13 @@ const MenuItemDetails = () => {
       const orderRes = await api.post("/order", {
         customer_id: user.id,
         concession_id: item.concession_id,
-        status: "pending",
+        order_status: inCart ? "cart" : "pending", 
         note,
         total_price: 0,
         in_cart: inCart,
+        payment_method: null, 
       });
+
       const orderId = orderRes.data.id;
 
       const detailRes = await api.post("/order-detail", {
@@ -139,6 +141,7 @@ const MenuItemDetails = () => {
 
       Alert.alert("Success", inCart ? "Item added to cart!" : "Order placed successfully!");
       navigation.navigate(inCart ? "Cart" : "Orders");
+
     } catch (err: any) {
       console.error(err.response?.data || err);
       Alert.alert("Error", err.response?.data?.message ?? "Failed to submit order.");

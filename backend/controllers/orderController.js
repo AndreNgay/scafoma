@@ -39,17 +39,17 @@ export const getOrdersByCustomerId = async (req, res) => {
   try {
     const result = await pool.query(
       `SELECT o.*, 
-       o.payment_method,
-       c.concession_name, 
-       caf.cafeteria_name,
-       COALESCE(c.gcash_payment_available, FALSE) AS gcash_payment_available,
-       COALESCE(c.oncounter_payment_available, FALSE) AS oncounter_payment_available
-FROM tblorder o
-JOIN tblconcession c ON o.concession_id = c.id
-JOIN tblcafeteria caf ON c.cafeteria_id = caf.id
-WHERE o.customer_id = $1
-ORDER BY o.created_at DESC
-`,
+              o.payment_method,
+              c.concession_name, 
+              caf.cafeteria_name,
+              COALESCE(c.gcash_payment_available, FALSE) AS gcash_payment_available,
+              COALESCE(c.oncounter_payment_available, FALSE) AS oncounter_payment_available
+       FROM tblorder o
+       JOIN tblconcession c ON o.concession_id = c.id
+       JOIN tblcafeteria caf ON c.cafeteria_id = caf.id
+       WHERE o.customer_id = $1
+         AND o.in_cart = FALSE   -- ✅ only checked-out orders
+       ORDER BY o.created_at DESC`,
       [id]
     );
 
@@ -66,6 +66,7 @@ ORDER BY o.created_at DESC
     res.status(500).json({ error: "Failed to fetch customer orders" });
   }
 };
+
 
 
 
@@ -173,30 +174,28 @@ export const updatePaymentMethod = async (req, res) => {
 export const addOrder = async (req, res) => {
   const { customer_id, concession_id, status, total_price, in_cart, payment_method } = req.body;
   try {
-    const existing = await pool.query(
-      `SELECT * FROM tblorder WHERE customer_id=$1 AND concession_id=$2 AND in_cart=TRUE LIMIT 1`,
-      [customer_id, concession_id]
-    );
-    if (existing.rows.length > 0) return res.status(200).json(existing.rows[0]);
+    if (in_cart) {
+      const existing = await pool.query(
+        `SELECT * FROM tblorder WHERE customer_id=$1 AND concession_id=$2 AND in_cart=TRUE LIMIT 1`,
+        [customer_id, concession_id]
+      );
+      if (existing.rows.length > 0) return res.status(200).json(existing.rows[0]);
+    }
 
     const result = await pool.query(
       `INSERT INTO tblorder (customer_id, concession_id, order_status, total_price, in_cart, payment_method)
-       VALUES ($1,$2,$3,$4,$5,$6) RETURNING *`,
+       VALUES ($1,$2,COALESCE($3, 'pending'),$4,$5,$6) RETURNING *`,
       [customer_id, concession_id, status, total_price, in_cart ?? false, payment_method]
     );
     res.status(201).json(result.rows[0]);
   } catch (err) {
-    console.error(err);
+    console.error("Error adding order:", err);
     res.status(500).json({ error: "Failed to add order" });
   }
 };
 
 
 
-
-// ==========================
-// Get items in cart for a customer
-// ==========================
 // ==========================
 // Get items in cart for a customer
 // ==========================

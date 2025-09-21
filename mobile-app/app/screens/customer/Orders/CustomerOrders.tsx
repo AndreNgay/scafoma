@@ -51,13 +51,11 @@ const CustomerOrders = () => {
   useEffect(() => {
     let filtered = [...orders];
 
-    // Search by cafeteria, concession, or note
     if (searchQuery) {
       filtered = filtered.filter(
         (o) =>
           o.cafeteria_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          o.concession_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          (o.note && o.note.toLowerCase().includes(searchQuery.toLowerCase()))
+          o.concession_name.toLowerCase().includes(searchQuery.toLowerCase()) 
       );
     }
 
@@ -69,25 +67,28 @@ const CustomerOrders = () => {
     setFilteredOrders(filtered);
   }, [searchQuery, statusFilter, orders]);
 
-  const renderItem = ({ item }: any) => (
-    <TouchableOpacity
-      onPress={() => navigation.navigate("View Order", { item })}
-    >
-      <View style={styles.card}>
-        <Text style={styles.title}>
-          {item.cafeteria_name} • {item.concession_name}
-        </Text>
-        <Text>
-          Status: <Text style={styles.status}>{item.order_status}</Text>
-        </Text>
-        <Text>Total: ₱{Number(item.total_price).toFixed(2)}</Text>
-        {item.note ? <Text>Note: {item.note}</Text> : null}
-        <Text style={styles.date}>
-          {new Date(item.created_at).toLocaleString()}
-        </Text>
-      </View>
-    </TouchableOpacity>
-  );
+const renderItem = ({ item }: any) => (
+  <TouchableOpacity
+    onPress={() => navigation.navigate("View Order", { item })}
+  >
+    <View style={styles.card}>
+      {/* ✅ Order ID */}
+      <Text style={styles.orderId}>Order #{item.id}</Text>
+
+      <Text style={styles.title}>
+        {item.cafeteria_name} • {item.concession_name}
+      </Text>
+      <Text>
+        Status: <Text style={styles.status}>{item.order_status}</Text>
+      </Text>
+      <Text>Total: ₱{Number(item.total_price).toFixed(2)}</Text>
+      <Text style={styles.date}>
+        {new Date(item.created_at).toLocaleString()}
+      </Text>
+    </View>
+  </TouchableOpacity>
+);
+
 
   return (
     <View style={styles.container}>
@@ -213,6 +214,13 @@ const styles = StyleSheet.create({
     marginTop: 20,
   },
   applyText: { color: "#fff", textAlign: "center", fontWeight: "bold" },
+  orderId: {
+  fontSize: 13,
+  fontWeight: "600",
+  color: "#555",
+  marginBottom: 3,
+},
+
 });
 
 export default CustomerOrders;
