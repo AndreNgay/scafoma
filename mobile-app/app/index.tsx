@@ -9,19 +9,17 @@ import SignIn from "./screens/auth/SignIn";
 import SignUp from "./screens/auth/SignUp";
 import Menu from "./screens/concessionaire/Menu/Menu";
 import Profile from "./screens/Profile";
-import Orders from "./screens/concessionaire/Order/OrderList";
-import AddMenu from "./screens/concessionaire/Menu/AddMenu";
 import EditMenu from "./screens/concessionaire/Menu/EditMenu";
 import Concession from "./screens/concessionaire/Concession/Concession";
 import MenuItems from "./screens/customer/MenuItems/MenuItems";
 import MenuItemDetails from "./screens/customer/MenuItems/MenuItemDetails";
 import ViewConcession from "./screens/customer/ViewConcession";
-import ViewOrder from "./screens/concessionaire/Order/ViewOrderConcessionaire";
 import CustomerOrders from "./screens/customer/Orders/CustomerOrders";
 import Cart from "./screens/customer/Cart/Cart";
 import OrderList from "./screens/concessionaire/Order/OrderList";
 import ViewOrderCustomer from "./screens/customer/Orders/ViewOrderCustomer";
 import ViewOrderConcessionaire from "./screens/concessionaire/Order/ViewOrderConcessionaire";
+import AddMenu from "./screens/concessionaire/Menu/AddMenu";
 
 
 const Stack = createNativeStackNavigator();
@@ -50,7 +48,7 @@ function MenuManagementStack() {
   );
 }
 
-function ConsessionaireConcessionStack() {
+function ConcessionaireConcessionStack() {
   return (
     <MenuStackNav.Navigator>
       <MenuStackNav.Screen
@@ -137,7 +135,7 @@ function ConcessionaireTabs() {
     <Tab.Navigator screenOptions={{ headerShown: false }}>
       <Tab.Screen name="Order List" component={OrderListStack} />
       <Tab.Screen name="Menu" component={MenuManagementStack} />
-      <Tab.Screen name="Concession" component={ConsessionaireConcessionStack} />
+      <Tab.Screen name="Concession" component={ConcessionaireConcessionStack} />
       <Tab.Screen name="Profile" component={Profile} />
     </Tab.Navigator>
   );

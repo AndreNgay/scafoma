@@ -1,5 +1,5 @@
 // screens/Menu/AddMenu.tsx
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -17,23 +17,33 @@ import { Picker } from "@react-native-picker/picker";
 import api from "../../../libs/apiCall";
 
 type Variation = { name: string; price: string };
-type VariationGroup = { label: string; variations: Variation[] };
+type VariationGroup = {
+  label: string;
+  variations: Variation[];
+  multiple_selection: boolean;
+  required_selection: boolean;
+};
 
 const AddMenu: React.FC = () => {
   const [itemName, setItemName] = useState("");
   const [price, setPrice] = useState("");
   const [category, setCategory] = useState("Beverage");
-  const [availability, setAvailability] = useState(true);
+  const [availability, setAvailability] = useState(false);
   const [image, setImage] = useState<any>(null);
   const [variationGroups, setVariationGroups] = useState<VariationGroup[]>([]);
   const [loading, setLoading] = useState(false);
 
-  // Tooltip states
-  const [showTooltipPrice, setShowTooltipPrice] = useState(false);
-  const [showTooltipAvailability, setShowTooltipAvailability] = useState(false);
-  const [showTooltipVariations, setShowTooltipVariations] = useState(false);
+  // Tooltip state
+  const [tooltip, setTooltip] = useState<string | null>(null);
 
   const navigation = useNavigation<any>();
+
+  // Auto-dismiss tooltip after 5s
+  useEffect(() => {
+    if (!tooltip) return;
+    const timer = setTimeout(() => setTooltip(null), 5000);
+    return () => clearTimeout(timer);
+  }, [tooltip]);
 
   const pickImage = async () => {
     const result = await ImagePicker.launchImageLibraryAsync({
@@ -44,27 +54,40 @@ const AddMenu: React.FC = () => {
   };
 
   const addVariationGroup = () =>
-    setVariationGroups([...variationGroups, { label: "", variations: [] }]);
+    setVariationGroups([
+      ...variationGroups,
+      {
+        label: "",
+        variations: [],
+        multiple_selection: false,
+        required_selection: false,
+      },
+    ]);
+
   const removeVariationGroup = (i: number) => {
     const updated = [...variationGroups];
     updated.splice(i, 1);
     setVariationGroups(updated);
   };
+
   const addVariation = (gIndex: number) => {
     const updated = [...variationGroups];
     updated[gIndex].variations.push({ name: "", price: "" });
     setVariationGroups(updated);
   };
+
   const removeVariation = (gIndex: number, vIndex: number) => {
     const updated = [...variationGroups];
     updated[gIndex].variations.splice(vIndex, 1);
     setVariationGroups(updated);
   };
+
   const updateGroupLabel = (index: number, value: string) => {
     const updated = [...variationGroups];
     updated[index].label = value;
     setVariationGroups(updated);
   };
+
   const updateVariation = (
     gIndex: number,
     vIndex: number,
@@ -73,6 +96,15 @@ const AddMenu: React.FC = () => {
   ) => {
     const updated = [...variationGroups];
     updated[gIndex].variations[vIndex][key] = value;
+    setVariationGroups(updated);
+  };
+
+  const toggleGroupOption = (
+    gIndex: number,
+    key: "multiple_selection" | "required_selection"
+  ) => {
+    const updated = [...variationGroups];
+    updated[gIndex][key] = !updated[gIndex][key];
     setVariationGroups(updated);
   };
 
@@ -113,24 +145,63 @@ const AddMenu: React.FC = () => {
     }
   };
 
-  const Tooltip = ({ visible, text }: { visible: boolean; text: string }) =>
-    visible ? <Text style={styles.tooltipText}>{text}</Text> : null;
+  // Tooltip component
+  const Tooltip = ({ id }: { id: string }) => {
+    if (tooltip !== id) return null;
+
+    let message = "";
+    switch (id) {
+      case "price":
+        message = "This is the base price of the menu item.";
+        break;
+      case "availability":
+        message = "Toggle to set if this menu item is available for ordering.";
+        break;
+      case "variations":
+        message =
+          "Add groups and variations like sizes or flavors with additional prices.";
+        break;
+      case "multi":
+        message =
+          "Allow customers to pick more than one option in this group.";
+        break;
+      case "required":
+        message =
+          "Customer must select at least one option in this group.";
+        break;
+    }
+
+    return (
+      <View style={styles.tooltipBox}>
+        <Text style={styles.tooltipText}>{message}</Text>
+      </View>
+    );
+  };
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: 120 }}>
+    <ScrollView
+      style={styles.container}
+      contentContainerStyle={{ paddingBottom: 120 }}
+    >
       <Text style={styles.label}>Item Name *</Text>
-      <TextInput style={styles.input} value={itemName} onChangeText={setItemName} />
+      <TextInput
+        style={styles.input}
+        value={itemName}
+        onChangeText={setItemName}
+      />
 
+      {/* Price */}
       <View style={styles.labelRow}>
         <Text style={styles.label}>Base Price *</Text>
-        <TouchableOpacity onPress={() => setShowTooltipPrice(!showTooltipPrice)}>
+        <TouchableOpacity
+          onPress={() =>
+            setTooltip(tooltip === "price" ? null : "price")
+          }
+        >
           <Text style={styles.infoIcon}>ℹ️</Text>
         </TouchableOpacity>
       </View>
-      <Tooltip
-        visible={showTooltipPrice}
-        text="This is the base price of the menu item."
-      />
+      <Tooltip id="price" />
       <TextInput
         style={styles.input}
         value={price}
@@ -138,6 +209,7 @@ const AddMenu: React.FC = () => {
         onChangeText={setPrice}
       />
 
+      {/* Image */}
       <Text style={styles.label}>Image</Text>
       <TouchableOpacity style={styles.imagePicker} onPress={pickImage}>
         {image ? (
@@ -147,6 +219,7 @@ const AddMenu: React.FC = () => {
         )}
       </TouchableOpacity>
 
+      {/* Category */}
       <Text style={styles.label}>Category</Text>
       <View style={styles.pickerWrapper}>
         <Picker selectedValue={category} onValueChange={setCategory}>
@@ -157,16 +230,18 @@ const AddMenu: React.FC = () => {
         </Picker>
       </View>
 
+      {/* Availability */}
       <View style={styles.labelRow}>
         <Text style={styles.label}>Availability</Text>
-        <TouchableOpacity onPress={() => setShowTooltipAvailability(!showTooltipAvailability)}>
+        <TouchableOpacity
+          onPress={() =>
+            setTooltip(tooltip === "availability" ? null : "availability")
+          }
+        >
           <Text style={styles.infoIcon}>ℹ️</Text>
         </TouchableOpacity>
       </View>
-      <Tooltip
-        visible={showTooltipAvailability}
-        text="Toggle to set if this menu item is available for ordering."
-      />
+      <Tooltip id="availability" />
       <View style={styles.toggleRow}>
         <Switch
           value={availability}
@@ -176,16 +251,18 @@ const AddMenu: React.FC = () => {
         />
       </View>
 
+      {/* Variations */}
       <View style={styles.labelRow}>
         <Text style={[styles.label, { marginTop: 18 }]}>Variations</Text>
-        <TouchableOpacity onPress={() => setShowTooltipVariations(!showTooltipVariations)}>
+        <TouchableOpacity
+          onPress={() =>
+            setTooltip(tooltip === "variations" ? null : "variations")
+          }
+        >
           <Text style={styles.infoIcon}>ℹ️</Text>
         </TouchableOpacity>
       </View>
-      <Tooltip
-        visible={showTooltipVariations}
-        text="Add groups and variations like sizes or flavors with additional prices."
-      />
+      <Tooltip id="variations" />
 
       {variationGroups.map((group, gIndex) => (
         <View key={gIndex} style={styles.groupBox}>
@@ -196,20 +273,66 @@ const AddMenu: React.FC = () => {
             onChangeText={(t) => updateGroupLabel(gIndex, t)}
           />
 
+          {/* Group Options */}
+          <View style={styles.toggleRow}>
+            <Text>Multiple Selection</Text>
+            <Switch
+              value={group.multiple_selection}
+              onValueChange={() =>
+                toggleGroupOption(gIndex, "multiple_selection")
+              }
+              trackColor={{ false: "#ccc", true: "#A40C2D" }}
+              thumbColor="#fff"
+            />
+            <TouchableOpacity
+              onPress={() =>
+                setTooltip(tooltip === "multi" ? null : "multi")
+              }
+            >
+              <Text style={styles.infoIcon}>ℹ️</Text>
+            </TouchableOpacity>
+          </View>
+          <Tooltip id="multi" />
+
+          <View style={styles.toggleRow}>
+            <Text>Required Selection</Text>
+            <Switch
+              value={group.required_selection}
+              onValueChange={() =>
+                toggleGroupOption(gIndex, "required_selection")
+              }
+              trackColor={{ false: "#ccc", true: "#A40C2D" }}
+              thumbColor="#fff"
+            />
+            <TouchableOpacity
+              onPress={() =>
+                setTooltip(tooltip === "required" ? null : "required")
+              }
+            >
+              <Text style={styles.infoIcon}>ℹ️</Text>
+            </TouchableOpacity>
+          </View>
+          <Tooltip id="required" />
+
+          {/* Variations */}
           {group.variations.map((v, vIndex) => (
             <View key={vIndex} style={styles.variationRow}>
               <TextInput
                 style={[styles.input, styles.variationInput]}
                 placeholder="Name"
                 value={v.name}
-                onChangeText={(t) => updateVariation(gIndex, vIndex, "name", t)}
+                onChangeText={(t) =>
+                  updateVariation(gIndex, vIndex, "name", t)
+                }
               />
               <TextInput
                 style={[styles.input, styles.priceInput]}
                 placeholder="Additional price"
                 keyboardType="numeric"
                 value={v.price}
-                onChangeText={(t) => updateVariation(gIndex, vIndex, "price", t)}
+                onChangeText={(t) =>
+                  updateVariation(gIndex, vIndex, "price", t)
+                }
               />
               <TouchableOpacity
                 style={styles.removeButton}
@@ -220,8 +343,13 @@ const AddMenu: React.FC = () => {
             </View>
           ))}
 
-          <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
-            <TouchableOpacity style={styles.smallButton} onPress={() => addVariation(gIndex)}>
+          <View
+            style={{ flexDirection: "row", justifyContent: "space-between" }}
+          >
+            <TouchableOpacity
+              style={styles.smallButton}
+              onPress={() => addVariation(gIndex)}
+            >
               <Text style={styles.smallButtonText}>+ Add Variation</Text>
             </TouchableOpacity>
             <TouchableOpacity
@@ -256,9 +384,21 @@ export default AddMenu;
 const styles = StyleSheet.create({
   container: { flex: 1, padding: 16, backgroundColor: "#fff" },
   label: { marginTop: 12, fontSize: 14, fontWeight: "600" },
-  labelRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  labelRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
   infoIcon: { fontSize: 16, color: "#555" },
-  tooltipText: { fontSize: 12, color: "#555", marginTop: 2, marginBottom: 4 },
+  tooltipBox: {
+    backgroundColor: "#333",
+    padding: 8,
+    borderRadius: 6,
+    marginTop: 4,
+    marginBottom: 6,
+    maxWidth: "90%",
+  },
+  tooltipText: { fontSize: 12, color: "#fff" },
   input: {
     borderWidth: 1,
     borderColor: "#ccc",
@@ -267,7 +407,12 @@ const styles = StyleSheet.create({
     marginTop: 6,
     backgroundColor: "#fff",
   },
-  pickerWrapper: { borderWidth: 1, borderColor: "#ccc", borderRadius: 8, marginTop: 6 },
+  pickerWrapper: {
+    borderWidth: 1,
+    borderColor: "#ccc",
+    borderRadius: 8,
+    marginTop: 6,
+  },
   imagePicker: {
     borderWidth: 1,
     borderColor: "#ccc",
@@ -280,22 +425,59 @@ const styles = StyleSheet.create({
   previewImage: { width: 120, height: 120, borderRadius: 10 },
   toggleRow: {
     flexDirection: "row",
-    justifyContent: "flex-start",
     alignItems: "center",
-    marginTop: 6,
+    justifyContent: "space-between",
+    marginTop: 8,
   },
-  groupBox: { borderWidth: 1, borderColor: "#aaa", borderRadius: 8, padding: 10, marginTop: 12, backgroundColor: "#f9f9f9" },
+  groupBox: {
+    borderWidth: 1,
+    borderColor: "#aaa",
+    borderRadius: 8,
+    padding: 10,
+    marginTop: 12,
+    backgroundColor: "#f9f9f9",
+  },
   variationRow: { flexDirection: "row", alignItems: "center", marginTop: 6 },
   variationInput: { flex: 2, marginRight: 6 },
   priceInput: { flex: 1, marginRight: 6 },
-  removeButton: { backgroundColor: "#ffdddd", paddingHorizontal: 10, paddingVertical: 6, borderRadius: 6 },
+  removeButton: {
+    backgroundColor: "#ffdddd",
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 6,
+  },
   removeButtonText: { color: "darkred", fontWeight: "bold" },
-  smallButton: { backgroundColor: "#eee", padding: 8, borderRadius: 6, marginTop: 8, alignItems: "center" },
+  smallButton: {
+    backgroundColor: "#eee",
+    padding: 8,
+    borderRadius: 6,
+    marginTop: 8,
+    alignItems: "center",
+  },
   smallButtonText: { color: "darkred", fontWeight: "600" },
-  removeGroupButton: { backgroundColor: "#ffeaea", padding: 8, borderRadius: 6, marginTop: 8, alignItems: "center" },
+  removeGroupButton: {
+    backgroundColor: "#ffeaea",
+    padding: 8,
+    borderRadius: 6,
+    marginTop: 8,
+    alignItems: "center",
+  },
   removeGroupButtonText: { color: "red", fontWeight: "600" },
-  buttonOutline: { borderWidth: 1, borderColor: "darkred", padding: 14, borderRadius: 8, marginTop: 16, alignItems: "center" },
+  buttonOutline: {
+    borderWidth: 1,
+    borderColor: "darkred",
+    padding: 14,
+    borderRadius: 8,
+    marginTop: 16,
+    alignItems: "center",
+  },
   buttonOutlineText: { color: "darkred", fontWeight: "600", fontSize: 14 },
-  button: { backgroundColor: "darkred", padding: 14, borderRadius: 8, marginTop: 20, alignItems: "center" },
+  button: {
+    backgroundColor: "darkred",
+    padding: 14,
+    borderRadius: 8,
+    marginTop: 20,
+    alignItems: "center",
+  },
   buttonText: { color: "white", fontWeight: "600", fontSize: 16 },
 });

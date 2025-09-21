@@ -12,6 +12,13 @@ const makeImageDataUrl = (imageBuffer, mime = "jpeg") => {
   return `data:image/${mime};base64,${base64}`;
 };
 
+// Helper: parse boolean safely
+const parseBool = (val) => {
+  if (typeof val === "boolean") return val;
+  if (typeof val === "string") return val.toLowerCase() === "true";
+  return false;
+};
+
 // =========================
 // Get all menu items (with optional filters, pagination, sorting)
 // =========================
@@ -359,71 +366,103 @@ export const getMenuItemsByConcessionaire = async (req, res) => {
 // Add new menu item
 // =========================
 export const addMenuItem = async (req, res) => {
-  const concessionaireId = req.user.id;
-  const { item_name, price, category } = req.body;
-  let variations = [];
-
-  if (!item_name || !price || !category) {
-    return res.status(400).json({ status: "failed", message: "Missing required fields" });
-  }
-
-  if (req.body.variations) {
-    try {
-      variations = JSON.parse(req.body.variations);
-    } catch {
-      return res.status(400).json({ status: "failed", message: "Invalid variations JSON" });
-    }
-  }
-
-  const imageData = req.file ? req.file.buffer : null;
   const client = await pool.connect();
-
   try {
-    await client.query("BEGIN");
+    const {
+      item_name,
+      price,
+      category,
+      availability,
+      variations
+    } = req.body;
 
-    const concessionResult = await client.query(
-      `SELECT id FROM tblconcession WHERE concessionaire_id = $1 LIMIT 1`,
+    if (!item_name || !price) {
+      return res.status(400).json({ status: "failed", message: "Item name and price are required" });
+    }
+
+    // Assume concession_id comes from the authenticated user’s concessionaire account
+    const concessionaireId = req.user?.id;
+    if (!concessionaireId) {
+      return res.status(403).json({ status: "failed", message: "Unauthorized" });
+    }
+
+    const concessionResult = await pool.query(
+      "SELECT id FROM tblconcession WHERE concessionaire_id = $1 LIMIT 1",
       [concessionaireId]
     );
-
-    if (!concessionResult.rows.length) {
-      throw new Error("No concession found for this concessionaire");
+    if (concessionResult.rows.length === 0) {
+      return res.status(400).json({ status: "failed", message: "Concession not found for this user" });
     }
-
     const concessionId = concessionResult.rows[0].id;
 
-    const insertMenu = await client.query(
-      `INSERT INTO tblmenuitem (item_name, concession_id, price, image, category) 
-       VALUES ($1, $2, $3, $4, $5) RETURNING id`,
-      [item_name, concessionId, parseFloat(price), imageData, category]
+    // Handle image (stored as BYTEA)
+    let imageBuffer = null;
+    if (req.file) {
+      imageBuffer = req.file.buffer;
+    }
+
+    await client.query("BEGIN");
+
+    // Insert menu item
+    const insertMenuItem = await client.query(
+      `INSERT INTO tblmenuitem 
+        (concession_id, item_name, price, category, available, image, created_at) 
+       VALUES ($1,$2,$3,$4,$5,$6,NOW())
+       RETURNING id`,
+      [
+        concessionId,
+        item_name.trim(),
+        Number(price),
+        category || null,
+        parseBool(availability),
+        imageBuffer,
+      ]
     );
-    const menuItemId = insertMenu.rows[0].id;
 
-    // Insert variation groups & variations
-    for (const group of variations) {
-      const insertGroup = await client.query(
-        `INSERT INTO tblitemvariationgroup (variation_group_name, menu_item_id) VALUES ($1, $2) RETURNING id`,
-        [group.label || "Default", menuItemId]
-      );
-      const groupId = insertGroup.rows[0].id;
+    const menuItemId = insertMenuItem.rows[0].id;
 
-      for (const v of group.variations) {
-        if (!v.name) continue;
-        await client.query(
-          `INSERT INTO tblitemvariation (item_variation_group_id, variation_name, additional_price)
-           VALUES ($1, $2, $3)`,
-          [groupId, v.name, v.price || 0]
+    // Handle variations (if provided)
+    if (variations) {
+      let parsed;
+      try {
+        parsed = JSON.parse(variations);
+      } catch (err) {
+        parsed = [];
+      }
+
+      for (const group of parsed) {
+        const groupRes = await client.query(
+          `INSERT INTO tblitemvariationgroup 
+            (menu_item_id, variation_group_name, multiple_selection, required_selection)
+           VALUES ($1,$2,$3,$4)
+           RETURNING id`,
+          [menuItemId, group.label, parseBool(group.multiple_selection), parseBool(group.required_selection)]
         );
+
+        const groupId = groupRes.rows[0].id;
+
+        for (const v of group.variations || []) {
+          await client.query(
+            `INSERT INTO tblitemvariation 
+              (item_variation_group_id, variation_name, additional_price)
+             VALUES ($1,$2,$3)`,
+            [groupId, v.name, Number(v.price) || 0]
+          );
+        }
       }
     }
 
     await client.query("COMMIT");
 
-    res.status(201).json({ status: "success", message: "Menu item created successfully" });
+    res.status(201).json({
+      status: "success",
+      message: "Menu item created successfully",
+      data: { id: menuItemId }
+    });
   } catch (err) {
     await client.query("ROLLBACK");
     console.error(err);
-    res.status(500).json({ status: "failed", message: "Internal Server Error" });
+    res.status(500).json({ status: "failed", message: "Server error" });
   } finally {
     client.release();
   }
