@@ -6,7 +6,7 @@ export const getVariationGroupsById = async (req, res) => {
 
   try {
     const query = `
-      SELECT id, variation_group_name, multiple_selection
+      SELECT id, variation_group_name, multiple_selection, required_selection
       FROM tblitemvariationgroup
       WHERE menu_item_id = $1
       ORDER BY variation_group_name ASC;
@@ -23,9 +23,9 @@ export const getVariationGroupsById = async (req, res) => {
   }
 };
 
-
+// Add group
 export const addVariationGroup = async (req, res) => {
-  const { variation_group_name, menu_item_id, multiple_selection } = req.body;
+  const { variation_group_name, menu_item_id, multiple_selection, required_selection } = req.body;
 
   if (!variation_group_name || !menu_item_id) {
     return res.status(400).json({ success: false, message: "Group name and menu item ID are required" });
@@ -33,8 +33,8 @@ export const addVariationGroup = async (req, res) => {
 
   try {
     const query = `
-      INSERT INTO tblitemvariationgroup (variation_group_name, menu_item_id, multiple_selection)
-      VALUES ($1, $2, $3)
+      INSERT INTO tblitemvariationgroup (variation_group_name, menu_item_id, multiple_selection, required_selection)
+      VALUES ($1, $2, $3, $4)
       RETURNING *;
     `;
 
@@ -42,6 +42,7 @@ export const addVariationGroup = async (req, res) => {
       variation_group_name,
       menu_item_id,
       multiple_selection || false,
+      required_selection || false,
     ]);
 
     return res.status(201).json({
@@ -57,22 +58,23 @@ export const addVariationGroup = async (req, res) => {
   }
 };
 
-// ✅ Update variation group
+// Update group
 export const updateVariationGroup = async (req, res) => {
   const { id } = req.params;
-  const { variation_group_name, multiple_selection } = req.body;
+  const { variation_group_name, multiple_selection, required_selection } = req.body;
 
   try {
     const query = `
       UPDATE tblitemvariationgroup
       SET variation_group_name = COALESCE($1, variation_group_name),
           multiple_selection = COALESCE($2, multiple_selection),
+          required_selection = COALESCE($3, required_selection),
           updated_at = CURRENT_TIMESTAMP
-      WHERE id = $3
+      WHERE id = $4
       RETURNING *;
     `;
 
-    const result = await pool.query(query, [variation_group_name, multiple_selection, id]);
+    const result = await pool.query(query, [variation_group_name, multiple_selection, required_selection, id]);
 
     if (result.rows.length === 0) {
       return res.status(404).json({ success: false, message: "Variation group not found" });
@@ -90,6 +92,7 @@ export const updateVariationGroup = async (req, res) => {
     });
   }
 };
+
 
 // ✅ Delete variation group
 export const deleteVariationGroup = async (req, res) => {

@@ -92,12 +92,17 @@ const MenuItems = () => {
   }, [cafeteriaId, concessionId, category, sortBy, searchQuery]);
 
   const renderItem = ({ item }: { item: any }) => (
-    <TouchableOpacity
-      style={styles.card}
-      onPress={() =>
-        (navigation as any).navigate("Menu Item Details", { item }) // pass whole item
-      }
-    >
+  <TouchableOpacity
+    style={styles.card}
+    onPress={() =>
+      (navigation as any).navigate("Menu Item Details", {
+        item,
+        concession: concessions.find((c) => c.id === item.concession_id),
+        cafeteria: cafeterias.find((caf) => caf.id === item.cafeteria_id),
+      })
+    }
+  >
+
 
       {item.image_url ? (
         <Image source={{ uri: item.image_url }} style={styles.image} />
