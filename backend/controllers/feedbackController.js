@@ -9,7 +9,8 @@ export const getFeedbackById = async (req, res) => {
 
   try {
     const result = await pool.query(
-      `SELECT f.id, f.rating, f.comment, f.created_at, u.first_name, u.last_name
+      `SELECT f.id, f.customer_id, f.rating, f.comment, f.created_at, 
+              u.first_name, u.last_name
        FROM tblfeedback f
        JOIN tbluser u ON f.customer_id = u.id
        WHERE f.menu_item_id = $1
@@ -17,7 +18,6 @@ export const getFeedbackById = async (req, res) => {
       [id]
     );
 
-    // Always return 200 with an array (empty if no feedbacks)
     return res.status(200).json(result.rows);
   } catch (error) {
     console.error("Error fetching feedbacks:", error);
