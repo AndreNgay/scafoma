@@ -25,76 +25,43 @@ const MenuItemDetails = () => {
   const [groupedVariations, setGroupedVariations] = useState<any>({});
   const [selectedVariations, setSelectedVariations] = useState<any[]>([]);
   const [placingOrder, setPlacingOrder] = useState(false);
-
-  // Feedback states
   const [feedbacks, setFeedbacks] = useState<any[]>([]);
-  const [canLeaveFeedback, setCanLeaveFeedback] = useState(false);
-  const [alreadyLeftFeedback, setAlreadyLeftFeedback] = useState(false);
-  const [rating, setRating] = useState(0);
-  const [comment, setComment] = useState("");
-  const [submittingFeedback, setSubmittingFeedback] = useState(false);
-
   const user = useStore.getState().user;
 
-// Fetch variations + feedbacks + eligibility
-useEffect(() => {
-  const fetchData = async () => {
-    try {
-      // Variations
-      const res = await api.get(`/item-variation-group/${item.id}`);
-      const groups = res.data.data;
+  // Fetch variations + feedbacks
+  useEffect(() => {
+    const fetchVariations = async () => {
+      try {
+        const res = await api.get(`/item-variation-group/${item.id}`);
+        const groups = res.data.data;
 
-      const grouped: any = {};
-      for (const g of groups) {
-        const vRes = await api.get(`/item-variation/group/${g.id}`);
-        grouped[g.variation_group_name] = {
-          ...g,
-          variations: vRes.data.data,
-        };
-      }
-      setGroupedVariations(grouped);
-
-      // Feedbacks
-      const feedbackRes = await api.get(`/feedback/${item.id}`);
-      setFeedbacks(sortFeedbacks(feedbackRes.data));
-
-      if (user) {
-        // Did user already leave feedback?
-        const hasFeedback = feedbackRes.data.some(
-          (f: any) => f.customer_id === user.id
-        );
-        setAlreadyLeftFeedback(hasFeedback);
-
-        if (!hasFeedback) {
-          // Only check eligibility if user hasn’t left feedback yet
-          const checkRes = await api.get(
-            `/feedback/can-leave/${item.id}/${user.id}`
-          );
-          setCanLeaveFeedback(checkRes.data.canLeave);
-        } else {
-          setCanLeaveFeedback(false);
+        const grouped: any = {};
+        for (const g of groups) {
+          const vRes = await api.get(`/item-variation/group/${g.id}`);
+          grouped[g.variation_group_name] = {
+            ...g,
+            variations: vRes.data.data,
+          };
         }
+        setGroupedVariations(grouped);
+      } catch (err) {
+        console.error("Error fetching variations:", err);
       }
-    } catch (err: any) {
-      console.error("Error fetching data:", err.response?.data || err);
-      setFeedbacks([]);
-      setCanLeaveFeedback(false);
-      setAlreadyLeftFeedback(false);
-    }
-  };
+    };
 
-  fetchData();
-}, [item.id, user]);
+    const fetchFeedbacks = async () => {
+      try {
+        const res = await api.get(`/feedback/${item.id}`);
+        setFeedbacks(res.data);
+      } catch (err: any) {
+        console.log("No feedback found", err.response?.data?.message || "");
+        setFeedbacks([]);
+      }
+    };
 
-
-  // Utility: sort feedback so current user’s appears first
-  const sortFeedbacks = (list: any[]) => {
-    if (!user) return list;
-    return [
-      ...list.filter((f) => f.customer_id === user.id),
-      ...list.filter((f) => f.customer_id !== user.id),
-    ];
-  };
+    fetchVariations();
+    fetchFeedbacks();
+  }, [item.id]);
 
   // Price calculation
   const basePrice = Number(item.price) || 0;
@@ -104,7 +71,7 @@ useEffect(() => {
   );
   const displayPrice = (basePrice + variationTotal) * quantity;
 
-  // Toggle variation selection
+  // Handle variation selection
   const toggleVariation = (group: any, variation: any) => {
     const alreadySelected = selectedVariations.find((v) => v.id === variation.id);
 
@@ -122,19 +89,19 @@ useEffect(() => {
     }
   };
 
-  // Submit order
+  // Submit order/cart
   const submitOrder = async (inCart: boolean) => {
     try {
       setPlacingOrder(true);
       if (!user) return Alert.alert("Error", "You must be logged in to place an order.");
 
-      // Required groups
+      // Validate required selections
       for (const [groupName, group] of Object.entries<any>(groupedVariations)) {
         if (group.required_selection) {
           const hasSelection = selectedVariations.some((v) => v.group_id === group.id);
           if (!hasSelection) {
             setPlacingOrder(false);
-            return Alert.alert("Missing Selection", `Please select from "${groupName}".`);
+            return Alert.alert("Missing Selection", `Please select at least one option from "${groupName}".`);
           }
         }
       }
@@ -183,66 +150,23 @@ useEffect(() => {
     }
   };
 
-  // Submit feedback
-  const submitFeedback = async () => {
-    if (!user) return Alert.alert("Error", "You must be logged in to leave feedback.");
-    if (rating < 1 || rating > 5) return Alert.alert("Invalid Rating", "Rating must be 1–5.");
-
-    try {
-      setSubmittingFeedback(true);
-      await api.post("/feedback", {
-        customer_id: user.id,
-        menu_item_id: item.id,
-        rating,
-        comment,
-      });
-
-      Alert.alert("Thank you!", "Your feedback has been submitted.");
-      setRating(0);
-      setComment("");
-
-      // Refresh
-      const res = await api.get(`/feedback/${item.id}`);
-      setFeedbacks(sortFeedbacks(res.data));
-      setCanLeaveFeedback(false);
-      setAlreadyLeftFeedback(true);
-    } catch (err: any) {
-      console.error(err.response?.data || err);
-
-      if (err.response?.status === 409) {
-        Alert.alert("Notice", "You have already left feedback for this item.");
-        setCanLeaveFeedback(false);
-        setAlreadyLeftFeedback(true);
-      } else {
-        Alert.alert("Error", err.response?.data?.message ?? "Failed to submit feedback.");
-      }
-    } finally {
-      setSubmittingFeedback(false);
-    }
-  };
-
   return (
-    <KeyboardAvoidingView
-      style={{ flex: 1 }}
-      behavior={Platform.OS === "ios" ? "padding" : undefined}
-    >
-      <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: 200 }}>
-        {/* Header */}
+    <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
+      <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: 120 }}>
+        {/* Item Header */}
         <Image source={{ uri: item.image_url }} style={styles.image} />
         <Text style={styles.title}>{item.item_name}</Text>
 
+        {/* Cafeteria + Concession */}
         <Text style={styles.subText}>
           {cafeteria?.cafeteria_name} •{" "}
-          <Text
-            style={styles.link}
-            onPress={() => navigation.navigate("View Concession", { concession, cafeteria })}
-          >
+          <Text style={styles.link} onPress={() => navigation.navigate("View Concession", { concession, cafeteria })}>
             {concession?.concession_name}
           </Text>
         </Text>
 
-        {/* Price + Quantity */}
-        <View style={styles.priceQuantityWrapper}>
+        {/* Price & Quantity */}
+        <View style={styles.priceQtyWrapper}>
           <Text style={styles.price}>₱{displayPrice.toFixed(2)}</Text>
           <View style={styles.quantityContainer}>
             <TouchableOpacity onPress={() => setQuantity(Math.max(1, quantity - 1))} style={styles.qtyBtn}>
@@ -263,7 +187,7 @@ useEffect(() => {
             <Text style={styles.groupTitle}>
               {groupName}{" "}
               {group.required_selection && <Text style={styles.required}>*Required</Text>}
-              {group.multiple_selection && <Text style={styles.multiple}>(Multiple allowed)</Text>}
+              {group.multiple_selection && <Text style={styles.multiple}>(Multiple choices allowed)</Text>}
             </Text>
             {group.variations.map((variation: any) => {
               const isSelected = selectedVariations.some((v) => v.id === variation.id);
@@ -298,65 +222,39 @@ useEffect(() => {
           <Text style={styles.btnText}>Place Order</Text>
         </TouchableOpacity>
 
-{/* Feedback */}
-<View style={styles.feedbackContainer}>
-  <Text style={styles.feedbackTitle}>Customer Feedback</Text>
-  {feedbacks.length === 0 ? (
-    <Text style={styles.noFeedback}>No feedback yet.</Text>
-  ) : (
-    feedbacks.map((fb) => (
-      <View key={fb.id} style={styles.feedbackCard}>
-        <Text style={styles.feedbackUser}>
-          {fb.customer_id === user?.id
-            ? `${fb.first_name} ${fb.last_name} (You)`
-            : `${fb.first_name} ${fb.last_name}`}
-        </Text>
-        <Text style={styles.feedbackRating}>⭐ {fb.rating}</Text>
-        {fb.comment && <Text style={styles.feedbackComment}>{fb.comment}</Text>}
-        <Text style={styles.feedbackDate}>
-          {new Date(fb.created_at).toLocaleString()}
-        </Text>
-      </View>
-    ))
-  )}
-
-  {/* Feedback form or messages */}
-  {canLeaveFeedback ? (
-    <View style={styles.addFeedbackForm}>
-      <Text style={styles.addFeedbackTitle}>Leave Your Feedback</Text>
-      <View style={styles.ratingRow}>
-        {[1, 2, 3, 4, 5].map((star) => (
-          <TouchableOpacity key={star} onPress={() => setRating(star)}>
-            <Text style={[styles.star, rating >= star && styles.starSelected]}>★</Text>
-          </TouchableOpacity>
-        ))}
-      </View>
-      <TextInput
-        style={styles.feedbackInput}
-        placeholder="Write your comment..."
-        value={comment}
-        onChangeText={setComment}
-        multiline
-      />
-      <TouchableOpacity
-        style={styles.btn}
-        onPress={submitFeedback}
-        disabled={submittingFeedback}
-      >
-        <Text style={styles.btnText}>Submit Feedback</Text>
-      </TouchableOpacity>
-    </View>
-  ) : alreadyLeftFeedback ? (
-    <Text style={{ marginTop: 10, color: "#888", fontStyle: "italic" }}>
-      You have already left feedback for this item.
-    </Text>
-  ) : (
-    <Text style={{ marginTop: 10, color: "#888", fontStyle: "italic" }}>
-      You can leave feedback once you’ve ordered this item.
-    </Text>
-  )}
-</View>
-
+        {/* Feedback Section */}
+        <View style={styles.feedbackContainer}>
+          <Text style={styles.feedbackTitle}>Customer Feedback</Text>
+          {feedbacks.length === 0 ? (
+            <Text style={styles.noFeedback}>No feedback yet.</Text>
+          ) : (
+            feedbacks.map((fb) => (
+              <View key={fb.id} style={styles.feedbackCard}>
+                <View style={styles.feedbackHeader}>
+                  {fb.profile_image ? (
+                    <Image source={{ uri: fb.profile_image }} style={styles.profileImage} />
+                  ) : (
+                    <View style={styles.profilePlaceholder}>
+                      <Text style={styles.profileInitials}>
+                        {fb.first_name?.[0]}{fb.last_name?.[0]}
+                      </Text>
+                    </View>
+                  )}
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.feedbackUser}>
+                      {fb.customer_id === user?.id
+                        ? `${fb.first_name} ${fb.last_name} (You)`
+                        : `${fb.first_name} ${fb.last_name}`}
+                    </Text>
+                    <Text style={styles.feedbackRating}>⭐ {fb.rating}</Text>
+                  </View>
+                </View>
+                {fb.comment && <Text style={styles.feedbackComment}>{fb.comment}</Text>}
+                <Text style={styles.feedbackDate}>{new Date(fb.created_at).toLocaleString()}</Text>
+              </View>
+            ))
+          )}
+        </View>
       </ScrollView>
     </KeyboardAvoidingView>
   );
@@ -368,82 +266,44 @@ const styles = StyleSheet.create({
   title: { fontSize: 22, fontWeight: "bold", color: "#A40C2D" },
   subText: { fontSize: 14, color: "#555", marginBottom: 5 },
   link: { color: "#A40C2D", fontWeight: "600" },
-  priceQuantityWrapper: { alignItems: "flex-start", marginVertical: 10 },
-  price: {
-    fontSize: 22,
-    fontWeight: "bold",
-    color: "#A40C2D",
-    backgroundColor: "#F8EAEA",
-    paddingHorizontal: 12,
-    paddingVertical: 4,
-    borderRadius: 6,
-    marginBottom: 6,
-  },
+
+  priceQtyWrapper: { alignItems: "flex-start", marginVertical: 10 },
+  price: { fontSize: 20, fontWeight: "bold", color: "#A40C2D", marginBottom: 5 },
   quantityContainer: { flexDirection: "row", alignItems: "center" },
-  qtyBtn: {
-    padding: 6,
-    backgroundColor: "#A40C2D",
-    borderRadius: 6,
-    marginHorizontal: 8,
-  },
+  qtyBtn: { padding: 6, backgroundColor: "#A40C2D", borderRadius: 6, marginHorizontal: 8 },
   qtyText: { color: "#fff", fontSize: 16, fontWeight: "bold" },
   qtyValue: { fontSize: 16, fontWeight: "600" },
+
   desc: { fontSize: 14, color: "#666", marginBottom: 15 },
   group: { marginBottom: 20 },
   groupTitle: { fontSize: 16, fontWeight: "600", marginBottom: 8 },
   required: { color: "red", fontSize: 14 },
   multiple: { fontSize: 12, color: "#555", marginLeft: 5 },
-  option: {
-    padding: 10,
-    backgroundColor: "#f2f2f2",
-    borderRadius: 8,
-    marginBottom: 6,
-  },
+  option: { padding: 10, backgroundColor: "#f2f2f2", borderRadius: 8, marginBottom: 6 },
   optionSelected: { backgroundColor: "#A40C2D33", borderWidth: 1, borderColor: "#A40C2D" },
+
   noteLabel: { fontSize: 14, fontWeight: "600", marginTop: 10, marginBottom: 5 },
-  noteInput: {
-    borderWidth: 1,
-    borderColor: "#ccc",
-    borderRadius: 6,
-    padding: 10,
-    minHeight: 50,
-    marginBottom: 15,
-  },
-  btn: {
-    backgroundColor: "#A40C2D",
-    padding: 15,
-    borderRadius: 8,
-    alignItems: "center",
-    marginBottom: 10,
-  },
+  noteInput: { borderWidth: 1, borderColor: "#ccc", borderRadius: 6, padding: 10, minHeight: 50, marginBottom: 15 },
+
+  btn: { backgroundColor: "#A40C2D", padding: 15, borderRadius: 8, alignItems: "center", marginBottom: 10 },
   btnAlt: { backgroundColor: "#444" },
   btnText: { color: "#fff", fontWeight: "bold", fontSize: 16 },
+
   feedbackContainer: { marginTop: 20 },
   feedbackTitle: { fontSize: 18, fontWeight: "bold", marginBottom: 10 },
   noFeedback: { color: "#888", fontStyle: "italic" },
-  feedbackCard: {
-    backgroundColor: "#f9f9f9",
-    padding: 10,
-    borderRadius: 6,
-    marginBottom: 10,
+  feedbackCard: { backgroundColor: "#f9f9f9", padding: 10, borderRadius: 6, marginBottom: 10 },
+  feedbackHeader: { flexDirection: "row", alignItems: "center", marginBottom: 6 },
+  profileImage: { width: 40, height: 40, borderRadius: 20, marginRight: 10 },
+  profilePlaceholder: {
+    width: 40, height: 40, borderRadius: 20, backgroundColor: "#ccc",
+    alignItems: "center", justifyContent: "center", marginRight: 10,
   },
-  feedbackUser: { fontWeight: "600", marginBottom: 3 },
-  feedbackRating: { color: "#A40C2D", marginBottom: 3 },
-  feedbackComment: { color: "#333" },
-  feedbackDate: { fontSize: 12, color: "#888", marginTop: 5 },
-  addFeedbackForm: { marginTop: 20 },
-  addFeedbackTitle: { fontSize: 16, fontWeight: "bold", marginBottom: 8 },
-  ratingRow: { flexDirection: "row", marginBottom: 10 },
-  star: { fontSize: 28, color: "#ccc", marginHorizontal: 5 },
-  starSelected: { color: "#FFD700" },
-  feedbackInput: {
-    borderWidth: 1,
-    borderColor: "#ccc",
-    borderRadius: 6,
-    padding: 10,
-    minHeight: 60,
-    marginBottom: 10,
-  },
+  profileInitials: { color: "#fff", fontWeight: "bold" },
+  feedbackUser: { fontWeight: "600" },
+  feedbackRating: { color: "#A40C2D" },
+  feedbackComment: { color: "#333", marginVertical: 3 },
+  feedbackDate: { fontSize: 12, color: "#888" },
 });
 
 export default MenuItemDetails;

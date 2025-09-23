@@ -1,5 +1,22 @@
 import { pool } from "../libs/database.js";
+import multer from "multer";
 
+const storage = multer.memoryStorage();
+export const upload = multer({ storage });
+
+// Helper: convert BYTEA image to base64 data URL
+const makeImageDataUrl = (imageBuffer, mime = "jpeg") => {
+  if (!imageBuffer) return null;
+  const base64 = Buffer.from(imageBuffer).toString("base64");
+  return `data:image/${mime};base64,${base64}`;
+};
+
+// Helper: parse boolean safely
+const parseBool = (val) => {
+  if (typeof val === "boolean") return val;
+  if (typeof val === "string") return val.toLowerCase() === "true";
+  return false;
+};
 /**
  * GET /feedback/:id
  * Return all feedbacks for a menu item (always returns 200 with array - empty if none)
@@ -10,7 +27,7 @@ export const getFeedbackById = async (req, res) => {
   try {
     const result = await pool.query(
       `SELECT f.id, f.customer_id, f.rating, f.comment, f.created_at, 
-              u.first_name, u.last_name
+              u.first_name, u.last_name, u.profile_image
        FROM tblfeedback f
        JOIN tbluser u ON f.customer_id = u.id
        WHERE f.menu_item_id = $1
@@ -18,12 +35,23 @@ export const getFeedbackById = async (req, res) => {
       [id]
     );
 
-    return res.status(200).json(result.rows);
+    // Convert profile_image to base64 if exists
+    const feedbacks = result.rows.map((fb) => ({
+      ...fb,
+      profile_image: fb.profile_image
+        ? `data:image/jpeg;base64,${Buffer.from(fb.profile_image).toString("base64")}`
+        : null,
+    }));
+
+    return res.status(200).json(feedbacks);
   } catch (error) {
     console.error("Error fetching feedbacks:", error);
-    return res.status(500).json({ message: "Server error while fetching feedbacks" });
+    return res
+      .status(500)
+      .json({ message: "Server error while fetching feedbacks" });
   }
 };
+
 
 /**
  * GET /feedback/can-leave/:itemId/:customerId
