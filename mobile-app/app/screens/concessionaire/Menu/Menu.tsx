@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import {
   View,
   Text,
@@ -8,11 +8,11 @@ import {
   StyleSheet,
   TouchableOpacity,
   TextInput,
+  RefreshControl,
 } from "react-native";
-import { useNavigation, useFocusEffect } from "@react-navigation/native";
 import { Picker } from "@react-native-picker/picker";
+import { useNavigation } from "@react-navigation/native";
 import useStore from "../../../store";
-
 import api from "../../../libs/apiCall";
 
 type Variation = {
@@ -34,8 +34,15 @@ type MenuItem = {
 
 const Menu = () => {
   const user = useStore((state: any) => state.user);
+
   const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
+
   const [search, setSearch] = useState("");
   const [sortOption, setSortOption] = useState("name");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc");
@@ -44,25 +51,48 @@ const Menu = () => {
 
   const navigation = useNavigation<any>();
 
-  const fetchMenuItems = async () => {
+  const fetchMenuItems = async (pageNum = 1, replace = false) => {
     try {
-      setLoading(true);
-      const res = await api.get(`/menu-item`);
-      setMenuItems(res.data.data);
+      if (pageNum === 1 && !refreshing) setLoading(true);
+      if (pageNum > 1) setLoadingMore(true);
+
+      const res = await api.get(`/menu-item`, {
+        params: { page: pageNum, limit: 10 },
+      });
+
+      const newItems = res.data.data || [];
+      const pagination = res.data.pagination;
+
+      setMenuItems((prev) =>
+        replace || pageNum === 1 ? newItems : [...prev, ...newItems]
+      );
+      setHasMore(pagination.page < pagination.totalPages);
+      setPage(pageNum);
     } catch (error) {
       console.error("Error fetching menu items:", error);
     } finally {
       setLoading(false);
+      setLoadingMore(false);
+      setRefreshing(false);
     }
   };
 
-  useFocusEffect(
-    useCallback(() => {
-      fetchMenuItems();
-    }, [])
-  );
+  useEffect(() => {
+    fetchMenuItems(1, true);
+  }, []);
 
-  // 🔎 Search + ↕️ Sort + Category Filter
+  const onRefresh = () => {
+    setRefreshing(true);
+    fetchMenuItems(1, true);
+  };
+
+  const loadMore = () => {
+    if (!loadingMore && hasMore) {
+      fetchMenuItems(page + 1);
+    }
+  };
+
+  // 🔎 Search + ↕️ Sort + Filter (applied client-side for now)
   const processedItems = useMemo(() => {
     let items = [...menuItems];
 
@@ -92,7 +122,8 @@ const Menu = () => {
           compareVal = (a.category || "").localeCompare(b.category || "");
           break;
         case "availability":
-          compareVal = a.availability === b.availability ? 0 : a.availability ? -1 : 1;
+          compareVal =
+            a.availability === b.availability ? 0 : a.availability ? -1 : 1;
           break;
       }
       return sortOrder === "asc" ? compareVal : -compareVal;
@@ -101,7 +132,7 @@ const Menu = () => {
     return items;
   }, [menuItems, search, categoryFilter, sortOption, sortOrder]);
 
-  if (loading) {
+  if (loading && !refreshing) {
     return (
       <View style={styles.center}>
         <ActivityIndicator size="large" color="#a00" />
@@ -124,6 +155,8 @@ const Menu = () => {
         value={search}
         onChangeText={setSearch}
       />
+
+
 
       {/* Sort Controls */}
       <View style={styles.controls}>
@@ -173,6 +206,9 @@ const Menu = () => {
           data={processedItems}
           keyExtractor={(item) => item.id.toString()}
           contentContainerStyle={styles.list}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+          }
           renderItem={({ item }) => (
             <TouchableOpacity
               style={styles.card}
@@ -198,7 +234,12 @@ const Menu = () => {
                   <Text style={styles.category}>Category: {item.category}</Text>
                 )}
 
-                <Text style={{ color: item.availability ? "green" : "red", marginTop: 2 }}>
+                <Text
+                  style={{
+                    color: item.availability ? "green" : "red",
+                    marginTop: 2,
+                  }}
+                >
                   {item.availability ? "Available" : "Unavailable"}
                 </Text>
                 {item.variations && item.variations.length > 0 && (
@@ -213,6 +254,13 @@ const Menu = () => {
               </View>
             </TouchableOpacity>
           )}
+          onEndReached={loadMore}
+          onEndReachedThreshold={0.5}
+          ListFooterComponent={
+            loadingMore ? (
+              <ActivityIndicator size="small" color="darkred" style={{ margin: 10 }} />
+            ) : null
+          }
         />
       )}
     </View>
@@ -222,14 +270,8 @@ const Menu = () => {
 export default Menu;
 
 const styles = StyleSheet.create({
-  center: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  list: {
-    padding: 12,
-  },
+  center: { flex: 1, justifyContent: "center", alignItems: "center" },
+  list: { padding: 12 },
   card: {
     flexDirection: "row",
     backgroundColor: "#fff",
@@ -239,35 +281,12 @@ const styles = StyleSheet.create({
     padding: 10,
     alignItems: "center",
   },
-  image: {
-    width: 70,
-    height: 70,
-    borderRadius: 8,
-    marginRight: 12,
-  },
-  info: {
-    flex: 1,
-  },
-  name: {
-    fontSize: 16,
-    fontWeight: "600",
-  },
-  price: {
-    marginTop: 2,
-    fontSize: 14,
-    color: "darkred",
-    fontWeight: "500",
-  },
-  category: {
-    fontSize: 13,
-    color: "#444",
-    marginTop: 2,
-  },
-  subInfo: {
-    fontSize: 12,
-    color: "#555",
-    marginTop: 1,
-  },
+  image: { width: 70, height: 70, borderRadius: 8, marginRight: 12 },
+  info: { flex: 1 },
+  name: { fontSize: 16, fontWeight: "600" },
+  price: { marginTop: 2, fontSize: 14, color: "darkred", fontWeight: "500" },
+  category: { fontSize: 13, color: "#444", marginTop: 2 },
+  subInfo: { fontSize: 12, color: "#555", marginTop: 1 },
   addButton: {
     backgroundColor: "darkred",
     padding: 12,
@@ -275,11 +294,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     alignItems: "center",
   },
-  addButtonText: {
-    color: "white",
-    fontWeight: "600",
-    fontSize: 16,
-  },
+  addButtonText: { color: "white", fontWeight: "600", fontSize: 16 },
   searchInput: {
     marginHorizontal: 12,
     marginBottom: 8,
@@ -295,8 +310,12 @@ const styles = StyleSheet.create({
     marginHorizontal: 12,
     marginBottom: 10,
   },
-  picker: {
-    flex: 1,
-    marginHorizontal: 4,
+  picker: { flex: 1, marginHorizontal: 4 },
+  hintText: {
+    marginHorizontal: 12,
+    marginBottom: 6,
+    fontSize: 12,
+    color: "#666",
+    textAlign: "center",
   },
 });

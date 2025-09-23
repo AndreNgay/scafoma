@@ -1,15 +1,5 @@
 import { pool } from "../libs/database.js";
-import multer from "multer";
 
-const storage = multer.memoryStorage();
-export const upload = multer({ storage });
-
-// Helper: convert BYTEA image to base64 data URL
-const makeImageDataUrl = (imageBuffer, mime = "jpeg") => {
-  if (!imageBuffer) return null;
-  const base64 = Buffer.from(imageBuffer).toString("base64");
-  return `data:image/${mime};base64,${base64}`;
-};
 
 // Helper: parse boolean safely
 const parseBool = (val) => {

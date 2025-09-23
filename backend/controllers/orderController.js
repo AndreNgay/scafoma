@@ -1,34 +1,62 @@
 import { pool } from "../libs/database.js";
+import multer from "multer";
 
-const makeImageDataUrl = (imageBuffer, mime = "jpeg") => {
-  if (!imageBuffer) return null;
-  const base64 = Buffer.from(imageBuffer).toString("base64");
-  return `data:image/${mime};base64,${base64}`;
+
+// Utility function to convert BYTEA → base64
+const makeImageDataUrl = (buffer) => {
+  if (!buffer) return null;
+  return `data:image/jpeg;base64,${Buffer.from(buffer).toString("base64")}`;
 };
 
-// ==========================
-// Get orders for a concessionaire
-// ==========================
 export const getOrdersByConcessionaireId = async (req, res) => {
-  const { id } = req.params;
+  const { id } = req.params; // concessionaire_id
+  const { page = 1, limit = 10 } = req.query;
+
   try {
+    const offset = (page - 1) * limit;
+
     const result = await pool.query(
       `SELECT o.*, 
-              u.first_name, u.last_name, u.email, 
+              u.first_name, u.last_name, u.email, u.profile_image,
               c.concession_name
        FROM tblorder o
        JOIN tbluser u ON o.customer_id = u.id
        JOIN tblconcession c ON o.concession_id = c.id
        WHERE c.concessionaire_id = $1
-       ORDER BY o.created_at DESC`,
+       ORDER BY o.created_at DESC
+       LIMIT $2 OFFSET $3`,
+      [id, limit, offset]
+    );
+
+    const orders = result.rows.map((order) => ({
+      ...order,
+      profile_image: makeImageDataUrl(order.profile_image),
+    }));
+
+    // Get total count for frontend pagination
+    const countResult = await pool.query(
+      `SELECT COUNT(*) AS total
+       FROM tblorder o
+       JOIN tblconcession c ON o.concession_id = c.id
+       WHERE c.concessionaire_id = $1`,
       [id]
     );
-    res.json(result.rows);
-  } catch (err) {
-    console.error("Error fetching orders:", err);
-    res.status(500).json({ error: "Failed to fetch orders" });
+
+    const totalOrders = parseInt(countResult.rows[0].total, 10);
+
+    return res.status(200).json({
+      page: Number(page),
+      limit: Number(limit),
+      total: totalOrders,
+      totalPages: Math.ceil(totalOrders / limit),
+      data: orders,
+    });
+  } catch (error) {
+    console.error("Error fetching orders:", error);
+    return res.status(500).json({ message: "Server error while fetching orders" });
   }
 };
+
 
 
 // ==========================

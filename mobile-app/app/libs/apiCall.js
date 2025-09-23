@@ -4,7 +4,7 @@ import useStore from "../store";
 
 const api = axios.create({
   baseURL: "http://192.168.42.152:5000/api-v1",
-  timeout: 10000,
+  timeout: 1000000,
 });
 
 

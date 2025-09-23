@@ -186,8 +186,9 @@ const MenuItemDetails = () => {
           <View key={group.id} style={styles.group}>
             <Text style={styles.groupTitle}>
               {groupName}{" "}
-              {group.required_selection && <Text style={styles.required}>*Required</Text>}
               {group.multiple_selection && <Text style={styles.multiple}>(Multiple choices allowed)</Text>}
+              {group.required_selection && <Text style={styles.required}>*Required</Text>}
+              
             </Text>
             {group.variations.map((variation: any) => {
               const isSelected = selectedVariations.some((v) => v.id === variation.id);

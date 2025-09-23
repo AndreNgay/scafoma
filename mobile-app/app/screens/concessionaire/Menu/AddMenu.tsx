@@ -13,7 +13,6 @@ import {
 } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import * as ImagePicker from "expo-image-picker";
-import { Picker } from "@react-native-picker/picker";
 import api from "../../../libs/apiCall";
 
 type Variation = { name: string; price: string };
@@ -27,7 +26,7 @@ type VariationGroup = {
 const AddMenu: React.FC = () => {
   const [itemName, setItemName] = useState("");
   const [price, setPrice] = useState("");
-  const [category, setCategory] = useState("Beverage");
+  const [category, setCategory] = useState(""); // ✅ text input now
   const [availability, setAvailability] = useState(false);
   const [image, setImage] = useState<any>(null);
   const [variationGroups, setVariationGroups] = useState<VariationGroup[]>([]);
@@ -117,7 +116,7 @@ const AddMenu: React.FC = () => {
     const formData = new FormData();
     formData.append("item_name", itemName.trim());
     formData.append("price", price.trim());
-    formData.append("category", category);
+    formData.append("category", category.trim()); // ✅ send typed category
     formData.append("availability", availability ? "true" : "false");
     formData.append("variations", JSON.stringify(variationGroups));
 
@@ -219,16 +218,14 @@ const AddMenu: React.FC = () => {
         )}
       </TouchableOpacity>
 
-      {/* Category */}
+      {/* ✅ Category now a text input */}
       <Text style={styles.label}>Category</Text>
-      <View style={styles.pickerWrapper}>
-        <Picker selectedValue={category} onValueChange={setCategory}>
-          <Picker.Item label="Beverage" value="Beverage" />
-          <Picker.Item label="Snack" value="Snack" />
-          <Picker.Item label="Meal" value="Meal" />
-          <Picker.Item label="Dessert" value="Dessert" />
-        </Picker>
-      </View>
+      <TextInput
+        style={styles.input}
+        placeholder="e.g. Beverage, Snack, Meal..."
+        value={category}
+        onChangeText={setCategory}
+      />
 
       {/* Availability */}
       <View style={styles.labelRow}>
@@ -406,12 +403,6 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     marginTop: 6,
     backgroundColor: "#fff",
-  },
-  pickerWrapper: {
-    borderWidth: 1,
-    borderColor: "#ccc",
-    borderRadius: 8,
-    marginTop: 6,
   },
   imagePicker: {
     borderWidth: 1,
