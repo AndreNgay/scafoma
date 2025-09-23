@@ -7,6 +7,9 @@ import {
   TouchableOpacity,
   Alert,
   StyleSheet,
+  TextInput,
+  KeyboardAvoidingView,
+  Platform,
 } from "react-native";
 import { useNavigation, useRoute } from "@react-navigation/native";
 import useStore from "../../../store";
@@ -22,12 +25,21 @@ const MenuItemDetails = () => {
   const [groupedVariations, setGroupedVariations] = useState<any>({});
   const [selectedVariations, setSelectedVariations] = useState<any[]>([]);
   const [placingOrder, setPlacingOrder] = useState(false);
+  const [feedbacks, setFeedbacks] = useState<any[]>([]);
+  const [canLeaveFeedback, setCanLeaveFeedback] = useState(false);
 
-  // Fetch variation groups + variations
+  // Feedback form states
+  const [rating, setRating] = useState(0);
+  const [comment, setComment] = useState("");
+  const [submittingFeedback, setSubmittingFeedback] = useState(false);
+
+  const user = useStore.getState().user;
+
+  // Fetch variation groups + feedback + feedback eligibility
   useEffect(() => {
-    console.log(concession)
-    const fetchVariations = async () => {
+    const fetchData = async () => {
       try {
+        // Variations
         const res = await api.get(`/item-variation-group/${item.id}`);
         const groups = res.data.data;
 
@@ -40,13 +52,26 @@ const MenuItemDetails = () => {
           };
         }
         setGroupedVariations(grouped);
-      } catch (err) {
-        console.error("Error fetching variations:", err);
+
+        // Feedbacks
+        const feedbackRes = await api.get(`/feedback/${item.id}`);
+        setFeedbacks(feedbackRes.data);
+
+        // Check if user can leave feedback
+        if (user) {
+          const checkRes = await api.get(
+            `/feedback/can-leave/${item.id}/${user.id}`
+          );
+          setCanLeaveFeedback(checkRes.data.canLeave);
+        }
+      } catch (err: any) {
+        console.error("Error fetching data:", err.response?.data || err);
+        setFeedbacks([]);
       }
     };
 
-    fetchVariations();
-  }, [item.id]);
+    fetchData();
+  }, [item.id, user]);
 
   // Price calculation
   const basePrice = Number(item.price) || 0;
@@ -78,10 +103,9 @@ const MenuItemDetails = () => {
   const submitOrder = async (inCart: boolean) => {
     try {
       setPlacingOrder(true);
-      const user = useStore.getState().user;
       if (!user) return Alert.alert("Error", "You must be logged in to place an order.");
 
-      // ✅ Validate required selections
+      // Validate required selections
       for (const [groupName, group] of Object.entries<any>(groupedVariations)) {
         if (group.required_selection) {
           const hasSelection = selectedVariations.some((v) => v.group_id === group.id);
@@ -97,7 +121,6 @@ const MenuItemDetails = () => {
         customer_id: user.id,
         concession_id: item.concession_id,
         order_status: inCart ? "cart" : "pending",
-        note,
         total_price: 0,
         in_cart: inCart,
         payment_method: null,
@@ -105,6 +128,7 @@ const MenuItemDetails = () => {
 
       const orderId = orderRes.data.id;
 
+      // Add order detail with note
       const detailRes = await api.post("/order-detail", {
         order_id: orderId,
         item_id: item.id,
@@ -116,6 +140,7 @@ const MenuItemDetails = () => {
 
       const orderDetailId = detailRes.data.id;
 
+      // Add variations
       for (const v of selectedVariations) {
         await api.post("/order-item-variation", {
           order_detail_id: orderDetailId,
@@ -135,83 +160,185 @@ const MenuItemDetails = () => {
     }
   };
 
+  // Submit feedback
+  const submitFeedback = async () => {
+    if (!user) return Alert.alert("Error", "You must be logged in to leave feedback.");
+    if (rating < 1 || rating > 5) return Alert.alert("Invalid Rating", "Please select a rating between 1 and 5.");
+
+    try {
+      setSubmittingFeedback(true);
+      await api.post("/feedback", {
+        customer_id: user.id,
+        menu_item_id: item.id,
+        rating,
+        comment,
+      });
+      Alert.alert("Thank you!", "Your feedback has been submitted.");
+      setRating(0);
+      setComment("");
+
+      // Refresh feedback list
+      const res = await api.get(`/feedback/${item.id}`);
+      setFeedbacks(res.data);
+      setCanLeaveFeedback(false); // prevent multiple feedbacks
+    } catch (err: any) {
+      console.error(err.response?.data || err);
+      Alert.alert("Error", err.response?.data?.message ?? "Failed to submit feedback.");
+    } finally {
+      setSubmittingFeedback(false);
+    }
+  };
+
   return (
-    <ScrollView style={styles.container}>
-      {/* Item Header */}
-      <Image source={{ uri: item.image_url }} style={styles.image} />
-      <Text style={styles.title}>{item.item_name}</Text>
+    <KeyboardAvoidingView
+      style={{ flex: 1 }}
+      behavior={Platform.OS === "ios" ? "padding" : undefined}
+    >
+      <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: 200 }}>
+        {/* Item Header */}
+        <Image source={{ uri: item.image_url }} style={styles.image} />
+        <Text style={styles.title}>{item.item_name}</Text>
 
-      {/* Cafeteria + Concession */}
-      <Text style={styles.subText}>
-        {cafeteria?.cafeteria_name} •{" "}
-        <Text
-          style={styles.link}
-          onPress={() =>
-            navigation.navigate("View Concession", { concession, cafeteria })
-          }
-        >
-          {concession?.concession_name}
-        </Text>
-      </Text>
-
-      <Text style={styles.price}>₱{displayPrice.toFixed(2)}</Text>
-      <Text style={styles.desc}>{item.description}</Text>
-
-      {/* Variations */}
-      {Object.entries<any>(groupedVariations).map(([groupName, group]) => (
-        <View key={group.id} style={styles.group}>
-          <Text style={styles.groupTitle}>
-            {groupName}{" "}
-            {group.required_selection && <Text style={styles.required}>*Required</Text>}
-            {group.multiple_selection && (
-              <Text style={styles.multiple}>(Multiple choices allowed)</Text>
-            )}
+        {/* Cafeteria + Concession */}
+        <Text style={styles.subText}>
+          {cafeteria?.cafeteria_name} •{" "}
+          <Text
+            style={styles.link}
+            onPress={() => navigation.navigate("View Concession", { concession, cafeteria })}
+          >
+            {concession?.concession_name}
           </Text>
-          {group.variations.map((variation: any) => {
-            const isSelected = selectedVariations.some((v) => v.id === variation.id);
-            return (
-              <TouchableOpacity
-                key={variation.id}
-                style={[styles.option, isSelected && styles.optionSelected]}
-                onPress={() => toggleVariation(group, variation)}
-              >
-                <Text>{variation.variation_name} (+₱{variation.additional_price})</Text>
-              </TouchableOpacity>
-            );
-          })}
+        </Text>
+
+        {/* Price + Quantity */}
+        <View style={styles.priceQuantityWrapper}>
+          <Text style={styles.price}>₱{displayPrice.toFixed(2)}</Text>
+          <View style={styles.quantityContainer}>
+            <TouchableOpacity
+              onPress={() => setQuantity(Math.max(1, quantity - 1))}
+              style={styles.qtyBtn}
+            >
+              <Text style={styles.qtyText}>-</Text>
+            </TouchableOpacity>
+            <Text style={styles.qtyValue}>{quantity}</Text>
+            <TouchableOpacity
+              onPress={() => setQuantity(quantity + 1)}
+              style={styles.qtyBtn}
+            >
+              <Text style={styles.qtyText}>+</Text>
+            </TouchableOpacity>
+          </View>
         </View>
-      ))}
 
-      {/* Quantity */}
-      <View style={styles.quantityContainer}>
+        <Text style={styles.desc}>{item.description}</Text>
+
+        {/* Variations */}
+        {Object.entries<any>(groupedVariations).map(([groupName, group]) => (
+          <View key={group.id} style={styles.group}>
+            <Text style={styles.groupTitle}>
+              {groupName}{" "}
+              {group.required_selection && <Text style={styles.required}>*Required</Text>}
+              {group.multiple_selection && (
+                <Text style={styles.multiple}>(Multiple choices allowed)</Text>
+              )}
+            </Text>
+            {group.variations.map((variation: any) => {
+              const isSelected = selectedVariations.some((v) => v.id === variation.id);
+              return (
+                <TouchableOpacity
+                  key={variation.id}
+                  style={[styles.option, isSelected && styles.optionSelected]}
+                  onPress={() => toggleVariation(group, variation)}
+                >
+                  <Text>{variation.variation_name} (+₱{variation.additional_price})</Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        ))}
+
+        {/* Note */}
+        <Text style={styles.noteLabel}>Add Note:</Text>
+        <TextInput
+          style={styles.noteInput}
+          placeholder="e.g. No onions, extra spicy..."
+          value={note}
+          onChangeText={setNote}
+          multiline
+        />
+
+        {/* Buttons */}
         <TouchableOpacity
-          onPress={() => setQuantity(Math.max(1, quantity - 1))}
-          style={styles.qtyBtn}
+          style={styles.btn}
+          onPress={() => submitOrder(true)}
+          disabled={placingOrder}
         >
-          <Text style={styles.qtyText}>-</Text>
+          <Text style={styles.btnText}>Add to Cart</Text>
         </TouchableOpacity>
-        <Text style={styles.qtyValue}>{quantity}</Text>
-        <TouchableOpacity onPress={() => setQuantity(quantity + 1)} style={styles.qtyBtn}>
-          <Text style={styles.qtyText}>+</Text>
+        <TouchableOpacity
+          style={[styles.btn, styles.btnAlt]}
+          onPress={() => submitOrder(false)}
+          disabled={placingOrder}
+        >
+          <Text style={styles.btnText}>Place Order</Text>
         </TouchableOpacity>
-      </View>
 
-      {/* Buttons */}
-      <TouchableOpacity
-        style={styles.btn}
-        onPress={() => submitOrder(true)}
-        disabled={placingOrder}
-      >
-        <Text style={styles.btnText}>Add to Cart</Text>
-      </TouchableOpacity>
-      <TouchableOpacity
-        style={[styles.btn, styles.btnAlt]}
-        onPress={() => submitOrder(false)}
-        disabled={placingOrder}
-      >
-        <Text style={styles.btnText}>Place Order</Text>
-      </TouchableOpacity>
-    </ScrollView>
+        {/* Feedback Section */}
+        <View style={styles.feedbackContainer}>
+          <Text style={styles.feedbackTitle}>Customer Feedback</Text>
+          {feedbacks.length === 0 ? (
+            <Text style={styles.noFeedback}>No feedback yet.</Text>
+          ) : (
+            feedbacks.map((fb) => (
+              <View key={fb.id} style={styles.feedbackCard}>
+                <Text style={styles.feedbackUser}>
+                  {fb.first_name} {fb.last_name}
+                </Text>
+                <Text style={styles.feedbackRating}>⭐ {fb.rating}</Text>
+                <Text style={styles.feedbackComment}>{fb.comment}</Text>
+                <Text style={styles.feedbackDate}>
+                  {new Date(fb.created_at).toLocaleString()}
+                </Text>
+              </View>
+            ))
+          )}
+
+          {/* Feedback Form or Message */}
+          {canLeaveFeedback ? (
+            <View style={styles.addFeedbackForm}>
+              <Text style={styles.addFeedbackTitle}>Leave Your Feedback</Text>
+              <View style={styles.ratingRow}>
+                {[1, 2, 3, 4, 5].map((star) => (
+                  <TouchableOpacity key={star} onPress={() => setRating(star)}>
+                    <Text style={[styles.star, rating >= star && styles.starSelected]}>
+                      ★
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+              <TextInput
+                style={styles.feedbackInput}
+                placeholder="Write your comment..."
+                value={comment}
+                onChangeText={setComment}
+                multiline
+              />
+              <TouchableOpacity
+                style={styles.btn}
+                onPress={submitFeedback}
+                disabled={submittingFeedback}
+              >
+                <Text style={styles.btnText}>Submit Feedback</Text>
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <Text style={{ marginTop: 10, color: "#888", fontStyle: "italic" }}>
+              You can leave feedback once you’ve ordered this item.
+            </Text>
+          )}
+        </View>
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 };
 
@@ -221,7 +348,28 @@ const styles = StyleSheet.create({
   title: { fontSize: 22, fontWeight: "bold", color: "#A40C2D" },
   subText: { fontSize: 14, color: "#555", marginBottom: 5 },
   link: { color: "#A40C2D", fontWeight: "600" },
-  price: { fontSize: 18, color: "#333", marginVertical: 5 },
+
+  priceQuantityWrapper: { alignItems: "flex-start", marginVertical: 10 },
+  price: {
+    fontSize: 22,
+    fontWeight: "bold",
+    color: "#A40C2D",
+    backgroundColor: "#F8EAEA",
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderRadius: 6,
+    marginBottom: 6,
+  },
+  quantityContainer: { flexDirection: "row", alignItems: "center" },
+  qtyBtn: {
+    padding: 6,
+    backgroundColor: "#A40C2D",
+    borderRadius: 6,
+    marginHorizontal: 8,
+  },
+  qtyText: { color: "#fff", fontSize: 16, fontWeight: "bold" },
+  qtyValue: { fontSize: 16, fontWeight: "600" },
+
   desc: { fontSize: 14, color: "#666", marginBottom: 15 },
   group: { marginBottom: 20 },
   groupTitle: { fontSize: 16, fontWeight: "600", marginBottom: 8 },
@@ -238,20 +386,17 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#A40C2D",
   },
-  quantityContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    marginVertical: 15,
-  },
-  qtyBtn: {
-    padding: 10,
-    backgroundColor: "#A40C2D",
+
+  noteLabel: { fontSize: 14, fontWeight: "600", marginTop: 10, marginBottom: 5 },
+  noteInput: {
+    borderWidth: 1,
+    borderColor: "#ccc",
     borderRadius: 6,
-    marginHorizontal: 10,
+    padding: 10,
+    minHeight: 50,
+    marginBottom: 15,
   },
-  qtyText: { color: "#fff", fontSize: 18, fontWeight: "bold" },
-  qtyValue: { fontSize: 18, fontWeight: "600" },
+
   btn: {
     backgroundColor: "#A40C2D",
     padding: 15,
@@ -261,6 +406,34 @@ const styles = StyleSheet.create({
   },
   btnAlt: { backgroundColor: "#444" },
   btnText: { color: "#fff", fontWeight: "bold", fontSize: 16 },
+
+  feedbackContainer: { marginTop: 20 },
+  feedbackTitle: { fontSize: 18, fontWeight: "bold", marginBottom: 10 },
+  noFeedback: { color: "#888", fontStyle: "italic" },
+  feedbackCard: {
+    backgroundColor: "#f9f9f9",
+    padding: 10,
+    borderRadius: 6,
+    marginBottom: 10,
+  },
+  feedbackUser: { fontWeight: "600", marginBottom: 3 },
+  feedbackRating: { color: "#A40C2D", marginBottom: 3 },
+  feedbackComment: { color: "#333" },
+  feedbackDate: { fontSize: 12, color: "#888", marginTop: 5 },
+
+  addFeedbackForm: { marginTop: 20 },
+  addFeedbackTitle: { fontSize: 16, fontWeight: "bold", marginBottom: 8 },
+  ratingRow: { flexDirection: "row", marginBottom: 10 },
+  star: { fontSize: 28, color: "#ccc", marginHorizontal: 5 },
+  starSelected: { color: "#FFD700" },
+  feedbackInput: {
+    borderWidth: 1,
+    borderColor: "#ccc",
+    borderRadius: 6,
+    padding: 10,
+    minHeight: 60,
+    marginBottom: 10,
+  },
 });
 
 export default MenuItemDetails;

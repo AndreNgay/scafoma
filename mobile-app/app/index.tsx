@@ -1,7 +1,13 @@
 import React, { useEffect, useState } from "react";
+import {
+  ActivityIndicator,
+  View,
+  BackHandler,
+  Alert,
+} from "react-native";
+import { useNavigation, NavigationContainer } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
-import { ActivityIndicator, View } from "react-native";
 import useStore from "./store";
 
 // Screens
@@ -20,7 +26,6 @@ import OrderList from "./screens/concessionaire/Order/OrderList";
 import ViewOrderCustomer from "./screens/customer/Orders/ViewOrderCustomer";
 import ViewOrderConcessionaire from "./screens/concessionaire/Order/ViewOrderConcessionaire";
 import AddMenu from "./screens/concessionaire/Menu/AddMenu";
-
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -57,7 +62,7 @@ function ConcessionaireConcessionStack() {
         options={{ headerShown: false }}
       />
     </MenuStackNav.Navigator>
-  )
+  );
 }
 
 function MenuItemsStack() {
@@ -79,7 +84,7 @@ function MenuItemsStack() {
         options={{ headerShown: false }}
       />
     </MenuStackNav.Navigator>
-  )
+  );
 }
 
 function OrdersStack() {
@@ -96,7 +101,7 @@ function OrdersStack() {
         options={{ headerShown: false }}
       />
     </MenuStackNav.Navigator>
-  )
+  );
 }
 
 function OrderListStack() {
@@ -113,11 +118,8 @@ function OrderListStack() {
         options={{ headerShown: false }}
       />
     </MenuStackNav.Navigator>
-  )
+  );
 }
-
-
-
 
 function CustomerTabs() {
   return (
@@ -154,6 +156,7 @@ function AuthStack() {
 export default function RootNavigator() {
   const { user, loadStorage } = useStore();
   const [loading, setLoading] = useState(true);
+  const navigation = useNavigation();
 
   useEffect(() => {
     const init = async () => {
@@ -162,6 +165,29 @@ export default function RootNavigator() {
     };
     init();
   }, []);
+
+  // Handle Android hardware back button
+  useEffect(() => {
+    const backAction = () => {
+      if (navigation.canGoBack()) {
+        navigation.goBack();
+        return true; // prevent exit
+      } else {
+        Alert.alert("Exit App", "Do you want to exit?", [
+          { text: "Cancel", style: "cancel" },
+          { text: "Yes", onPress: () => BackHandler.exitApp() },
+        ]);
+        return true;
+      }
+    };
+
+    const backHandler = BackHandler.addEventListener(
+      "hardwareBackPress",
+      backAction
+    );
+
+    return () => backHandler.remove();
+  }, [navigation]);
 
   if (loading) {
     return (
