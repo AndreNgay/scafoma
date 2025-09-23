@@ -310,21 +310,33 @@ export const getMenuItemsByConcessionaire = async (req, res) => {
     let variationsMap = {};
     if (menuItemIds.length > 0) {
       const vRes = await pool.query(
-        `SELECT ivg.menu_item_id, ivg.variation_group_name AS label,
+        `SELECT ivg.id AS group_id, ivg.menu_item_id, 
+                ivg.variation_group_name AS label,
+                ivg.multiple_selection, ivg.required_selection,
                 iv.variation_name, iv.additional_price
-         FROM tblitemvariation iv
-         JOIN tblitemvariationgroup ivg ON iv.item_variation_group_id = ivg.id
-         WHERE ivg.menu_item_id = ANY($1::int[])`,
+        FROM tblitemvariationgroup ivg
+        LEFT JOIN tblitemvariation iv 
+          ON iv.item_variation_group_id = ivg.id
+        WHERE ivg.menu_item_id = ANY($1::int[])`,
         [menuItemIds]
       );
 
       for (const v of vRes.rows) {
         if (!variationsMap[v.menu_item_id]) variationsMap[v.menu_item_id] = {};
-        if (!variationsMap[v.menu_item_id][v.label]) variationsMap[v.menu_item_id][v.label] = [];
-        variationsMap[v.menu_item_id][v.label].push({
-          name: v.variation_name,
-          price: Number(v.additional_price),
-        });
+        if (!variationsMap[v.menu_item_id][v.label]) {
+          variationsMap[v.menu_item_id][v.label] = {
+            label: v.label,
+            multiple_selection: v.multiple_selection,
+            required_selection: v.required_selection,
+            variations: []
+          };
+        }
+        if (v.variation_name) {
+          variationsMap[v.menu_item_id][v.label].variations.push({
+            name: v.variation_name,
+            price: Number(v.additional_price),
+          });
+        }
       }
     }
 
@@ -339,11 +351,10 @@ export const getMenuItemsByConcessionaire = async (req, res) => {
       cafeteria_name: r.cafeteria_name,
       image_url: makeImageDataUrl(r.image),
       variations: variationsMap[r.id]
-        ? Object.keys(variationsMap[r.id]).map(label => ({
-            label,
-            variations: variationsMap[r.id][label]
-          }))
+        ? Object.values(variationsMap[r.id])
         : [],
+      gcash_payment_available: r.gcash_payment_available,
+      oncounter_payment_available: r.oncounter_payment_available,
     }));
 
     res.json({
@@ -560,21 +571,28 @@ export const updateMenuItem = async (req, res) => {
     // Insert new variation groups & variations
     for (const group of variations) {
       const insertGroup = await client.query(
-        `INSERT INTO tblitemvariationgroup (variation_group_name, menu_item_id) VALUES ($1, $2) RETURNING id`,
-        [group.label || "Default", id]
+        `INSERT INTO tblitemvariationgroup 
+          (variation_group_name, menu_item_id, multiple_selection, required_selection) 
+        VALUES ($1, $2, $3, $4) RETURNING id`,
+        [
+          group.label || "Default",
+          id,
+          group.multiple_selection || false,
+          group.required_selection || false,
+        ]
       );
       const groupId = insertGroup.rows[0].id;
 
       for (const v of group.variations) {
         if (!v.name) continue;
         await client.query(
-          `INSERT INTO tblitemvariation (item_variation_group_id, variation_name, additional_price)
-           VALUES ($1, $2, $3)`,
-          [groupId, v.name, v.price || 0]
+          `INSERT INTO tblitemvariation 
+            (item_variation_group_id, variation_name, additional_price)
+          VALUES ($1, $2, $3)`,
+          [groupId, v.name, parseFloat(v.price) || 0]
         );
       }
     }
-
     await client.query("COMMIT");
 
     res.json({ status: "success", message: "Menu item updated successfully" });

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
 import {
   View,
   Text,
@@ -11,7 +11,7 @@ import {
   RefreshControl,
 } from "react-native";
 import { Picker } from "@react-native-picker/picker";
-import { useNavigation } from "@react-navigation/native";
+import { useNavigation, useFocusEffect } from "@react-navigation/native"; // 👈 useFocusEffect
 import useStore from "../../../store";
 import api from "../../../libs/apiCall";
 
@@ -77,9 +77,12 @@ const Menu = () => {
     }
   };
 
-  useEffect(() => {
-    fetchMenuItems(1, true);
-  }, []);
+  // 🔄 Refresh when screen is focused
+  useFocusEffect(
+    useCallback(() => {
+      fetchMenuItems(1, true);
+    }, [])
+  );
 
   const onRefresh = () => {
     setRefreshing(true);
@@ -155,8 +158,6 @@ const Menu = () => {
         value={search}
         onChangeText={setSearch}
       />
-
-
 
       {/* Sort Controls */}
       <View style={styles.controls}>
@@ -258,7 +259,11 @@ const Menu = () => {
           onEndReachedThreshold={0.5}
           ListFooterComponent={
             loadingMore ? (
-              <ActivityIndicator size="small" color="darkred" style={{ margin: 10 }} />
+              <ActivityIndicator
+                size="small"
+                color="darkred"
+                style={{ margin: 10 }}
+              />
             ) : null
           }
         />
@@ -311,11 +316,4 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   picker: { flex: 1, marginHorizontal: 4 },
-  hintText: {
-    marginHorizontal: 12,
-    marginBottom: 6,
-    fontSize: 12,
-    color: "#666",
-    textAlign: "center",
-  },
 });
