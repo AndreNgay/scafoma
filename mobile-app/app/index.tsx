@@ -26,6 +26,7 @@ import OrderList from "./screens/concessionaire/Order/OrderList";
 import ViewOrderCustomer from "./screens/customer/Orders/ViewOrderCustomer";
 import ViewOrderConcessionaire from "./screens/concessionaire/Order/ViewOrderConcessionaire";
 import AddMenu from "./screens/concessionaire/Menu/AddMenu";
+import ViewMenu from "./screens/concessionaire/Menu/ViewMenu";
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -48,6 +49,11 @@ function MenuManagementStack() {
         name="Edit Menu"
         component={EditMenu}
         options={{ title: "Edit Menu Item" }}
+      />
+      <MenuStackNav.Screen
+        name="View Menu"
+        component={ViewMenu}
+        options={{ title: "View Menu Item" }}
       />
     </MenuStackNav.Navigator>
   );

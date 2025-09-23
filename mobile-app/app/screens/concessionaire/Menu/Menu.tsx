@@ -11,7 +11,7 @@ import {
   RefreshControl,
 } from "react-native";
 import { Picker } from "@react-native-picker/picker";
-import { useNavigation, useFocusEffect } from "@react-navigation/native"; // 👈 useFocusEffect
+import { useNavigation, useFocusEffect } from "@react-navigation/native";
 import useStore from "../../../store";
 import api from "../../../libs/apiCall";
 
@@ -27,22 +27,17 @@ type MenuItem = {
   category?: string;
   image_url?: string;
   availability?: boolean;
-  concession_name?: string;
-  cafeteria_name?: string;
   variations?: Variation[];
 };
 
 const Menu = () => {
   const user = useStore((state: any) => state.user);
-
   const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
-
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
-
   const [search, setSearch] = useState("");
   const [sortOption, setSortOption] = useState("name");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc");
@@ -56,16 +51,11 @@ const Menu = () => {
       if (pageNum === 1 && !refreshing) setLoading(true);
       if (pageNum > 1) setLoadingMore(true);
 
-      const res = await api.get(`/menu-item`, {
-        params: { page: pageNum, limit: 10 },
-      });
-
+      const res = await api.get(`/menu-item`, { params: { page: pageNum, limit: 10 } });
       const newItems = res.data.data || [];
       const pagination = res.data.pagination;
 
-      setMenuItems((prev) =>
-        replace || pageNum === 1 ? newItems : [...prev, ...newItems]
-      );
+      setMenuItems((prev) => (replace || pageNum === 1 ? newItems : [...prev, ...newItems]));
       setHasMore(pagination.page < pagination.totalPages);
       setPage(pageNum);
     } catch (error) {
@@ -77,7 +67,6 @@ const Menu = () => {
     }
   };
 
-  // 🔄 Refresh when screen is focused
   useFocusEffect(
     useCallback(() => {
       fetchMenuItems(1, true);
@@ -90,46 +79,34 @@ const Menu = () => {
   };
 
   const loadMore = () => {
-    if (!loadingMore && hasMore) {
-      fetchMenuItems(page + 1);
-    }
+    if (!loadingMore && hasMore) fetchMenuItems(page + 1);
   };
 
-  // 🔎 Search + ↕️ Sort + Filter (applied client-side for now)
   const processedItems = useMemo(() => {
     let items = [...menuItems];
-
-    if (search.trim()) {
-      items = items.filter((item) =>
-        item.item_name.toLowerCase().includes(search.toLowerCase())
-      );
-    }
-
-    if (categoryFilter !== "all") {
-      items = items.filter((item) => item.category === categoryFilter);
-    }
+    if (search.trim()) items = items.filter((i) => i.item_name.toLowerCase().includes(search.toLowerCase()));
+    if (categoryFilter !== "all") items = items.filter((i) => i.category === categoryFilter);
 
     items.sort((a, b) => {
-      let compareVal = 0;
+      let cmp = 0;
       switch (sortOption) {
         case "name":
-          compareVal = a.item_name.localeCompare(b.item_name);
+          cmp = a.item_name.localeCompare(b.item_name);
           break;
         case "price_asc":
-          compareVal = a.price - b.price;
+          cmp = a.price - b.price;
           break;
         case "price_desc":
-          compareVal = b.price - a.price;
+          cmp = b.price - a.price;
           break;
         case "category":
-          compareVal = (a.category || "").localeCompare(b.category || "");
+          cmp = (a.category || "").localeCompare(b.category || "");
           break;
         case "availability":
-          compareVal =
-            a.availability === b.availability ? 0 : a.availability ? -1 : 1;
+          cmp = a.availability === b.availability ? 0 : a.availability ? -1 : 1;
           break;
       }
-      return sortOrder === "asc" ? compareVal : -compareVal;
+      return sortOrder === "asc" ? cmp : -cmp;
     });
 
     return items;
@@ -159,37 +136,22 @@ const Menu = () => {
         onChangeText={setSearch}
       />
 
-      {/* Sort Controls */}
       <View style={styles.controls}>
-        <Picker
-          selectedValue={sortOption}
-          style={styles.picker}
-          onValueChange={(val) => setSortOption(val)}
-        >
+        <Picker selectedValue={sortOption} style={styles.picker} onValueChange={setSortOption}>
           <Picker.Item label="Sort by Name" value="name" />
           <Picker.Item label="Sort by Price Asc" value="price_asc" />
           <Picker.Item label="Sort by Price Desc" value="price_desc" />
           <Picker.Item label="Sort by Category" value="category" />
           <Picker.Item label="Sort by Availability" value="availability" />
         </Picker>
-
-        <Picker
-          selectedValue={sortOrder}
-          style={styles.picker}
-          onValueChange={(val) => setSortOrder(val)}
-        >
+        <Picker selectedValue={sortOrder} style={styles.picker} onValueChange={setSortOrder}>
           <Picker.Item label="Ascending" value="asc" />
           <Picker.Item label="Descending" value="desc" />
         </Picker>
       </View>
 
-      {/* Category Filter */}
       <View style={styles.controls}>
-        <Picker
-          selectedValue={categoryFilter}
-          style={styles.picker}
-          onValueChange={(val) => setCategoryFilter(val)}
-        >
+        <Picker selectedValue={categoryFilter} style={styles.picker} onValueChange={setCategoryFilter}>
           <Picker.Item label="All Categories" value="all" />
           <Picker.Item label="Drinks" value="Drinks" />
           <Picker.Item label="Snacks" value="Snacks" />
@@ -207,65 +169,51 @@ const Menu = () => {
           data={processedItems}
           keyExtractor={(item) => item.id.toString()}
           contentContainerStyle={styles.list}
-          refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+          onEndReached={loadMore}
+          onEndReachedThreshold={0.5}
+          ListFooterComponent={
+            loadingMore ? <ActivityIndicator size="small" color="darkred" style={{ margin: 10 }} /> : null
           }
           renderItem={({ item }) => (
             <TouchableOpacity
               style={styles.card}
-              onPress={() => navigation.navigate("Edit Menu", { menuItem: item })}
+              onPress={() => navigation.navigate("View Menu", { menuItem: item })}
             >
               <Image
                 source={{
-                  uri:
-                    !imageError[item.id] && item.image_url
-                      ? item.image_url
-                      : "https://cdn-icons-png.flaticon.com/512/9417/9417083.png",
+                  uri: !imageError[item.id] && item.image_url
+                    ? item.image_url
+                    : "https://cdn-icons-png.flaticon.com/512/9417/9417083.png",
                 }}
                 style={styles.image}
-                onError={() =>
-                  setImageError((prev) => ({ ...prev, [item.id]: true }))
-                }
+                onError={() => setImageError((prev) => ({ ...prev, [item.id]: true }))}
               />
-
               <View style={styles.info}>
                 <Text style={styles.name}>{item.item_name}</Text>
                 <Text style={styles.price}>₱ {item.price.toFixed(2)}</Text>
-                {item.category && (
-                  <Text style={styles.category}>Category: {item.category}</Text>
-                )}
-
-                <Text
-                  style={{
-                    color: item.availability ? "green" : "red",
-                    marginTop: 2,
-                  }}
-                >
+                {item.category && <Text style={styles.category}>Category: {item.category}</Text>}
+                <Text style={{ color: item.availability ? "green" : "red", marginTop: 2 }}>
                   {item.availability ? "Available" : "Unavailable"}
                 </Text>
-                {item.variations && item.variations.length > 0 && (
-                  <View style={{ marginTop: 4 }}>
-                    {item.variations.map((v) => (
-                      <Text key={v.label} style={styles.subInfo}>
-                        {v.label}: {v.variations.map((x) => x.name).join(", ")}
-                      </Text>
-                    ))}
-                  </View>
-                )}
+                {item.variations && item.variations.length > 0 &&
+                  item.variations.map((v) => (
+                    <Text key={v.label} style={styles.subInfo}>
+                      {v.label}: {v.variations.map((x) => x.name).join(", ")}
+                    </Text>
+                  ))
+                }
               </View>
+
+              {/* Edit button */}
+              <TouchableOpacity
+                style={styles.editButton}
+                onPress={() => navigation.navigate("Edit Menu", { menuItem: item })}
+              >
+                <Text style={styles.editButtonText}>✎</Text>
+              </TouchableOpacity>
             </TouchableOpacity>
           )}
-          onEndReached={loadMore}
-          onEndReachedThreshold={0.5}
-          ListFooterComponent={
-            loadingMore ? (
-              <ActivityIndicator
-                size="small"
-                color="darkred"
-                style={{ margin: 10 }}
-              />
-            ) : null
-          }
         />
       )}
     </View>
@@ -285,6 +233,7 @@ const styles = StyleSheet.create({
     elevation: 2,
     padding: 10,
     alignItems: "center",
+    position: "relative",
   },
   image: { width: 70, height: 70, borderRadius: 8, marginRight: 12 },
   info: { flex: 1 },
@@ -316,4 +265,16 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   picker: { flex: 1, marginHorizontal: 4 },
+  editButton: {
+    position: "absolute",
+    top: 8,
+    right: 8,
+    backgroundColor: "darkred",
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  editButtonText: { color: "white", fontWeight: "bold", fontSize: 16 },
 });
