@@ -111,43 +111,10 @@ const SignIn = () => {
                     </button>
                 </form>
 
-                {/* Divider */}
-                <div className="flex items-center my-6">
-                    <hr className="flex-grow border-gray-300"/>
-                    <span className="mx-2 text-gray-500 text-sm">or</span>
-                    <hr className="flex-grow border-gray-300"/>
-                </div>
 
-                {/* Social Login Buttons */}
-                <div className="space-y-3">
-                    <button
-                        onClick={() => console.log("Google Sign In")}
-                        className="w-full flex items-center justify-center gap-2 py-2 border rounded-lg hover:bg-gray-50">
-                        <img
-                            src="https://www.svgrepo.com/show/475656/google-color.svg"
-                            alt="Google"
-                            className="w-5 h-5"/>
-                        Sign in with Google
-                    </button>
 
-                    <button
-                        onClick={() => console.log("Facebook Sign In")}
-                        className="w-full flex items-center justify-center gap-2 py-2 border rounded-lg hover:bg-gray-50">
-                        <img
-                            src="https://www.svgrepo.com/show/448224/facebook.svg"
-                            alt="Facebook"
-                            className="w-5 h-5"/>
-                        Sign in with Facebook
-                    </button>
-                </div>
 
-                {/* Sign Up Link */}
-                <p className="text-center text-sm text-gray-600 mt-6">
-                    Don’t have an account?{" "}
-                    <Link to="/sign-up" className="text-indigo-600 hover:underline">
-                        Sign up
-                    </Link>
-                </p>
+
             </div>
         </div>
     );

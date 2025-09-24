@@ -40,28 +40,33 @@ export const Concessions = () => {
   const [concessionaires, setConcessionaires] = useState([]);
 
   // Fetch concessions
-  const fetchConcessions = async () => {
-    setIsLoading(true);
-    try {
-      const res = await api.get("/concession");
-      const concessionsList = Array.isArray(res.data)
-        ? res.data
-        : Array.isArray(res.data.data)
-        ? res.data.data
-        : [];
+const fetchConcessions = async () => {
+  setIsLoading(true);
+  try {
+    const res = await api.get("/concession/all");
 
-      const filtered = concessionsList.filter(
-        (c) => String(c.cafeteria_id) === String(cafeteriaId)
-      );
-      setConcessions(filtered);
-      setFilteredConcessions(filtered);
-    } catch (err) {
-      console.error(err);
-      toast.error("Failed to fetch concessions");
-    } finally {
-      setIsLoading(false);
+    if (res.data?.status !== "success") {
+      throw new Error(res.data?.message || "Failed to fetch concessions");
     }
-  };
+
+    const concessionsList = Array.isArray(res.data.data) ? res.data.data : [];
+
+    const filtered = concessionsList.filter(
+      (c) => String(c.cafeteria_id) === String(cafeteriaId)
+    );
+
+    setConcessions(filtered);
+    setFilteredConcessions(filtered);
+  } catch (err) {
+    console.error("Error fetching concessions:", err);
+    toast.error(err.message || "Failed to fetch concessions");
+    setConcessions([]);
+    setFilteredConcessions([]);
+  } finally {
+    setIsLoading(false);
+  }
+};
+
 
   // Fetch concessionaires
   const fetchConcessionaires = async () => {
