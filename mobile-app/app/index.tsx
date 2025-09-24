@@ -27,6 +27,7 @@ import ViewOrderCustomer from "./screens/customer/Orders/ViewOrderCustomer";
 import ViewOrderConcessionaire from "./screens/concessionaire/Order/ViewOrderConcessionaire";
 import AddMenu from "./screens/concessionaire/Menu/AddMenu";
 import ViewMenu from "./screens/concessionaire/Menu/ViewMenu";
+import Notifications from "./screens/Notifications";
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -133,6 +134,7 @@ function CustomerTabs() {
       <Tab.Screen name="Menu Items" component={MenuItemsStack} />
       <Tab.Screen name="Cart" component={Cart} />
       <Tab.Screen name="Orders" component={OrdersStack} />
+      <Tab.Screen name="Notifications" component={Notifications} />
       <Tab.Screen name="Profile" component={Profile} />
     </Tab.Navigator>
   );
@@ -144,10 +146,12 @@ function ConcessionaireTabs() {
       <Tab.Screen name="Order List" component={OrderListStack} />
       <Tab.Screen name="Menu" component={MenuManagementStack} />
       <Tab.Screen name="Concession" component={ConcessionaireConcessionStack} />
+      <Tab.Screen name="Notifications" component={Notifications} />
       <Tab.Screen name="Profile" component={Profile} />
     </Tab.Navigator>
   );
 }
+
 
 function AuthStack() {
   const AuthStackNav = createNativeStackNavigator();

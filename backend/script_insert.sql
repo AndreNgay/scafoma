@@ -125,3 +125,38 @@ INSERT INTO tblitemvariation (item_variation_group_id, variation_name, additiona
   ((SELECT id FROM tblitemvariationgroup WHERE variation_group_name='Add-ons' AND menu_item_id=(SELECT id FROM tblmenuitem WHERE item_name='Banana Shake')), 'Choco Chips', 10.00),
   ((SELECT id FROM tblitemvariationgroup WHERE variation_group_name='Add-ons' AND menu_item_id=(SELECT id FROM tblmenuitem WHERE item_name='Banana Shake')), 'Whipped Cream', 8.00),
   ((SELECT id FROM tblitemvariationgroup WHERE variation_group_name='Add-ons' AND menu_item_id=(SELECT id FROM tblmenuitem WHERE item_name='Banana Shake')), 'Caramel Drizzle', 12.00);
+
+
+-- =========================
+-- NOTIFICATIONS SEED DATA FOR TESTING
+-- =========================
+
+-- Customer notifications
+INSERT INTO tblnotification (user_id, notification_type, message)
+VALUES
+  -- Orders accepted
+  ((SELECT id FROM tbluser WHERE email='cust1@example.com'), 'order_update', 'Your order #101 has been accepted.'),
+  ((SELECT id FROM tbluser WHERE email='cust2@example.com'), 'order_update', 'Your order #102 has been accepted.'),
+  
+  -- Orders declined
+  ((SELECT id FROM tbluser WHERE email='cust3@example.com'), 'order_update', 'Your order #103 has been declined.'),
+  ((SELECT id FROM tbluser WHERE email='cust4@example.com'), 'order_update', 'Your order #104 has been declined.'),
+  
+  -- Orders ready for pickup
+  ((SELECT id FROM tbluser WHERE email='cust1@example.com'), 'order_update', 'Your order #105 is ready for pickup.'),
+  ((SELECT id FROM tbluser WHERE email='cust2@example.com'), 'order_update', 'Your order #106 is ready for pickup.'),
+  
+  -- Orders completed
+  ((SELECT id FROM tbluser WHERE email='cust3@example.com'), 'order_update', 'Your order #107 has been completed. Thank you!'),
+  ((SELECT id FROM tbluser WHERE email='cust4@example.com'), 'order_update', 'Your order #108 has been completed. Thank you!');
+
+-- Concessionaire notifications
+INSERT INTO tblnotification (user_id, notification_type, message)
+VALUES
+  -- New orders
+  ((SELECT id FROM tbluser WHERE email='conc1@example.com'), 'new_order', 'New order #101 has been placed by a customer.'),
+  ((SELECT id FROM tbluser WHERE email='conc2@example.com'), 'new_order', 'New order #102 has been placed by a customer.'),
+  
+  -- Customer cancellations
+  ((SELECT id FROM tbluser WHERE email='conc1@example.com'), 'order_update', 'Order #103 has been cancelled by the customer.'),
+  ((SELECT id FROM tbluser WHERE email='conc2@example.com'), 'order_update', 'Order #104 has been cancelled by the customer.');

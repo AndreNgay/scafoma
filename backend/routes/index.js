@@ -13,6 +13,7 @@ import feedbackRoutes from './feedbackRoutes.js';
 import cartRoutes from './cartRoutes.js';
 import itemVariationGroupRoutes from './itemVariationGroupRoutes.js';
 import dashboardRoutes from './dashboardRoutes.js';
+import notificationRoutes from './notificationRoutes.js';
 
 const router = express.Router();
 
@@ -29,6 +30,7 @@ router.use('/item-variation', itemVariationRoutes);
 router.use('/item-variation-group', itemVariationGroupRoutes);
 router.use('/feedback', feedbackRoutes);
 router.use('/cart', cartRoutes);
+router.use('/notification', notificationRoutes);
 
 // Dashboard
 router.use('/dashboard', dashboardRoutes);
