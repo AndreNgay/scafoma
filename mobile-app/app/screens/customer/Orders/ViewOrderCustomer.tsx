@@ -9,46 +9,50 @@ import {
   ScrollView,
   Alert,
   TouchableOpacity,
+  Platform,
 } from "react-native";
 import { Picker } from "@react-native-picker/picker";
 import { useRoute } from "@react-navigation/native";
-import * as ImagePicker from "react-native-image-picker";
-
-
+import * as ImagePicker from "expo-image-picker";
 import api from "../../../libs/apiCall";
 
 const ViewOrderCustomer = () => {
   const route = useRoute<any>();
-  const { item } = route.params;
+  const { orderId } = route.params;
 
-  const [order, setOrder] = useState<any>(item || null);
-  const [loading, setLoading] = useState(!item);
+  const [order, setOrder] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
   const [updatingPayment, setUpdatingPayment] = useState(false);
   const [uploading, setUploading] = useState(false);
-  const [localProof, setLocalProof] = useState<any>(null); // local image before upload
+
+  // ===============================
+  // Fetch order by ID
+  // ===============================
+  const fetchOrder = async () => {
+    try {
+      setLoading(true);
+      const res = await api.get(`/order/${orderId}`);
+      const data = res.data;
+
+      // Normalize payment proof URL for frontend
+      data.payment_proof = data.payment_proof || data.gcash_screenshot || null;
+
+      setOrder(data);
+    } catch (err) {
+      console.error(err);
+      Alert.alert("Error", "Failed to fetch order");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    const fetchOrderDetails = async () => {
-      if (!item?.id) return;
-      try {
-        setLoading(true);
-        const res = await api.get(`/order-detail/${item.id}`);
-        setOrder({
-          ...res.data,
-          gcash_payment_available: res.data.gcash_payment_available ?? true,
-          oncounter_payment_available: res.data.oncounter_payment_available ?? true,
-        });
-      } catch (err) {
-        console.error("Error fetching order details:", err);
-        Alert.alert("Error", "Failed to fetch order details");
-      } finally {
-        setLoading(false);
-      }
-    };
+    fetchOrder();
+  }, [orderId]);
 
-    if (!item?.items) fetchOrderDetails();
-  }, [item]);
-
+  // ===============================
+  // Change payment method
+  // ===============================
   const handlePaymentChange = async (newMethod: "gcash" | "on-counter") => {
     if (!order) return;
     try {
@@ -56,52 +60,70 @@ const ViewOrderCustomer = () => {
       const res = await api.patch(`/order/${order.id}/payment-method`, {
         payment_method: newMethod,
       });
+
       setOrder((prev: any) => ({
         ...prev,
         payment_method: res.data.payment_method,
+        // reset payment proof if switched to On-Counter
+        payment_proof: newMethod === "gcash" ? prev.payment_proof || null : null,
       }));
-    } catch (err: any) {
-      console.error(err.response?.data || err);
+    } catch (err) {
+      console.error(err);
       Alert.alert("Error", "Failed to update payment method");
     } finally {
       setUpdatingPayment(false);
     }
   };
 
+  // ===============================
+  // Pick and upload GCash screenshot
+  // ===============================
   const pickImage = async () => {
-    ImagePicker.launchImageLibrary(
-      { mediaType: "photo", quality: 0.8 },
-      async (response) => {
-        if (response.didCancel) return;
-        if (response.errorCode) {
-          Alert.alert("Error", response.errorMessage || "Failed to pick image");
-          return;
-        }
+    if (!order) return;
 
-        const asset = response.assets?.[0];
-        if (!asset) return;
-
-        setLocalProof(asset.uri);
-        await uploadPaymentProof(asset);
+    try {
+      const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!permissionResult.granted) {
+        Alert.alert("Permission required", "Please allow access to your photos.");
+        return;
       }
-    );
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        quality: 0.8,
+      });
+
+      if (result.canceled) return;
+      const asset = result.assets[0];
+      if (!asset?.uri) return;
+
+      await uploadPaymentProof(asset.uri);
+    } catch (err) {
+      console.error(err);
+      Alert.alert("Error", "Failed to pick image");
+    }
   };
 
-  const uploadPaymentProof = async (image: any) => {
+  const uploadPaymentProof = async (uri: string) => {
     if (!order) return;
-    const data = new FormData();
-    data.append("file", {
-      uri: image.uri,
+
+    const formData = new FormData();
+    formData.append("gcash_screenshot", {
+      uri: Platform.OS === "android" ? uri : uri.replace("file://", ""),
       name: `gcash_${order.id}.jpg`,
       type: "image/jpeg",
     } as any);
 
     try {
       setUploading(true);
-      const res = await api.patch(`/order/${order.id}/payment-proof`, data, {
+      const res = await api.put(`/order/gcash-screenshot/${order.id}`, formData, {
         headers: { "Content-Type": "multipart/form-data" },
       });
-      setOrder((prev: any) => ({ ...prev, payment_proof: res.data.payment_proof }));
+
+      setOrder((prev: any) => ({
+        ...prev,
+        payment_proof: res.data.payment_proof || res.data.gcash_screenshot,
+      }));
       Alert.alert("Success", "GCash screenshot uploaded!");
     } catch (err) {
       console.error(err);
@@ -111,7 +133,12 @@ const ViewOrderCustomer = () => {
     }
   };
 
-  if (loading) return <ActivityIndicator size="large" color="#A40C2D" style={{ flex: 1 }} />;
+  // ===============================
+  // Render
+  // ===============================
+  if (loading)
+    return <ActivityIndicator size="large" color="#A40C2D" style={{ flex: 1 }} />;
+
   if (!order)
     return (
       <View style={styles.container}>
@@ -120,7 +147,8 @@ const ViewOrderCustomer = () => {
     );
 
   const paymentOptions = [];
-  if (order.oncounter_payment_available) paymentOptions.push({ label: "On-Counter", value: "on-counter" });
+  if (order.oncounter_payment_available)
+    paymentOptions.push({ label: "On-Counter", value: "on-counter" });
   if (order.gcash_payment_available) paymentOptions.push({ label: "GCash", value: "gcash" });
 
   return (
@@ -133,13 +161,14 @@ const ViewOrderCustomer = () => {
       {order.note && <Text>Note: {order.note}</Text>}
       <Text>Date: {new Date(order.created_at).toLocaleString()}</Text>
 
-      {/* Payment Method */}
       {paymentOptions.length > 0 && (
         <View style={{ marginTop: 15 }}>
-          <Text style={{ fontWeight: "600", color: "#A40C2D", marginBottom: 5 }}>Payment Method</Text>
+          <Text style={styles.paymentLabel}>Payment Method</Text>
           <Picker
             selectedValue={order.payment_method || paymentOptions[0].value}
-            onValueChange={(val: string) => handlePaymentChange(val as "gcash" | "on-counter")}
+            onValueChange={(val: string) =>
+              handlePaymentChange(val as "gcash" | "on-counter")
+            }
             enabled={!updatingPayment}
           >
             {paymentOptions.map((opt) => (
@@ -149,46 +178,35 @@ const ViewOrderCustomer = () => {
         </View>
       )}
 
-      {/* GCash Screenshot */}
-      {order.payment_method === "gcash" && (
+      {order.payment_method === "gcash" ? (
         <View style={{ marginTop: 15 }}>
-          <Text style={{ fontWeight: "600", color: "#A40C2D", marginBottom: 5 }}>GCash Screenshot (Required)</Text>
-          {order.payment_proof || localProof ? (
-            <Image
-              source={{ uri: localProof || order.payment_proof }}
-              style={styles.paymentProof}
-            />
+          <Text style={styles.paymentLabel}>GCash Screenshot (Required)</Text>
+          {order.payment_proof ? (
+            <Image source={{ uri: order.payment_proof }} style={styles.paymentProof} />
           ) : (
-            <TouchableOpacity
-              style={{
-                backgroundColor: "#f9f9f9",
-                padding: 15,
-                borderRadius: 10,
-                alignItems: "center",
-              }}
-              onPress={pickImage}
-            >
-              <Text>{uploading ? "Uploading..." : "Upload Screenshot"}</Text>
-            </TouchableOpacity>
+            <Text style={{ color: "#888", marginBottom: 10 }}>
+              No screenshot uploaded
+            </Text>
           )}
-        </View>
-      )}
-
-      {order.payment_method === "on-counter" && (
-        <View style={{ marginTop: 15 }}>
-          <Text style={{ fontWeight: "600", color: "#A40C2D", marginBottom: 5 }}>GCash Screenshot (Optional)</Text>
           <TouchableOpacity
-            style={{
-              backgroundColor: "#f9f9f9",
-              padding: 15,
-              borderRadius: 10,
-              alignItems: "center",
-            }}
+            style={styles.uploadBtn}
             onPress={pickImage}
+            disabled={uploading}
           >
-            <Text>{uploading ? "Uploading..." : localProof || order.payment_proof ? "Change Screenshot" : "Upload Screenshot"}</Text>
+            <Text>
+              {uploading
+                ? "Uploading..."
+                : order.payment_proof
+                ? "Change Screenshot"
+                : "Upload Screenshot"}
+            </Text>
           </TouchableOpacity>
-          {order.payment_proof && <Image source={{ uri: order.payment_proof }} style={styles.paymentProof} />}
+        </View>
+      ) : (
+        <View style={{ marginTop: 15 }}>
+          <Text style={{ color: "#888", fontStyle: "italic" }}>
+            You chose On-Counter payment. No screenshot required.
+          </Text>
         </View>
       )}
 
@@ -230,6 +248,14 @@ const styles = StyleSheet.create({
   variation: { fontSize: 13, color: "#444" },
   paymentProof: { marginTop: 15, width: "100%", height: 200, borderRadius: 10 },
   emptyText: { textAlign: "center", color: "#888", marginTop: 20 },
+  uploadBtn: {
+    backgroundColor: "#f9f9f9",
+    padding: 15,
+    borderRadius: 10,
+    alignItems: "center",
+    marginTop: 10,
+  },
+  paymentLabel: { fontWeight: "600", color: "#A40C2D", marginBottom: 5 },
 });
 
 export default ViewOrderCustomer;

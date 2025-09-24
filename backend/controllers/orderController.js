@@ -1,11 +1,14 @@
 import { pool } from "../libs/database.js";
 import multer from "multer";
 
+const storage = multer.memoryStorage();
+export const upload = multer({ storage });
 
-// Utility function to convert BYTEA → base64
-const makeImageDataUrl = (buffer) => {
-  if (!buffer) return null;
-  return `data:image/jpeg;base64,${Buffer.from(buffer).toString("base64")}`;
+// Helper: convert BYTEA image to base64 data URL
+const makeImageDataUrl = (imageBuffer, mime = "jpeg") => {
+  if (!imageBuffer) return null;
+  const base64 = Buffer.from(imageBuffer).toString("base64");
+  return `data:image/${mime};base64,${base64}`;
 };
 
 export const getOrdersByConcessionaireId = async (req, res) => {
@@ -81,12 +84,11 @@ export const getOrdersByCustomerId = async (req, res) => {
       [id]
     );
 
-    const orders = result.rows.map(order => {
-      if (order.payment_proof) {
-        order.payment_proof = makeImageDataUrl(order.payment_proof);
-      }
-      return order;
-    });
+  const orders = result.rows.map(order => {
+    order.payment_proof = makeImageDataUrl(order.gcash_screenshot);
+    return order;
+  });
+
 
     res.json(orders);
   } catch (err) {
@@ -96,6 +98,68 @@ export const getOrdersByCustomerId = async (req, res) => {
 };
 
 
+export const getOrderById = async (req, res) => {
+  const { id } = req.params; // order ID
+
+  try {
+    // Get main order info with customer and concession details, including payment flags
+    const orderResult = await pool.query(
+      `SELECT o.*, 
+              u.first_name, u.last_name, u.email, u.profile_image,
+              c.concession_name, 
+              caf.cafeteria_name,
+              COALESCE(c.gcash_payment_available, FALSE) AS gcash_payment_available,
+              COALESCE(c.oncounter_payment_available, FALSE) AS oncounter_payment_available
+       FROM tblorder o
+       JOIN tbluser u ON o.customer_id = u.id
+       JOIN tblconcession c ON o.concession_id = c.id
+       JOIN tblcafeteria caf ON c.cafeteria_id = caf.id
+       WHERE o.id = $1`,
+      [id]
+    );
+
+    if (orderResult.rowCount === 0) {
+      return res.status(404).json({ error: "Order not found" });
+    }
+
+    const order = orderResult.rows[0];
+
+    // Convert images to base64
+    order.profile_image = makeImageDataUrl(order.profile_image);
+    order.gcash_screenshot = makeImageDataUrl(order.gcash_screenshot);
+    order.payment_proof = order.gcash_screenshot || null;
+
+    // Get order items
+    const itemsResult = await pool.query(
+      `SELECT od.*, m.item_name, m.price AS base_price
+       FROM tblorderdetail od
+       JOIN tblmenuitem m ON od.item_id = m.id
+       WHERE od.order_id = $1`,
+      [id]
+    );
+
+    const items = itemsResult.rows;
+
+    // For each item, get variations
+    for (let item of items) {
+      const variationsResult = await pool.query(
+        `SELECT iv.id, iv.variation_name, iv.additional_price
+         FROM tblorderitemvariation oiv
+         JOIN tblitemvariation iv ON oiv.variation_id = iv.id
+         WHERE oiv.order_detail_id = $1`,
+        [item.id]
+      );
+      item.variations = variationsResult.rows;
+    }
+
+    order.items = items;
+
+    res.json(order);
+  } catch (err) {
+    console.error("Error fetching order by ID:", err);
+    res.status(500).json({ error: "Failed to fetch order" });
+  }
+};
 
 
 
@@ -161,14 +225,15 @@ export const updatePaymentProof = async (req, res) => {
   try {
     const result = await pool.query(
       `UPDATE tblorder 
-       SET payment_proof = $1, updated_at = NOW()
+       SET gcash_screenshot = $1, updated_at = NOW()
        WHERE id = $2 RETURNING *`,
       [file.buffer, id]
     );
     if (result.rowCount === 0) return res.status(404).json({ error: "Order not found" });
 
     const order = result.rows[0];
-    order.payment_proof = makeImageDataUrl(order.payment_proof);
+    // Convert gcash_screenshot to base64 for frontend
+    order.payment_proof = makeImageDataUrl(order.gcash_screenshot);
 
     res.json(order);
   } catch (err) {
@@ -176,6 +241,7 @@ export const updatePaymentProof = async (req, res) => {
     res.status(500).json({ error: "Failed to upload payment proof" });
   }
 };
+
 
 export const updatePaymentMethod = async (req, res) => {
   const { id } = req.params;

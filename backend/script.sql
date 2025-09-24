@@ -125,7 +125,7 @@ CREATE TABLE IF NOT EXISTS tblorder (
     order_status VARCHAR(30) DEFAULT 'pending' CHECK (order_status IN (
         'pending', 'accepted', 'declined', 'ready for pickup', 'completed'
     )),
-    payment_method VARCHAR(20) CHECK (payment_method IN ('gcash', 'on-counter')),
+    payment_method VARCHAR(20) CHECK (payment_method IN ('gcash', 'on-counter')) DEFAULT 'on-counter',
     in_cart BOOLEAN DEFAULT FALSE,
     gcash_screenshot BYTEA,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,

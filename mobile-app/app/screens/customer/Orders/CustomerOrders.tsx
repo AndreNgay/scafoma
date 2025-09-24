@@ -68,9 +68,10 @@ const CustomerOrders = () => {
   }, [searchQuery, statusFilter, orders]);
 
 const renderItem = ({ item }: any) => (
-  <TouchableOpacity
-    onPress={() => navigation.navigate("View Order", { item })}
-  >
+<TouchableOpacity
+  onPress={() => navigation.navigate("View Order", { orderId: item.id })}
+>
+
     <View style={styles.card}>
       {/* ✅ Order ID */}
       <Text style={styles.orderId}>Order #{item.id}</Text>
