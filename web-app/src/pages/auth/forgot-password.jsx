@@ -1,6 +1,7 @@
 // src/pages/auth/forgot-password.jsx
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { toast } from "sonner";
 
 const ForgotPassword = () => {
   const navigate = useNavigate();
@@ -12,16 +13,23 @@ const ForgotPassword = () => {
 
   const handleSendOtp = () => {
     // Prototype: Always succeed
+    toast.success("OTP sent to your email!");
     setStep(2);
   };
 
   const handleVerifyOtp = () => {
     // Prototype: Always succeed
+    toast.success("OTP verified successfully!");
     setStep(3);
   };
 
   const handleResetPassword = () => {
     // Prototype: Always succeed
+    if (newPassword !== confirmPassword) {
+      toast.error("Passwords do not match!");
+      return;
+    }
+    toast.success("Password changed successfully!");
     navigate("/sign-in");
   };
 
