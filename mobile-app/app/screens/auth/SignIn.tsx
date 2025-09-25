@@ -104,6 +104,12 @@ const SignIn: React.FC<Props> = ({ navigation }) => {
         >
           {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>Sign In</Text>}
         </TouchableOpacity>
+        {/* Forgot Password Link */}
+<TouchableOpacity onPress={() => navigation.navigate("ForgotPassword")}>
+  <Text style={[styles.link, { marginTop: 5 }]}>
+    <Text style={styles.linkHighlight}>Forgot your password?</Text>
+  </Text>
+</TouchableOpacity>
 
         {/* Sign Up Link */}
         <TouchableOpacity onPress={() => navigation.navigate("SignUp")}>

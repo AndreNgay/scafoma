@@ -28,6 +28,7 @@ import ViewOrderConcessionaire from "./screens/concessionaire/Order/ViewOrderCon
 import AddMenu from "./screens/concessionaire/Menu/AddMenu";
 import ViewMenu from "./screens/concessionaire/Menu/ViewMenu";
 import Notifications from "./screens/Notifications";
+import ForgotPassword from "./screens/auth/ForgotPassword";
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -159,6 +160,7 @@ function AuthStack() {
     <AuthStackNav.Navigator screenOptions={{ headerShown: false }}>
       <AuthStackNav.Screen name="SignIn" component={SignIn} />
       <AuthStackNav.Screen name="SignUp" component={SignUp} />
+      <AuthStackNav.Screen name="ForgotPassword" component={ForgotPassword} />
     </AuthStackNav.Navigator>
   );
 }

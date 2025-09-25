@@ -13,6 +13,7 @@ import { MenuItems } from "./pages/menu-items"
 import { Orders } from "./pages/orders"
 import { Concessions } from "./pages/concessions"
 import { Profile } from "./pages/profile"
+import ForgotPassword from "./pages/auth/forgot-password"
 
 
 const RootLayout = () => {
@@ -52,6 +53,7 @@ function App() {
           </Route>
           <Route path="/sign-in" element={<SignIn />} />
           <Route path="/sign-up" element={<SignUp />} />
+          <Route path="/forgot-password" element={<ForgotPassword />} />
         </Routes>
       </div>
 
