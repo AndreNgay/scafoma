@@ -104,6 +104,24 @@ export const getMenuItems = async (req, res) => {
       }
     }
 
+    // Fetch feedback aggregates (avg and count) per menu item
+    let feedbackMap = {};
+    if (menuItemIds.length > 0) {
+      const fbRes = await pool.query(
+        `SELECT menu_item_id, COUNT(*) AS feedback_count, AVG(rating) AS avg_rating
+         FROM tblfeedback
+         WHERE menu_item_id = ANY($1::int[])
+         GROUP BY menu_item_id`,
+        [menuItemIds]
+      );
+      for (const row of fbRes.rows) {
+        feedbackMap[row.menu_item_id] = {
+          feedback_count: Number(row.feedback_count),
+          avg_rating: row.avg_rating !== null ? Number(row.avg_rating) : null,
+        };
+      }
+    }
+
     // Format response
     const formattedItems = menuItems.map(r => ({
       id: r.id,
@@ -115,6 +133,7 @@ export const getMenuItems = async (req, res) => {
       concession_id: r.concession_id,
       cafeteria_name: r.cafeteria_name,
       image_url: makeImageDataUrl(r.image),
+      feedback: feedbackMap[r.id] || { feedback_count: 0, avg_rating: null },
       variations: variationsMap[r.id]
         ? Object.keys(variationsMap[r.id]).map(label => ({
             label,

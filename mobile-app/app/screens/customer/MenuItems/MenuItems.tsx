@@ -136,6 +136,16 @@ const MenuItems = () => {
         <Text style={styles.subText}>
           {item.concession_name} • {item.cafeteria_name}
         </Text>
+        {(() => {
+          const feedbackCount = Number((item as any).feedback?.feedback_count ?? (item as any).feedback_count ?? 0);
+          const avgRating = (item as any).feedback?.avg_rating ?? (item as any).avg_rating;
+          if (feedbackCount > 0 && avgRating !== null && avgRating !== undefined) {
+            return (
+              <Text style={styles.feedbackText}>⭐ {Number(avgRating).toFixed(1)} ({feedbackCount})</Text>
+            );
+          }
+          return <Text style={styles.feedbackEmpty}>No feedback yet</Text>;
+        })()}
         {item.category && (
           <Text style={styles.categoryTag}>{item.category}</Text>
         )}
@@ -321,6 +331,8 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
   price: { marginTop: 5, fontWeight: "600", color: "#A40C2D" },
+  feedbackText: { marginTop: 2, fontSize: 12, color: "#111" },
+  feedbackEmpty: { marginTop: 2, fontSize: 12, color: "#888", fontStyle: "italic" },
   filterContainer: { flex: 1, padding: 20, backgroundColor: "#fff" },
   filterHeader: { fontSize: 18, fontWeight: "bold", marginBottom: 10 },
   filterHeaderRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 10 },

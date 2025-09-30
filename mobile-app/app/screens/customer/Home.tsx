@@ -22,7 +22,13 @@ const Home = ({ navigation }: any) => {
       // Load concessions (featured/top-rated placeholder)
       const conRes = await api.get("/concession/all");
       const concessions = conRes.data.data || [];
-      setFeaturedConcessions(concessions.slice(0, 10));
+      // Randomize to avoid burying less popular concessions
+      const shuffled = [...concessions];
+      for (let i = shuffled.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+      }
+      setFeaturedConcessions(shuffled.slice(0, 10));
 
       // Load menu items, derive categories
       const miRes = await api.get("/menu-item/all", { params: { sortBy: "name", limit: 100 } });
