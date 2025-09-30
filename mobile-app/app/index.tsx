@@ -2,8 +2,6 @@ import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   View,
-  BackHandler,
-  Alert,
 } from "react-native";
 import { useNavigation, NavigationContainer } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
@@ -178,28 +176,7 @@ export default function RootNavigator() {
     init();
   }, []);
 
-  // Handle Android hardware back button
-  useEffect(() => {
-    const backAction = () => {
-      if (navigation.canGoBack()) {
-        navigation.goBack();
-        return true; // prevent exit
-      } else {
-        Alert.alert("Exit App", "Do you want to exit?", [
-          { text: "Cancel", style: "cancel" },
-          { text: "Yes", onPress: () => BackHandler.exitApp() },
-        ]);
-        return true;
-      }
-    };
-
-    const backHandler = BackHandler.addEventListener(
-      "hardwareBackPress",
-      backAction
-    );
-
-    return () => backHandler.remove();
-  }, [navigation]);
+  // Use default React Navigation Android back behavior (navigate back or exit at root)
 
   if (loading) {
     return (
