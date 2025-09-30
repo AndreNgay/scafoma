@@ -161,17 +161,21 @@ const MenuItemDetails = () => {
         <Text style={styles.subText}>
           {cafeteria?.cafeteria_name || cafeteriaName || item?.cafeteria_name}
           {" "}•{" "}
-          <Text
-            style={styles.link}
-            onPress={() =>
-              navigation.navigate("View Concession", {
-                concession,
-                cafeteria,
-              })
-            }
-          >
-            {concession?.concession_name}
-          </Text>
+          {concession ? (
+            <Text
+              style={styles.link}
+              onPress={() =>
+                navigation.navigate("View Concession", {
+                  concession,
+                  cafeteria,
+                })
+              }
+            >
+              {concession?.concession_name}
+            </Text>
+          ) : (
+            <Text style={styles.link}>{item?.concession_name || ""}</Text>
+          )}
         </Text>
 
         {/* Price & Quantity */}

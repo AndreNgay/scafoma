@@ -147,3 +147,129 @@ export const updateOrderDetailQuantity = async (req, res) => {
     res.status(500).json({ error: "Server error" });
   }
 };
+
+// ==========================
+// Aggregations: Most ordered items (overall)
+// ==========================
+export const getMostOrderedItems = async (req, res) => {
+  try {
+    const limit = parseInt(req.query.limit) || 10;
+    const result = await pool.query(
+      `SELECT mi.id, mi.item_name, mi.price, mi.category, mi.image,
+              SUM(od.quantity) AS total_qty,
+              c.concession_name, caf.cafeteria_name
+       FROM tblorderdetail od
+       JOIN tblmenuitem mi ON od.item_id = mi.id
+       JOIN tblconcession c ON mi.concession_id = c.id
+       JOIN tblcafeteria caf ON c.cafeteria_id = caf.id
+       GROUP BY mi.id, c.concession_name, caf.cafeteria_name
+       ORDER BY total_qty DESC
+       LIMIT $1`,
+      [limit]
+    );
+
+    const items = result.rows.map(r => ({
+      id: r.id,
+      item_name: r.item_name,
+      price: Number(r.price),
+      category: r.category,
+      image_url: r.image ? `data:image/jpeg;base64,${r.image.toString("base64")}` : null,
+      total_qty: Number(r.total_qty),
+      concession_name: r.concession_name,
+      cafeteria_name: r.cafeteria_name,
+    }));
+
+    res.json({ status: "success", data: items });
+  } catch (err) {
+    console.error("Error fetching most ordered items:", err);
+    res.status(500).json({ status: "failed", message: "Server error" });
+  }
+};
+
+// ==========================
+// Aggregations: Trending items (current week)
+// ==========================
+export const getTrendingItemsThisWeek = async (req, res) => {
+  try {
+    const limit = parseInt(req.query.limit) || 10;
+    const result = await pool.query(
+      `SELECT mi.id, mi.item_name, mi.price, mi.category, mi.image,
+              SUM(od.quantity) AS total_qty,
+              c.concession_name, caf.cafeteria_name
+       FROM tblorderdetail od
+       JOIN tblorder o ON od.order_id = o.id
+       JOIN tblmenuitem mi ON od.item_id = mi.id
+       JOIN tblconcession c ON mi.concession_id = c.id
+       JOIN tblcafeteria caf ON c.cafeteria_id = caf.id
+       WHERE date_trunc('week', o.created_at) = date_trunc('week', NOW())
+       GROUP BY mi.id, c.concession_name, caf.cafeteria_name
+       ORDER BY total_qty DESC
+       LIMIT $1`,
+      [limit]
+    );
+
+    const items = result.rows.map(r => ({
+      id: r.id,
+      item_name: r.item_name,
+      price: Number(r.price),
+      category: r.category,
+      image_url: r.image ? `data:image/jpeg;base64,${r.image.toString("base64")}` : null,
+      total_qty: Number(r.total_qty),
+      concession_name: r.concession_name,
+      cafeteria_name: r.cafeteria_name,
+    }));
+
+    res.json({ status: "success", data: items });
+  } catch (err) {
+    console.error("Error fetching trending items:", err);
+    res.status(500).json({ status: "failed", message: "Server error" });
+  }
+};
+
+// ==========================
+// Personalized: Recent items for a user (most recent first)
+// ==========================
+export const getRecentItemsByUser = async (req, res) => {
+  try {
+    const userId = parseInt(req.params.userId);
+    const limit = parseInt(req.query.limit) || 10;
+    if (!userId) return res.status(400).json({ status: "failed", message: "userId required" });
+
+    const result = await pool.query(
+      `SELECT od.item_id AS id,
+              mi.item_name,
+              mi.price,
+              mi.category,
+              mi.image,
+              c.concession_name,
+              caf.cafeteria_name,
+              MAX(o.created_at) AS last_ordered_at
+       FROM tblorder o
+       JOIN tblorderdetail od ON od.order_id = o.id
+       JOIN tblmenuitem mi ON mi.id = od.item_id
+       JOIN tblconcession c ON mi.concession_id = c.id
+       JOIN tblcafeteria caf ON c.cafeteria_id = caf.id
+       WHERE o.customer_id = $1 AND o.in_cart = FALSE
+       GROUP BY od.item_id, mi.item_name, mi.price, mi.category, mi.image, c.concession_name, caf.cafeteria_name
+       ORDER BY last_ordered_at DESC
+       LIMIT $2`,
+      [userId, limit]
+    );
+
+    const items = result.rows.map(r => ({
+      id: r.id,
+      item_name: r.item_name,
+      price: Number(r.price),
+      category: r.category,
+      image_url: r.image ? `data:image/jpeg;base64,${r.image.toString("base64")}` : null,
+      concession_name: r.concession_name,
+      cafeteria_name: r.cafeteria_name,
+      last_ordered_at: r.last_ordered_at,
+    }));
+
+    res.json({ status: "success", data: items });
+  } catch (err) {
+    console.error("Error fetching recent items by user:", err);
+    res.status(500).json({ status: "failed", message: "Server error" });
+  }
+};

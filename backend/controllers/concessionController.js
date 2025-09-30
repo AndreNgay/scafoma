@@ -10,15 +10,13 @@ export const getConcessions = async (req, res) => {
   try {
     const concessions = await pool.query(`
       SELECT 
-        c.id,
-        c.concession_name,
-        c.concessionaire_id,
+        c.*, 
         u.first_name || ' ' || u.last_name AS concessionaire_name,
-        c.cafeteria_id,
-        c.created_at,
-        c.updated_at
+        f.cafeteria_name,
+        f.location
       FROM tblconcession c
       LEFT JOIN tbluser u ON c.concessionaire_id = u.id
+      LEFT JOIN tblcafeteria f ON c.cafeteria_id = f.id
       ORDER BY c.created_at DESC
     `);
 
@@ -29,10 +27,16 @@ export const getConcessions = async (req, res) => {
       });
     }
 
+    const data = concessions.rows.map((row) => {
+      const image_url = formatImage(row.image);
+      const { image, ...rest } = row;
+      return { ...rest, image_url };
+    });
+
     res.status(200).json({
       status: "success",
       message: "Concessions retrieved successfully",
-      data: concessions.rows,
+      data,
     });
   } catch (err) {
     console.error("Error fetching concessions:", err);
@@ -97,6 +101,32 @@ export const deleteConcession = async (req, res) => {
 
 export const getConcessionById = async (req, res) => {
   try {
+    // If an :id param is provided (public route), fetch by concession id
+    if (req.params && req.params.id) {
+      const id = req.params.id;
+      const byId = await pool.query(
+        `SELECT c.*, f.cafeteria_name, f.location
+         FROM tblconcession c
+         JOIN tblcafeteria f ON c.cafeteria_id = f.id
+         WHERE c.id = $1`,
+        [id]
+      );
+
+      if (byId.rows.length === 0) {
+        return res.status(404).json({ message: "Concession not found" });
+      }
+
+      const concession = byId.rows[0];
+      concession.image_url = formatImage(concession.image);
+      delete concession.image;
+
+      return res.json({
+        status: "success",
+        data: concession,
+      });
+    }
+
+    // Otherwise, for protected route without :id, fetch by authenticated concessionaire id
     const result = await pool.query(
       `SELECT c.*, f.cafeteria_name, f.location
        FROM tblconcession c
@@ -110,8 +140,8 @@ export const getConcessionById = async (req, res) => {
     }
 
     const concession = result.rows[0];
-    concession.image_url = formatImage(concession.image); // ✅ convert BYTEA → base64
-    delete concession.image; // hide raw buffer
+    concession.image_url = formatImage(concession.image);
+    delete concession.image;
 
     res.json({
       status: "success",

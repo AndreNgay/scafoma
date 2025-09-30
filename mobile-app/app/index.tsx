@@ -3,7 +3,7 @@ import {
   ActivityIndicator,
   View,
 } from "react-native";
-import { useNavigation, NavigationContainer } from "@react-navigation/native";
+import { NavigationContainer } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import useStore from "./store";
@@ -18,6 +18,7 @@ import Concession from "./screens/concessionaire/Concession/Concession";
 import MenuItems from "./screens/customer/MenuItems/MenuItems";
 import MenuItemDetails from "./screens/customer/MenuItems/MenuItemDetails";
 import ViewConcession from "./screens/customer/ViewConcession";
+import Home from "./screens/customer/Home";
 import CustomerOrders from "./screens/customer/Orders/CustomerOrders";
 import Cart from "./screens/customer/Cart/Cart";
 import OrderList from "./screens/concessionaire/Order/OrderList";
@@ -34,7 +35,7 @@ const MenuStackNav = createNativeStackNavigator();
 
 function MenuManagementStack() {
   return (
-    <MenuStackNav.Navigator>
+    <MenuStackNav.Navigator initialRouteName="Menu Management">
       <MenuStackNav.Screen
         name="Menu Management"
         component={Menu}
@@ -61,7 +62,7 @@ function MenuManagementStack() {
 
 function ConcessionaireConcessionStack() {
   return (
-    <MenuStackNav.Navigator>
+    <MenuStackNav.Navigator initialRouteName="Concession Management">
       <MenuStackNav.Screen
         name="Concession Management"
         component={Concession}
@@ -73,7 +74,7 @@ function ConcessionaireConcessionStack() {
 
 function MenuItemsStack() {
   return (
-    <MenuStackNav.Navigator>
+    <MenuStackNav.Navigator initialRouteName="View Menu Items">
       <MenuStackNav.Screen
         name="View Menu Items"
         component={MenuItems}
@@ -95,7 +96,7 @@ function MenuItemsStack() {
 
 function OrdersStack() {
   return (
-    <MenuStackNav.Navigator>
+    <MenuStackNav.Navigator initialRouteName="Customer Orders">
       <MenuStackNav.Screen
         name="Customer Orders"
         component={CustomerOrders}
@@ -112,7 +113,7 @@ function OrdersStack() {
 
 function OrderListStack() {
   return (
-    <MenuStackNav.Navigator>
+    <MenuStackNav.Navigator initialRouteName="View Orders">
       <MenuStackNav.Screen
         name="View Orders"
         component={OrderList}
@@ -129,8 +130,18 @@ function OrderListStack() {
 
 function CustomerTabs() {
   return (
-    <Tab.Navigator screenOptions={{ headerShown: false }}>
-      <Tab.Screen name="Menu Items" component={MenuItemsStack} />
+    <Tab.Navigator screenOptions={{ headerShown: false }} initialRouteName="Home">
+      <Tab.Screen name="Home" component={Home} />
+      <Tab.Screen
+        name="Menu Items"
+        component={MenuItemsStack}
+        listeners={({ navigation }) => ({
+          tabPress: (e) => {
+            // Ensure the nested stack shows the root list screen
+            navigation.navigate("Menu Items", { screen: "View Menu Items" });
+          },
+        })}
+      />
       <Tab.Screen name="Cart" component={Cart} />
       <Tab.Screen name="Orders" component={OrdersStack} />
       <Tab.Screen name="Notifications" component={Notifications} />
@@ -141,7 +152,7 @@ function CustomerTabs() {
 
 function ConcessionaireTabs() {
   return (
-    <Tab.Navigator screenOptions={{ headerShown: false }}>
+    <Tab.Navigator screenOptions={{ headerShown: false }} initialRouteName="Order List">
       <Tab.Screen name="Order List" component={OrderListStack} />
       <Tab.Screen name="Menu" component={MenuManagementStack} />
       <Tab.Screen name="Concession" component={ConcessionaireConcessionStack} />
@@ -166,7 +177,6 @@ function AuthStack() {
 export default function RootNavigator() {
   const { user, loadStorage } = useStore();
   const [loading, setLoading] = useState(true);
-  const navigation = useNavigation();
 
   useEffect(() => {
     const init = async () => {
@@ -187,7 +197,7 @@ export default function RootNavigator() {
   }
 
   return (
-    <Stack.Navigator screenOptions={{ headerShown: false }}>
+    <Stack.Navigator screenOptions={{ headerShown: false }} initialRouteName={!user ? "Auth" : user.role === "customer" ? "Customer" : "Concessionaire"}>
       {!user ? (
         <Stack.Screen name="Auth" component={AuthStack} />
       ) : user.role === "customer" ? (
