@@ -18,7 +18,7 @@ import api from "../../../libs/apiCall";
 const MenuItemDetails = () => {
   const navigation = useNavigation<any>();
   const route = useRoute<any>();
-  const { item, concession, cafeteria } = route.params;
+  const { item, concession, cafeteria, cafeteriaName } = route.params as any;
 
   const [quantity, setQuantity] = useState(1);
   const [note, setNote] = useState("");
@@ -159,8 +159,17 @@ const MenuItemDetails = () => {
 
         {/* Cafeteria + Concession */}
         <Text style={styles.subText}>
-          {cafeteria?.cafeteria_name} •{" "}
-          <Text style={styles.link} onPress={() => navigation.navigate("View Concession", { concession, cafeteria })}>
+          {cafeteria?.cafeteria_name || cafeteriaName || item?.cafeteria_name}
+          {" "}•{" "}
+          <Text
+            style={styles.link}
+            onPress={() =>
+              navigation.navigate("View Concession", {
+                concession,
+                cafeteria,
+              })
+            }
+          >
             {concession?.concession_name}
           </Text>
         </Text>

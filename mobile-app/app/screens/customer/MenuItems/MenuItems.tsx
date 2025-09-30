@@ -99,6 +99,7 @@ const MenuItems = () => {
         item,
         concession: concessions.find((c) => c.id === item.concession_id),
         cafeteria: cafeterias.find((caf) => caf.id === item.cafeteria_id),
+        cafeteriaName: item.cafeteria_name,
       })
     }
   >
