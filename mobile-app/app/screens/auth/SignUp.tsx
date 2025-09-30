@@ -8,12 +8,18 @@ import { useNavigation } from "@react-navigation/native";
 import api from "../../libs/apiCall";
 import useStore from "../../store";
 
-const RegisterSchema = z.object({
-  first_name: z.string().min(2, { message: "First name must be at least 2 characters" }),
-  last_name: z.string().min(2, { message: "Last name must be at least 2 characters" }),
-  email: z.string().email({ message: "Invalid email address" }),
-  password: z.string().min(6, { message: "Password must be at least 6 characters long" }),
-});
+const RegisterSchema = z
+  .object({
+    first_name: z.string().min(2, { message: "First name must be at least 2 characters" }),
+    last_name: z.string().min(2, { message: "Last name must be at least 2 characters" }),
+    email: z.string().email({ message: "Invalid email address" }),
+    password: z.string().min(6, { message: "Password must be at least 6 characters long" }),
+    confirm_password: z.string({ required_error: "Please confirm your password" }),
+  })
+  .refine((data) => data.password === data.confirm_password, {
+    message: "Passwords do not match",
+    path: ["confirm_password"],
+  });
 
 type RegisterForm = z.infer<typeof RegisterSchema>;
 
@@ -33,11 +39,24 @@ const SignUp = () => {
   const onSubmit = async (data: RegisterForm) => {
     try {
       setLoading(true);
-      const { data: res } = await api.post("/auth/sign-up", data);
+      const { confirm_password, ...payload } = data as any;
+      const { data: res } = await api.post("/auth/sign-up", payload);
 
       if (res?.user) {
-        // save user credentials
-        setCredentials(res.user);
+        // Immediately sign in to retrieve token and persist it
+        try {
+          const signinRes = await api.post("/auth/sign-in", {
+            email: payload.email,
+            password: payload.password,
+          });
+          if (signinRes?.data?.user) {
+            const userInfo = { ...signinRes.data.user, token: signinRes.data.token };
+            await setCredentials(userInfo);
+          }
+        } catch (e) {
+          console.warn("Auto sign-in after signup failed:", e);
+        }
+
         alert(res?.message || "Account created successfully!");
         navigation.navigate("SignIn"); // go to sign-in screen
       } else {
@@ -120,6 +139,23 @@ const SignUp = () => {
         )}
       />
       {errors.password && <Text style={styles.error}>{errors.password.message}</Text>}
+
+      {/* Confirm Password */}
+      <Controller
+        control={control}
+        name="confirm_password"
+        render={({ field: { onChange, value } }) => (
+          <TextInput
+            style={styles.input}
+            placeholder="Confirm Password"
+            secureTextEntry
+            value={value}
+            onChangeText={onChange}
+            editable={!isLoading}
+          />
+        )}
+      />
+      {errors.confirm_password && <Text style={styles.error}>{errors.confirm_password.message}</Text>}
 
       {/* Submit */}
       <TouchableOpacity

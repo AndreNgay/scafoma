@@ -9,20 +9,26 @@ import api from "../../libs/apiCall.js";
 import useStore from "../../store/index.js";
 import {SocialAuth} from "../../components/ui/social-auth.jsx";
 
-const RegisterSchema = z.object({
-    first_name: z
-        .string({required_error: "First name is required"})
-        .min(2, {message: "First name must be at least 2 characters"}),
-    last_name: z
-        .string({required_error: "Last name is required"})
-        .min(2, {message: "Last name must be at least 2 characters"}),
-    email: z
-        .string({required_error: "Email is required"})
-        .email({message: "Invalid email address"}),
-    password: z
-        .string({required_error: "Password is required"})
-        .min(6, {message: "Password must be at least 6 characters long"})
-});
+const RegisterSchema = z
+    .object({
+        first_name: z
+            .string({required_error: "First name is required"})
+            .min(2, {message: "First name must be at least 2 characters"}),
+        last_name: z
+            .string({required_error: "Last name is required"})
+            .min(2, {message: "Last name must be at least 2 characters"}),
+        email: z
+            .string({required_error: "Email is required"})
+            .email({message: "Invalid email address"}),
+        password: z
+            .string({required_error: "Password is required"})
+            .min(6, {message: "Password must be at least 6 characters long"}),
+        confirm_password: z.string({required_error: "Please confirm your password"})
+    })
+    .refine((data) => data.password === data.confirm_password, {
+        message: "Passwords do not match",
+        path: ["confirm_password"],
+    });
 
 const SignUp = () => {
     const [isLoading,
@@ -39,7 +45,8 @@ const SignUp = () => {
         try {
             setLoading(true);
 
-            const {data: res} = await api.post("/auth/sign-up", data);
+            const {confirm_password, ...payload} = data;
+            const {data: res} = await api.post("/auth/sign-up", payload);
 
             if (res
                 ?.user) {
@@ -130,6 +137,22 @@ const SignUp = () => {
                             {...register("password")}
                             className="mt-1 block w-full rounded-md border border-gray-300 shadow-sm px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"/> {errors.password && (
                             <p className="mt-1 text-sm text-red-600">{errors.password.message}</p>
+                        )}
+                    </div>
+
+                    {/* Confirm Password */}
+                    <div>
+                        <label htmlFor="confirm_password" className="block text-sm font-medium text-gray-700">
+                            Confirm Password
+                        </label>
+                        <input
+                            disabled={isLoading}
+                            id="confirm_password"
+                            type="password"
+                            placeholder="••••••••"
+                            {...register("confirm_password")}
+                            className="mt-1 block w-full rounded-md border border-gray-300 shadow-sm px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"/> {errors.confirm_password && (
+                            <p className="mt-1 text-sm text-red-600">{errors.confirm_password.message}</p>
                         )}
                     </div>
 
