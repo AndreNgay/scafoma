@@ -69,7 +69,8 @@ export const getMenuItems = async (req, res) => {
 
     // Get menu items
     const result = await pool.query(
-      `SELECT mi.*, c.concession_name, c.gcash_payment_available, c.oncounter_payment_available, caf.cafeteria_name
+      `SELECT mi.*, c.concession_name, c.gcash_payment_available, c.oncounter_payment_available,
+              caf.cafeteria_name, caf.id AS cafeteria_id
        FROM tblmenuitem mi
        JOIN tblconcession c ON mi.concession_id = c.id
        JOIN tblcafeteria caf ON c.cafeteria_id = caf.id
@@ -131,6 +132,7 @@ export const getMenuItems = async (req, res) => {
       availability: r.available,
       concession_name: r.concession_name,
       concession_id: r.concession_id,
+      cafeteria_id: r.cafeteria_id,
       cafeteria_name: r.cafeteria_name,
       image_url: makeImageDataUrl(r.image),
       feedback: feedbackMap[r.id] || { feedback_count: 0, avg_rating: null },

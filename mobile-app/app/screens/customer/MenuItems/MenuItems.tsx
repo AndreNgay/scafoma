@@ -1,5 +1,5 @@
 // screens/customer/MenuItems.tsx
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   View,
   Text,
@@ -19,6 +19,7 @@ import { useNavigation } from "@react-navigation/native";
 const MenuItems = () => {
   // data
   const [menuItems, setMenuItems] = useState<any[]>([]);
+  const [baseItems, setBaseItems] = useState<any[]>([]); // items after server fetch + multi-select filters (no search applied)
   const [cafeterias, setCafeterias] = useState<any[]>([]);
   const [concessions, setConcessions] = useState<any[]>([]);
   const [categories, setCategories] = useState<string[]>([]);
@@ -33,6 +34,25 @@ const MenuItems = () => {
 
   // ui state
   const [loading, setLoading] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const limit = 10;
+  const lastVisibleIndexRef = useRef(0);
+  const onViewableItemsChanged = useRef(({ viewableItems }: any) => {
+    if (Array.isArray(viewableItems) && viewableItems.length) {
+      const maxIndex = Math.max(
+        ...viewableItems
+          .map((v: any) => (typeof v.index === "number" ? v.index : -1))
+          .filter((i: number) => i >= 0)
+      );
+      if (!Number.isNaN(maxIndex)) {
+        lastVisibleIndexRef.current = Math.max(lastVisibleIndexRef.current, maxIndex);
+      }
+    }
+  }).current;
+  const viewabilityConfig = useRef({ itemVisiblePercentThreshold: 50 }).current;
   const [filtersVisible, setFiltersVisible] = useState(false);
 
   // fetch cafeterias + concessions
@@ -48,18 +68,21 @@ const MenuItems = () => {
   };
 
   // fetch menu items and extract categories
-  const fetchItems = async () => {
+  const fetchItems = async (targetPage = 1, isRefresh = false) => {
     try {
-      setLoading(true);
+      if (isRefresh) setRefreshing(true);
+      else if (targetPage === 1) setLoading(true);
+      else setIsLoadingMore(true);
 
       // Backend supports single values; use the first selected for server-side narrowing when available
-      const res = await api.get<{ data: any[] }>("/menu-item/all", {
+      const res = await api.get<{ data: any[]; pagination?: any }>("/menu-item/all", {
         params: {
           cafeteriaId: cafeteriaIds.length === 1 ? cafeteriaIds[0] : undefined,
           concessionId: concessionIds.length === 1 ? concessionIds[0] : undefined,
           category: selectedCategories.length === 1 ? selectedCategories[0] : undefined,
           sortBy,
-          search: searchQuery,
+          page: targetPage,
+          limit,
         },
       });
 
@@ -68,14 +91,27 @@ const MenuItems = () => {
         item_name: string;
         concession_name: string;
         concession_id: number;
+        cafeteria_id: number;
         cafeteria_name: string;
         price: number;
         category?: string;
         image_url?: string;
       }[];
 
+      // Update pagination
+      const pagination = (res.data as any).pagination || {};
+      setTotalPages(pagination.totalPages || totalPages);
+
+      // Merge pages into a unique list before client filtering
+      const merged = targetPage === 1 || isRefresh ? items : [...baseItems, ...items];
+      const uniqueById: any[] = [];
+      const seen = new Set<number>();
+      for (const it of merged) {
+        if (!seen.has(it.id)) { seen.add(it.id); uniqueById.push(it); }
+      }
+
       // client-side filtering for multi-select
-      const filtered = items.filter((it) => {
+      const filtered = uniqueById.filter((it) => {
         const cafeteriaOk = cafeteriaIds.length
           ? cafeteriaIds.includes((it as any).cafeteria_id)
           : true;
@@ -87,12 +123,23 @@ const MenuItems = () => {
           : true;
         return cafeteriaOk && concessionOk && categoryOk;
       });
-
-      setMenuItems(filtered);
+      setBaseItems(filtered);
+      // Apply current search locally for snappy UX
+      const q = searchQuery.trim().toLowerCase();
+      const searched = q
+        ? filtered.filter((it) =>
+            (it.item_name || "").toLowerCase().includes(q) ||
+            (it.concession_name || "").toLowerCase().includes(q) ||
+            (it.cafeteria_name || "").toLowerCase().includes(q) ||
+            ((it.category || "").toLowerCase().includes(q))
+          )
+        : filtered;
+      setMenuItems(searched);
 
       // derive categories dynamically
+      const categorySource = filtered.length ? filtered : uniqueById;
       const uniqueCategories: string[] = Array.from(
-        new Set(items.map((i) => i.category || "").filter(Boolean))
+        new Set(categorySource.map((i: any) => i.category || "").filter(Boolean))
       );
 
       setCategories(uniqueCategories);
@@ -100,17 +147,37 @@ const MenuItems = () => {
       console.error("Error fetching menu items:", err);
     } finally {
       setLoading(false);
+      setRefreshing(false);
+      setIsLoadingMore(false);
     }
   };
 
   useEffect(() => {
     fetchFilterData();
-    fetchItems();
+    fetchItems(1, true);
   }, []);
 
   useEffect(() => {
-    fetchItems();
-  }, [cafeteriaIds, concessionIds, selectedCategories, sortBy, searchQuery]);
+    setPage(1);
+    fetchItems(1, true);
+  }, [cafeteriaIds, concessionIds, selectedCategories, sortBy]);
+
+  // Fast local search on top of already-filtered items
+  useEffect(() => {
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) {
+      setMenuItems(baseItems);
+      return;
+    }
+    setMenuItems(
+      baseItems.filter((it) =>
+        (it.item_name || "").toLowerCase().includes(q) ||
+        (it.concession_name || "").toLowerCase().includes(q) ||
+        (it.cafeteria_name || "").toLowerCase().includes(q) ||
+        ((it.category || "").toLowerCase().includes(q))
+      )
+    );
+  }, [searchQuery, baseItems]);
 
   const renderItem = ({ item }: { item: any }) => (
   <TouchableOpacity
@@ -173,7 +240,7 @@ const MenuItems = () => {
       </TouchableOpacity>
 
       {/* Items */}
-      {loading ? (
+      {loading && page === 1 ? (
         <ActivityIndicator size="large" color="#A40C2D" style={{ marginTop: 20 }} />
       ) : (
         <FlatList
@@ -181,6 +248,25 @@ const MenuItems = () => {
           renderItem={renderItem}
           keyExtractor={(i) => i.id.toString()}
           contentContainerStyle={{ padding: 10 }}
+          viewabilityConfig={viewabilityConfig}
+          onViewableItemsChanged={onViewableItemsChanged}
+          refreshing={refreshing}
+          onRefresh={() => {
+            setPage(1);
+            fetchItems(1, true);
+          }}
+          onEndReachedThreshold={0.4}
+          onEndReached={() => {
+            const remaining = menuItems.length - (lastVisibleIndexRef.current + 1);
+            if (!isLoadingMore && page < totalPages && remaining <= 10) {
+              const next = page + 1;
+              setPage(next);
+              fetchItems(next);
+            }
+          }}
+          ListFooterComponent={isLoadingMore ? (
+            <ActivityIndicator size="small" color="#A40C2D" style={{ marginVertical: 12 }} />
+          ) : null}
         />
       )}
 
