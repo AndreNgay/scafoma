@@ -12,6 +12,8 @@ const ViewConcession = () => {
   const [menuItems, setMenuItems] = useState<any[]>([]);
   const cafeteria = params.cafeteria;
   const [search, setSearch] = useState("");
+  const [loadingDetails, setLoadingDetails] = useState(false);
+  const [loadingItems, setLoadingItems] = useState(false);
 
   useEffect(() => {
     // If a new concession param arrives, sync local state
@@ -21,6 +23,7 @@ const ViewConcession = () => {
 
     const load = async () => {
       try {
+        setLoadingDetails(true);
         const id = params.concession?.id || details?.id;
         if (id) {
           const res = await api.get(`/concession/${id}`);
@@ -28,7 +31,7 @@ const ViewConcession = () => {
         }
       } catch (e) {
         // no-op: keep whatever we have
-      }
+      } finally { setLoadingDetails(false); }
     };
     load();
   }, [params.concession?.id]);
@@ -36,13 +39,14 @@ const ViewConcession = () => {
   useEffect(() => {
     const loadItems = async () => {
       try {
+        setLoadingItems(true);
         const id = details?.id || params.concession?.id;
         if (!id) return;
         const res = await api.get(`/menu-item/all`, { params: { concessionId: id, limit: 100 } });
         setMenuItems(res.data.data || []);
       } catch (e) {
         setMenuItems([]);
-      }
+      } finally { setLoadingItems(false); }
     };
     loadItems();
   }, [details?.id, params.concession?.id]);
@@ -65,6 +69,14 @@ const ViewConcession = () => {
     }
     return Object.entries(groups).map(([category, items]) => ({ category, items }));
   }, [filteredItems]);
+
+  if (loadingDetails && !details) {
+    return (
+      <View style={[styles.container, { justifyContent: "center", alignItems: "center" }] }>
+        <Text style={{ color: "#666" }}>Loading concession...</Text>
+      </View>
+    );
+  }
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: 20 }}>
@@ -105,7 +117,9 @@ const ViewConcession = () => {
       />
 
       {/* Menu Items by Category */}
-      {itemsByCategory.map(({ category, items }) => (
+      {loadingItems ? (
+        <Text style={{ color: "#666", marginTop: 10 }}>Loading items...</Text>
+      ) : itemsByCategory.map(({ category, items }) => (
         <View key={category} style={{ marginTop: 10 }}>
           <Text style={styles.sectionHeader}>{category}</Text>
           {items.map((item: any) => {
