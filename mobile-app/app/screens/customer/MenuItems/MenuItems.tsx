@@ -25,9 +25,9 @@ const MenuItems = () => {
   const navigation = useNavigation();
 
   // filter state
-  const [cafeteriaId, setCafeteriaId] = useState<number | null>(null);
-  const [concessionId, setConcessionId] = useState<number | null>(null);
-  const [category, setCategory] = useState<string | null>(null);
+  const [cafeteriaIds, setCafeteriaIds] = useState<number[]>([]);
+  const [concessionIds, setConcessionIds] = useState<number[]>([]);
+  const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
   const [sortBy, setSortBy] = useState<string>("name");
   const [searchQuery, setSearchQuery] = useState<string>("");
 
@@ -52,8 +52,15 @@ const MenuItems = () => {
     try {
       setLoading(true);
 
+      // Backend supports single values; use the first selected for server-side narrowing when available
       const res = await api.get<{ data: any[] }>("/menu-item/all", {
-        params: { cafeteriaId, concessionId, category, sortBy, search: searchQuery },
+        params: {
+          cafeteriaId: cafeteriaIds.length === 1 ? cafeteriaIds[0] : undefined,
+          concessionId: concessionIds.length === 1 ? concessionIds[0] : undefined,
+          category: selectedCategories.length === 1 ? selectedCategories[0] : undefined,
+          sortBy,
+          search: searchQuery,
+        },
       });
 
       const items = res.data.data as {
@@ -67,7 +74,21 @@ const MenuItems = () => {
         image_url?: string;
       }[];
 
-      setMenuItems(items);
+      // client-side filtering for multi-select
+      const filtered = items.filter((it) => {
+        const cafeteriaOk = cafeteriaIds.length
+          ? cafeteriaIds.includes((it as any).cafeteria_id)
+          : true;
+        const concessionOk = concessionIds.length
+          ? concessionIds.includes((it as any).concession_id)
+          : true;
+        const categoryOk = selectedCategories.length
+          ? selectedCategories.includes((it as any).category || "")
+          : true;
+        return cafeteriaOk && concessionOk && categoryOk;
+      });
+
+      setMenuItems(filtered);
 
       // derive categories dynamically
       const uniqueCategories: string[] = Array.from(
@@ -89,7 +110,7 @@ const MenuItems = () => {
 
   useEffect(() => {
     fetchItems();
-  }, [cafeteriaId, concessionId, category, sortBy, searchQuery]);
+  }, [cafeteriaIds, concessionIds, selectedCategories, sortBy, searchQuery]);
 
   const renderItem = ({ item }: { item: any }) => (
   <TouchableOpacity
@@ -154,76 +175,102 @@ const MenuItems = () => {
       )}
 
       {/* Filter modal */}
-      <Modal visible={filtersVisible} animationType="slide">
+      <Modal visible={filtersVisible} animationType="slide" onRequestClose={() => setFiltersVisible(false)}>
         <View style={styles.filterContainer}>
-          <Text style={styles.filterHeader}>Filters</Text>
-
-          {/* Cafeteria */}
-          <Text style={styles.label}>Cafeteria</Text>
-          {cafeterias.map((caf) => (
-            <TouchableOpacity
-              key={caf.id}
-              onPress={() => setCafeteriaId(cafeteriaId === caf.id ? null : caf.id)}
-            >
-              <Text
-                style={cafeteriaId === caf.id ? styles.active : styles.option}
-              >
-                {caf.cafeteria_name}
-              </Text>
+          <View style={styles.filterHeaderRow}>
+            <Text style={styles.filterHeader}>Filters</Text>
+            <TouchableOpacity onPress={() => setFiltersVisible(false)}>
+              <Text style={styles.closeText}>Close</Text>
             </TouchableOpacity>
-          ))}
+          </View>
+          <View style={{ flex: 1 }}>
+            <FlatList
+              data={[{ key: 'content' }]}
+              keyExtractor={(i) => i.key}
+              renderItem={() => (
+                <>
+                  {/* Cafeteria (multi-select) */}
+                  <Text style={styles.label}>Cafeteria</Text>
+                  {cafeterias.map((caf) => {
+                    const active = cafeteriaIds.includes(caf.id);
+                    return (
+                      <TouchableOpacity
+                        key={caf.id}
+                        onPress={() => {
+                          setCafeteriaIds((prev) =>
+                            active ? prev.filter((id) => id !== caf.id) : [...prev, caf.id]
+                          );
+                        }}
+                      >
+                        <Text style={active ? styles.active : styles.option}>
+                          {caf.cafeteria_name}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
 
-          {/* Concession */}
-          <Text style={styles.label}>Concession</Text>
-          {concessions
-            .filter((c) => !cafeteriaId || c.cafeteria_id === cafeteriaId)
-            .map((c) => (
-              <TouchableOpacity
-                key={c.id}
-                onPress={() =>
-                  setConcessionId(concessionId === c.id ? null : c.id)
-                }
-              >
-                <Text
-                  style={concessionId === c.id ? styles.active : styles.option}
-                >
-                  {c.concession_name}
-                </Text>
-              </TouchableOpacity>
-            ))}
+                  {/* Concession (multi-select) */}
+                  <Text style={styles.label}>Concession</Text>
+                  {concessions
+                    .filter((c) =>
+                      cafeteriaIds.length ? cafeteriaIds.includes(c.cafeteria_id) : true
+                    )
+                    .map((c) => {
+                      const active = concessionIds.includes(c.id);
+                      return (
+                        <TouchableOpacity
+                          key={c.id}
+                          onPress={() => {
+                            setConcessionIds((prev) =>
+                              active ? prev.filter((id) => id !== c.id) : [...prev, c.id]
+                            );
+                          }}
+                        >
+                          <Text style={active ? styles.active : styles.option}>
+                            {c.concession_name}
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    })}
 
-          {/* Category */}
-          <Text style={styles.label}>Category</Text>
-          {categories.map((cat) => (
-            <TouchableOpacity
-              key={cat}
-              onPress={() => setCategory(category === cat ? null : cat)}
-            >
-              <Text style={category === cat ? styles.active : styles.option}>
-                {cat}
-              </Text>
-            </TouchableOpacity>
-          ))}
+                  {/* Category (unique + multi-select) */}
+                  <Text style={styles.label}>Category</Text>
+                  {categories.map((cat) => {
+                    const active = selectedCategories.includes(cat);
+                    return (
+                      <TouchableOpacity
+                        key={cat}
+                        onPress={() => {
+                          setSelectedCategories((prev) =>
+                            active ? prev.filter((c) => c !== cat) : [...prev, cat]
+                          );
+                        }}
+                      >
+                        <Text style={active ? styles.active : styles.option}>{cat}</Text>
+                      </TouchableOpacity>
+                    );
+                  })}
 
-          {/* Sort */}
-          <Text style={styles.label}>Sort by</Text>
-          {[
-            { key: "name", label: "Name (A → Z)" },
-            { key: "price_asc", label: "Price (Low → High)" },
-            { key: "price_desc", label: "Price (High → Low)" },
-          ].map((opt) => (
-            <TouchableOpacity key={opt.key} onPress={() => setSortBy(opt.key)}>
-              <Text style={sortBy === opt.key ? styles.active : styles.option}>
-                {opt.label}
-              </Text>
-            </TouchableOpacity>
-          ))}
+                  {/* Sort */}
+                  <Text style={styles.label}>Sort by</Text>
+                  {[
+                    { key: "name", label: "Name (A → Z)" },
+                    { key: "price_asc", label: "Price (Low → High)" },
+                    { key: "price_desc", label: "Price (High → Low)" },
+                  ].map((opt) => (
+                    <TouchableOpacity key={opt.key} onPress={() => setSortBy(opt.key)}>
+                      <Text style={sortBy === opt.key ? styles.active : styles.option}>
+                        {opt.label}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </>
+              )}
+            />
+          </View>
 
-          {/* Close */}
-          <TouchableOpacity
-            style={styles.applyBtn}
-            onPress={() => setFiltersVisible(false)}
-          >
+          {/* Apply / Close */}
+          <TouchableOpacity style={styles.applyBtn} onPress={() => setFiltersVisible(false)}>
             <Text style={styles.applyText}>Apply</Text>
           </TouchableOpacity>
         </View>
@@ -276,6 +323,8 @@ const styles = StyleSheet.create({
   price: { marginTop: 5, fontWeight: "600", color: "#A40C2D" },
   filterContainer: { flex: 1, padding: 20, backgroundColor: "#fff" },
   filterHeader: { fontSize: 18, fontWeight: "bold", marginBottom: 10 },
+  filterHeaderRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 10 },
+  closeText: { color: "#A40C2D", fontWeight: "600", fontSize: 14 },
   label: { marginTop: 15, fontWeight: "600" },
   option: { padding: 8, fontSize: 14 },
   active: {
