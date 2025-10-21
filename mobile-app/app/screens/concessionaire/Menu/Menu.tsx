@@ -11,7 +11,6 @@ import {
   TextInput,
   RefreshControl,
 } from "react-native";
-import { Picker } from "@react-native-picker/picker";
 import { useNavigation, useFocusEffect } from "@react-navigation/native";
 import useStore from "../../../store";
 import api from "../../../libs/apiCall";
@@ -40,10 +39,7 @@ const Menu = () => {
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
   const [search, setSearch] = useState("");
-  const [sortOption, setSortOption] = useState("name");
-  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc");
   const [imageError, setImageError] = useState<Record<number, boolean>>({});
-  const [categoryFilter, setCategoryFilter] = useState("all");
   const [groupByCategory, setGroupByCategory] = useState(true);
 
   const navigation = useNavigation<any>();
@@ -87,32 +83,8 @@ const Menu = () => {
   const processedItems = useMemo(() => {
     let items = [...menuItems];
     if (search.trim()) items = items.filter((i) => i.item_name.toLowerCase().includes(search.toLowerCase()));
-    if (categoryFilter !== "all") items = items.filter((i) => i.category === categoryFilter);
-
-    items.sort((a, b) => {
-      let cmp = 0;
-      switch (sortOption) {
-        case "name":
-          cmp = a.item_name.localeCompare(b.item_name);
-          break;
-        case "price_asc":
-          cmp = a.price - b.price;
-          break;
-        case "price_desc":
-          cmp = b.price - a.price;
-          break;
-        case "category":
-          cmp = (a.category || "").localeCompare(b.category || "");
-          break;
-        case "availability":
-          cmp = a.availability === b.availability ? 0 : a.availability ? -1 : 1;
-          break;
-      }
-      return sortOrder === "asc" ? cmp : -cmp;
-    });
-
     return items;
-  }, [menuItems, search, categoryFilter, sortOption, sortOrder]);
+  }, [menuItems, search]);
 
   const groupedItems = useMemo(() => {
     if (!groupByCategory) {
@@ -147,43 +119,12 @@ const Menu = () => {
 
   return (
     <View style={{ flex: 1 }}>
-      <TouchableOpacity
-        style={styles.addButton}
-        onPress={() => navigation.navigate("Add Menu")}
-      >
-        <Text style={styles.addButtonText}>+ Add Menu Item</Text>
-      </TouchableOpacity>
-
       <TextInput
         style={styles.searchInput}
         placeholder="Search menu..."
         value={search}
         onChangeText={setSearch}
       />
-
-      <View style={styles.controls}>
-        <Picker selectedValue={sortOption} style={styles.picker} onValueChange={setSortOption}>
-          <Picker.Item label="Sort by Name" value="name" />
-          <Picker.Item label="Sort by Price Asc" value="price_asc" />
-          <Picker.Item label="Sort by Price Desc" value="price_desc" />
-          <Picker.Item label="Sort by Category" value="category" />
-          <Picker.Item label="Sort by Availability" value="availability" />
-        </Picker>
-        <Picker selectedValue={sortOrder} style={styles.picker} onValueChange={setSortOrder}>
-          <Picker.Item label="Ascending" value="asc" />
-          <Picker.Item label="Descending" value="desc" />
-        </Picker>
-      </View>
-
-      <View style={styles.controls}>
-        <Picker selectedValue={categoryFilter} style={styles.picker} onValueChange={setCategoryFilter}>
-          <Picker.Item label="All Categories" value="all" />
-          <Picker.Item label="Drinks" value="Drinks" />
-          <Picker.Item label="Snacks" value="Snacks" />
-          <Picker.Item label="Meals" value="Meals" />
-          <Picker.Item label="Desserts" value="Desserts" />
-        </Picker>
-      </View>
 
       {/* Group by Category Toggle */}
       <View style={styles.toggleContainer}>
@@ -258,6 +199,14 @@ const Menu = () => {
           )}
         />
       )}
+      
+      {/* Floating Add Button */}
+      <TouchableOpacity
+        style={styles.floatingAddButton}
+        onPress={() => navigation.navigate("Add Menu")}
+      >
+        <Text style={styles.floatingAddButtonText}>+</Text>
+      </TouchableOpacity>
     </View>
   );
 };
@@ -283,14 +232,6 @@ const styles = StyleSheet.create({
   price: { marginTop: 2, fontSize: 14, color: "darkred", fontWeight: "500" },
   category: { fontSize: 13, color: "#444", marginTop: 2 },
   subInfo: { fontSize: 12, color: "#555", marginTop: 1 },
-  addButton: {
-    backgroundColor: "darkred",
-    padding: 12,
-    margin: 12,
-    borderRadius: 8,
-    alignItems: "center",
-  },
-  addButtonText: { color: "white", fontWeight: "600", fontSize: 16 },
   searchInput: {
     marginHorizontal: 12,
     marginBottom: 8,
@@ -300,13 +241,6 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     backgroundColor: "#fff",
   },
-  controls: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    marginHorizontal: 12,
-    marginBottom: 10,
-  },
-  picker: { flex: 1, marginHorizontal: 4 },
   editButton: {
     position: "absolute",
     top: 8,
@@ -319,6 +253,21 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   editButtonText: { color: "white", fontWeight: "bold", fontSize: 16 },
+  sectionHeader: {
+    backgroundColor: "#f8f9fa",
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    marginTop: 10,
+    marginBottom: 5,
+    borderLeftWidth: 4,
+    borderLeftColor: "darkred",
+  },
+  sectionHeaderText: {
+    fontSize: 16,
+    fontWeight: "bold",
+    color: "darkred",
+    textTransform: "uppercase",
+  },
   toggleContainer: {
     marginHorizontal: 12,
     marginBottom: 10,
@@ -344,19 +293,29 @@ const styles = StyleSheet.create({
   toggleButtonTextActive: {
     color: "white",
   },
-  sectionHeader: {
-    backgroundColor: "#f8f9fa",
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    marginTop: 10,
-    marginBottom: 5,
-    borderLeftWidth: 4,
-    borderLeftColor: "darkred",
+
+  floatingAddButton: {
+    position: "absolute",
+    bottom: 20,
+    right: 20,
+    backgroundColor: "darkred",
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    justifyContent: "center",
+    alignItems: "center",
+    elevation: 8,
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
   },
-  sectionHeaderText: {
-    fontSize: 16,
+  floatingAddButtonText: {
+    color: "white",
+    fontSize: 24,
     fontWeight: "bold",
-    color: "darkred",
-    textTransform: "uppercase",
   },
 });
