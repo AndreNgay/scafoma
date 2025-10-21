@@ -6,6 +6,7 @@ import {
 import { NavigationContainer } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
+import { Ionicons } from "@expo/vector-icons";
 import useStore from "./store";
 
 // Screens
@@ -130,11 +131,44 @@ function OrderListStack() {
 
 function CustomerTabs() {
   return (
-    <Tab.Navigator screenOptions={{ headerShown: false }} initialRouteName="Home">
-      <Tab.Screen name="Home" component={Home} />
+    <Tab.Navigator 
+      screenOptions={{ 
+        headerShown: false,
+        title: "",
+        tabBarStyle: {
+          backgroundColor: '#fff',
+          borderTopColor: '#e0e0e0',
+        },
+        tabBarActiveTintColor: '#A40C2D',
+        tabBarInactiveTintColor: '#666',
+        tabBarLabelStyle: {
+          fontSize: 12,
+          fontWeight: '600',
+        },
+      }} 
+      initialRouteName="Home"
+    >
+      <Tab.Screen 
+        name="Home" 
+        component={Home}
+        options={{
+          title: "",
+          tabBarLabel: 'Home',
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="home" size={size} color={color} />
+          ),
+        }}
+      />
       <Tab.Screen
         name="Menu Items"
         component={MenuItemsStack}
+        options={{
+          title: "",
+          tabBarLabel: 'Menu',
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="restaurant" size={size} color={color} />
+          ),
+        }}
         listeners={({ navigation }) => ({
           tabPress: (e) => {
             // Ensure the nested stack shows the root list screen
@@ -142,22 +176,128 @@ function CustomerTabs() {
           },
         })}
       />
-      <Tab.Screen name="Cart" component={Cart} />
-      <Tab.Screen name="Orders" component={OrdersStack} />
-      <Tab.Screen name="Notifications" component={Notifications} />
-      <Tab.Screen name="Profile" component={Profile} />
+      <Tab.Screen 
+        name="Cart" 
+        component={Cart}
+        options={{
+          title: "",
+          tabBarLabel: 'Cart',
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="cart" size={size} color={color} />
+          ),
+        }}
+      />
+      <Tab.Screen 
+        name="Orders" 
+        component={OrdersStack}
+        options={{
+          title: "",
+          tabBarLabel: 'Orders',
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="receipt" size={size} color={color} />
+          ),
+        }}
+      />
+      <Tab.Screen 
+        name="Notifications" 
+        component={Notifications}
+        options={{
+          title: "",
+          tabBarLabel: 'Notifications',
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="notifications" size={size} color={color} />
+          ),
+        }}
+      />
+      <Tab.Screen 
+        name="Profile" 
+        component={Profile}
+        options={{
+          title: "",
+          tabBarLabel: 'Profile',
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="person" size={size} color={color} />
+          ),
+        }}
+      />
     </Tab.Navigator>
   );
 }
 
 function ConcessionaireTabs() {
   return (
-    <Tab.Navigator screenOptions={{ headerShown: false }} initialRouteName="Order List">
-      <Tab.Screen name="Order List" component={OrderListStack} />
-      <Tab.Screen name="Menu" component={MenuManagementStack} />
-      <Tab.Screen name="Concession" component={ConcessionaireConcessionStack} />
-      <Tab.Screen name="Notifications" component={Notifications} />
-      <Tab.Screen name="Profile" component={Profile} />
+    <Tab.Navigator 
+      screenOptions={{ 
+        headerShown: false,
+        title: "",
+        tabBarStyle: {
+          backgroundColor: '#fff',
+          borderTopColor: '#e0e0e0',
+        },
+        tabBarActiveTintColor: '#A40C2D',
+        tabBarInactiveTintColor: '#666',
+        tabBarLabelStyle: {
+          fontSize: 12,
+          fontWeight: '600',
+        },
+      }} 
+      initialRouteName="Order List"
+    >
+      <Tab.Screen 
+        name="Order List" 
+        component={OrderListStack}
+        options={{
+          title: "",
+          tabBarLabel: 'Orders',
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="list" size={size} color={color} />
+          ),
+        }}
+      />
+      <Tab.Screen 
+        name="Menu" 
+        component={MenuManagementStack}
+        options={{
+          title: "",
+          tabBarLabel: 'Menu',
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="restaurant" size={size} color={color} />
+          ),
+        }}
+      />
+      <Tab.Screen 
+        name="Concession" 
+        component={ConcessionaireConcessionStack}
+        options={{
+          title: "",
+          tabBarLabel: 'Concession',
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="storefront" size={size} color={color} />
+          ),
+        }}
+      />
+      <Tab.Screen 
+        name="Notifications" 
+        component={Notifications}
+        options={{
+          title: "",
+          tabBarLabel: 'Notifications',
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="notifications" size={size} color={color} />
+          ),
+        }}
+      />
+      <Tab.Screen 
+        name="Profile" 
+        component={Profile}
+        options={{
+          title: "",
+          tabBarLabel: 'Profile',
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="person" size={size} color={color} />
+          ),
+        }}
+      />
     </Tab.Navigator>
   );
 }
@@ -199,11 +339,11 @@ export default function RootNavigator() {
   return (
     <Stack.Navigator screenOptions={{ headerShown: false }} initialRouteName={!user ? "Auth" : user.role === "customer" ? "Customer" : "Concessionaire"}>
       {!user ? (
-        <Stack.Screen name="Auth" component={AuthStack} />
+        <Stack.Screen name="Auth" component={AuthStack} options={{ title: "" }} />
       ) : user.role === "customer" ? (
-        <Stack.Screen name="Customer" component={CustomerTabs} />
+        <Stack.Screen name="Customer" component={CustomerTabs} options={{ title: "" }} />
       ) : (
-        <Stack.Screen name="Concessionaire" component={ConcessionaireTabs} />
+        <Stack.Screen name="Concessionaire" component={ConcessionaireTabs} options={{ title: "" }} />
       )}
     </Stack.Navigator>
   );

@@ -121,6 +121,8 @@ CREATE TABLE IF NOT EXISTS tblorder (
     id SERIAL PRIMARY KEY,
     customer_id INT NOT NULL,
     concession_id INT NOT NULL,
+    dining_option VARCHAR(10) CHECK (dining_option IN ('dine-in', 'take-out')) DEFAULT 'dine-in',
+    schedule_time TIMESTAMP,
     total_price NUMERIC(10,2) CHECK (total_price >= 0),
     order_status VARCHAR(30) DEFAULT 'pending' CHECK (order_status IN (
         'pending', 'accepted', 'declined', 'ready for pickup', 'completed'

@@ -28,14 +28,12 @@ router.put("/change-password/:id", authMiddleware, changePassword);
 router.post("/concessionaire", createConcessionaire);
 
 // Reset password
-router.post("/:id/reset-password", authMiddleware, resetPassword);
+router.post("/:id/reset-password", resetPassword);
 
 router.put("/profile", authMiddleware, upload.single("profile_image"), updateProfile);
 
 // Update user details
 router.put("/:id", authMiddleware, updateUser);
-
-
 
 // Delete user
 router.delete("/:id", authMiddleware, deleteUser);

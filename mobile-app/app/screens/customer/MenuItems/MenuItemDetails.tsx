@@ -22,6 +22,7 @@ const MenuItemDetails = () => {
 
   const [quantity, setQuantity] = useState(1);
   const [note, setNote] = useState("");
+  const [diningOption, setDiningOption] = useState<'dine-in' | 'take-out'>('dine-in');
   const [groupedVariations, setGroupedVariations] = useState<any>({});
   const [selectedVariations, setSelectedVariations] = useState<any[]>([]);
   const [placingOrder, setPlacingOrder] = useState(false);
@@ -110,6 +111,7 @@ const MenuItemDetails = () => {
       const orderRes = await api.post("/order", {
         customer_id: user.id,
         concession_id: item.concession_id,
+        dining_option: diningOption,
         order_status: inCart ? "cart" : "pending",
         total_price: 0,
         in_cart: inCart,
@@ -193,6 +195,41 @@ const MenuItemDetails = () => {
         </View>
 
         <Text style={styles.desc}>{item.description}</Text>
+
+        {/* Dining Option */}
+        <View style={styles.diningOptionContainer}>
+          <Text style={styles.diningOptionTitle}>Dining Option</Text>
+          <View style={styles.diningOptionButtons}>
+            <TouchableOpacity
+              style={[
+                styles.diningOptionButton,
+                diningOption === 'dine-in' && styles.diningOptionSelected
+              ]}
+              onPress={() => setDiningOption('dine-in')}
+            >
+              <Text style={[
+                styles.diningOptionText,
+                diningOption === 'dine-in' && styles.diningOptionTextSelected
+              ]}>
+                🍽️ Dine In
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[
+                styles.diningOptionButton,
+                diningOption === 'take-out' && styles.diningOptionSelected
+              ]}
+              onPress={() => setDiningOption('take-out')}
+            >
+              <Text style={[
+                styles.diningOptionText,
+                diningOption === 'take-out' && styles.diningOptionTextSelected
+              ]}>
+                📦 Take Out
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
 
         {/* Variations */}
         {Object.entries<any>(groupedVariations).map(([groupName, group]) => (
@@ -289,6 +326,33 @@ const styles = StyleSheet.create({
   qtyValue: { fontSize: 16, fontWeight: "600" },
 
   desc: { fontSize: 14, color: "#666", marginBottom: 15 },
+  
+  diningOptionContainer: { marginBottom: 20 },
+  diningOptionTitle: { fontSize: 16, fontWeight: "600", marginBottom: 10 },
+  diningOptionButtons: { flexDirection: "row", gap: 10 },
+  diningOptionButton: {
+    flex: 1,
+    padding: 12,
+    borderRadius: 8,
+    borderWidth: 2,
+    borderColor: "#ddd",
+    backgroundColor: "#f9f9f9",
+    alignItems: "center",
+  },
+  diningOptionSelected: {
+    borderColor: "#A40C2D",
+    backgroundColor: "#A40C2D22",
+  },
+  diningOptionText: {
+    fontSize: 14,
+    fontWeight: "500",
+    color: "#666",
+  },
+  diningOptionTextSelected: {
+    color: "#A40C2D",
+    fontWeight: "600",
+  },
+  
   group: { marginBottom: 20 },
   groupTitle: { fontSize: 16, fontWeight: "600", marginBottom: 8 },
   required: { color: "red", fontSize: 14 },

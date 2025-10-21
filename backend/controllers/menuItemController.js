@@ -123,6 +123,21 @@ export const getMenuItems = async (req, res) => {
       }
     }
 
+    // Fetch total ordered counts per menu item
+    let orderCountMap = {};
+    if (menuItemIds.length > 0) {
+      const ocRes = await pool.query(
+        `SELECT od.item_id AS menu_item_id, COALESCE(SUM(od.quantity), 0) AS total_ordered
+         FROM tblorderdetail od
+         WHERE od.item_id = ANY($1::int[])
+         GROUP BY od.item_id`,
+        [menuItemIds]
+      );
+      for (const row of ocRes.rows) {
+        orderCountMap[row.menu_item_id] = Number(row.total_ordered);
+      }
+    }
+
     // Format response
     const formattedItems = menuItems.map(r => ({
       id: r.id,
@@ -136,6 +151,7 @@ export const getMenuItems = async (req, res) => {
       cafeteria_name: r.cafeteria_name,
       image_url: makeImageDataUrl(r.image),
       feedback: feedbackMap[r.id] || { feedback_count: 0, avg_rating: null },
+      order_count: orderCountMap[r.id] || 0,
       variations: variationsMap[r.id]
         ? Object.keys(variationsMap[r.id]).map(label => ({
             label,

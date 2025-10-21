@@ -266,7 +266,7 @@ export const updatePaymentMethod = async (req, res) => {
 // Add a new order
 // ==========================
 export const addOrder = async (req, res) => {
-  const { customer_id, concession_id, status, total_price, in_cart, payment_method } = req.body;
+  const { customer_id, concession_id, dining_option, status, total_price, in_cart, payment_method } = req.body;
   try {
     if (in_cart) {
       const existing = await pool.query(
@@ -277,9 +277,9 @@ export const addOrder = async (req, res) => {
     }
 
     const result = await pool.query(
-      `INSERT INTO tblorder (customer_id, concession_id, order_status, total_price, in_cart, payment_method)
-       VALUES ($1,$2,COALESCE($3, 'pending'),$4,$5,$6) RETURNING *`,
-      [customer_id, concession_id, status, total_price, in_cart ?? false, payment_method]
+      `INSERT INTO tblorder (customer_id, concession_id, dining_option, order_status, total_price, in_cart, payment_method)
+       VALUES ($1,$2,$3,COALESCE($4, 'pending'),$5,$6,$7) RETURNING *`,
+      [customer_id, concession_id, dining_option || 'dine-in', status, total_price, in_cart ?? false, payment_method]
     );
     res.status(201).json(result.rows[0]);
   } catch (err) {
@@ -299,6 +299,7 @@ export const getCartByCustomerId = async (req, res) => {
     const query = `
       SELECT o.id AS order_id,
              o.total_price,
+             o.dining_option,
              od.id AS order_detail_id,
              od.quantity,
              od.total_price AS order_detail_total,
@@ -315,7 +316,7 @@ export const getCartByCustomerId = async (req, res) => {
       LEFT JOIN tblorderitemvariation oiv ON od.id = oiv.order_detail_id
       LEFT JOIN tblitemvariation iv ON oiv.variation_id = iv.id
       WHERE o.customer_id = $1 AND o.in_cart = TRUE
-      GROUP BY o.id, od.id, m.item_name, m.price, c.concession_name, caf.cafeteria_name
+      GROUP BY o.id, od.id, m.item_name, m.price, c.concession_name, caf.cafeteria_name, o.dining_option
       ORDER BY o.created_at DESC;
     `;
     const result = await pool.query(query, [id]);
