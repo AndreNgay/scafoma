@@ -45,7 +45,6 @@ const SignIn: React.FC<Props> = ({ navigation }) => {
       if (res.data.user) {
         const userInfo = { ...res.data.user, token: res.data.token };
         await setCredentials(userInfo); 
-        Alert.alert("Success", "Signed in successfully!");
       } else {
         Alert.alert("Error", res.data.message || "Something went wrong");
       }
