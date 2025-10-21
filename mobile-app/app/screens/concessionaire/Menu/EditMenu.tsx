@@ -15,7 +15,7 @@ import { useNavigation, useRoute } from "@react-navigation/native";
 import * as ImagePicker from "expo-image-picker";
 import api from "../../../libs/apiCall";
 
-type Variation = { name: string; price: string };
+type Variation = { name: string; price: string; image?: any };
 type VariationGroup = {
   label: string;
   variations: Variation[];

@@ -1,5 +1,12 @@
 import { pool } from "../libs/database.js";
 
+// Helper: convert BYTEA image to base64 data URL
+const makeImageDataUrl = (imageBuffer, mime = "jpeg") => {
+  if (!imageBuffer) return null;
+  const base64 = Buffer.from(imageBuffer).toString("base64");
+  return `data:image/${mime};base64,${base64}`;
+};
+
 // ✅ Get all variations for a given group
 export const getVariationsByGroupId = async (req, res) => {
   const { id } = req.params;
@@ -11,6 +18,7 @@ export const getVariationsByGroupId = async (req, res) => {
         v.item_variation_group_id,
         v.variation_name,
         v.additional_price,
+        v.image,
         v.created_at,
         v.updated_at
       FROM tblitemvariation v
@@ -20,9 +28,15 @@ export const getVariationsByGroupId = async (req, res) => {
 
     const result = await pool.query(query, [id]);
 
+    // Convert image buffers to base64 data URLs
+    const variations = result.rows.map(variation => ({
+      ...variation,
+      image_url: makeImageDataUrl(variation.image)
+    }));
+
     return res.status(200).json({
       success: true,
-      data: result.rows,
+      data: variations,
     });
   } catch (err) {
     console.error("Error fetching variations:", err);
@@ -122,6 +136,50 @@ export const deleteVariation = async (req, res) => {
     return res.status(500).json({
       success: false,
       message: "Server error while deleting variation",
+    });
+  }
+};
+
+// ✅ Upload variation image
+export const uploadVariationImage = async (req, res) => {
+  const { id } = req.params;
+  
+  if (!req.file) {
+    return res.status(400).json({ 
+      success: false, 
+      message: "No image file provided" 
+    });
+  }
+
+  try {
+    const imageBuffer = req.file.buffer;
+    
+    const query = `
+      UPDATE tblitemvariation 
+      SET image = $1, updated_at = CURRENT_TIMESTAMP
+      WHERE id = $2
+      RETURNING *;
+    `;
+
+    const result = await pool.query(query, [imageBuffer, id]);
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ 
+        success: false, 
+        message: "Variation not found" 
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: "Variation image uploaded successfully",
+      data: result.rows[0],
+    });
+  } catch (err) {
+    console.error("Error uploading variation image:", err);
+    return res.status(500).json({
+      success: false,
+      message: "Server error while uploading variation image",
     });
   }
 };

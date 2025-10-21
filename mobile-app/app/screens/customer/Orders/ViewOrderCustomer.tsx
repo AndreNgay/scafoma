@@ -22,6 +22,7 @@ const ViewOrderCustomer = () => {
   const [order, setOrder] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
 
   const formatManila = (value: any) => {
     if (!value) return "";
@@ -91,6 +92,43 @@ const ViewOrderCustomer = () => {
   useEffect(() => {
     fetchOrder();
   }, [orderId]);
+
+  // ===============================
+  // Cancel order
+  // ===============================
+  const cancelOrder = async () => {
+    Alert.alert(
+      "Cancel Order",
+      "Are you sure you want to cancel this order? This action cannot be undone.",
+      [
+        {
+          text: "No",
+          style: "cancel",
+        },
+        {
+          text: "Yes, Cancel",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              setCancelling(true);
+              const res = await api.put(`/order/cancel/${orderId}`);
+              Alert.alert("Success", "Order cancelled successfully");
+              // Refresh the order data
+              await fetchOrder();
+            } catch (error: any) {
+              console.error("Error cancelling order:", error);
+              Alert.alert(
+                "Error",
+                error.response?.data?.error || "Failed to cancel order. Please try again."
+              );
+            } finally {
+              setCancelling(false);
+            }
+          },
+        },
+      ]
+    );
+  };
 
 
   // ===============================
@@ -280,6 +318,23 @@ const ViewOrderCustomer = () => {
         )}
         scrollEnabled={false}
       />
+
+      {/* Cancel Order Button - Only show for pending orders */}
+      {order.order_status === 'pending' && (
+        <View style={styles.cancelButtonContainer}>
+          <TouchableOpacity
+            style={[styles.cancelButton, cancelling && styles.cancelButtonDisabled]}
+            onPress={cancelOrder}
+            disabled={cancelling}
+          >
+            {cancelling ? (
+              <ActivityIndicator color="#fff" size="small" />
+            ) : (
+              <Text style={styles.cancelButtonText}>Cancel Order</Text>
+            )}
+          </TouchableOpacity>
+        </View>
+      )}
     </ScrollView>
   );
 };
@@ -362,6 +417,26 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: "#666",
     fontStyle: "italic",
+  },
+  cancelButtonContainer: {
+    marginTop: 20,
+    marginBottom: 20,
+  },
+  cancelButton: {
+    backgroundColor: "#d32f2f",
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 8,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  cancelButtonDisabled: {
+    backgroundColor: "#ccc",
+  },
+  cancelButtonText: {
+    color: "#fff",
+    fontSize: 16,
+    fontWeight: "600",
   },
 });
 

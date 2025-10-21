@@ -104,6 +104,7 @@ CREATE TABLE IF NOT EXISTS tblitemvariation (
     item_variation_group_id INT NOT NULL,
     variation_name VARCHAR(50) NOT NULL,
     additional_price NUMERIC(10,2) NOT NULL CHECK (additional_price >= 0),
+    image BYTEA,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 
@@ -125,7 +126,7 @@ CREATE TABLE IF NOT EXISTS tblorder (
     schedule_time TIMESTAMP,
     total_price NUMERIC(10,2) CHECK (total_price >= 0),
     order_status VARCHAR(30) DEFAULT 'pending' CHECK (order_status IN (
-        'pending', 'accepted', 'declined', 'ready for pickup', 'completed'
+        'pending', 'accepted', 'declined', 'cancelled', 'ready for pickup', 'completed'
     )),
     payment_method VARCHAR(20) CHECK (payment_method IN ('gcash', 'on-counter')) DEFAULT 'on-counter',
     in_cart BOOLEAN DEFAULT FALSE,

@@ -203,13 +203,6 @@ const OrderList = () => {
       </View>
     );
 
-  if (!orders.length)
-    return (
-      <View style={styles.container}>
-        <Text style={styles.emptyText}>No orders found</Text>
-      </View>
-    );
-
   return (
     <View style={styles.container}>
       <TextInput
@@ -226,26 +219,32 @@ const OrderList = () => {
         <Text style={styles.filterText}>Filters & Sort</Text>
       </TouchableOpacity>
 
-      <FlatList
-        data={filteredOrders}
-        keyExtractor={(item) => item.id.toString()}
-        renderItem={renderOrder}
-        contentContainerStyle={{ paddingBottom: 20 }}
-        onEndReached={loadMore}
-        onEndReachedThreshold={0.5}
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-        }
-        ListFooterComponent={
-          loading && page > 1 ? (
-            <ActivityIndicator
-              size="small"
-              color="#A40C2D"
-              style={{ marginVertical: 10 }}
-            />
-          ) : null
-        }
-      />
+      {!orders.length ? (
+        <View style={styles.emptyContainer}>
+          <Text style={styles.emptyText}>No orders found</Text>
+        </View>
+      ) : (
+        <FlatList
+          data={filteredOrders}
+          keyExtractor={(item) => item.id.toString()}
+          renderItem={renderOrder}
+          contentContainerStyle={{ paddingBottom: 20 }}
+          onEndReached={loadMore}
+          onEndReachedThreshold={0.5}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+          }
+          ListFooterComponent={
+            loading && page > 1 ? (
+              <ActivityIndicator
+                size="small"
+                color="#A40C2D"
+                style={{ marginVertical: 10 }}
+              />
+            ) : null
+          }
+        />
+      )}
 
       <Modal visible={filtersVisible} animationType="slide">
         <View style={styles.filterContainer}>
@@ -354,7 +353,8 @@ const styles = StyleSheet.create({
   orderId: { fontWeight: "bold", fontSize: 16, color: "#A40C2D" },
   customer: { fontSize: 14, marginTop: 4 },
   status: { fontWeight: "600", color: "#A40C2D" },
-  emptyText: { textAlign: "center", color: "#888", marginTop: 20 },
+  emptyContainer: { flex: 1, justifyContent: "center", alignItems: "center", paddingVertical: 40 },
+  emptyText: { textAlign: "center", color: "#888", fontSize: 16 },
   errorText: { textAlign: "center", color: "red", marginTop: 20 },
   filterContainer: { flex: 1, padding: 20, backgroundColor: "#fff" },
   filterHeaderContainer: { 

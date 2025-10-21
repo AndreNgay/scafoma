@@ -326,7 +326,19 @@ const MenuItemDetails = () => {
                   style={[styles.option, isSelected && styles.optionSelected]}
                   onPress={() => toggleVariation(group, variation)}
                 >
-                  <Text>{variation.variation_name} (+₱{variation.additional_price})</Text>
+                  <View style={styles.variationContent}>
+                    {variation.image_url && (
+                      <Image 
+                        source={{ uri: variation.image_url }} 
+                        style={styles.variationImage}
+                        resizeMode="cover"
+                      />
+                    )}
+                    <View style={styles.variationTextContainer}>
+                      <Text style={styles.variationName}>{variation.variation_name}</Text>
+                      <Text style={styles.variationPrice}>+₱{variation.additional_price}</Text>
+                    </View>
+                  </View>
                 </TouchableOpacity>
               );
             })}
@@ -491,6 +503,11 @@ const styles = StyleSheet.create({
   multiple: { fontSize: 12, color: "#555", marginLeft: 5 },
   option: { padding: 10, backgroundColor: "#f2f2f2", borderRadius: 8, marginBottom: 6 },
   optionSelected: { backgroundColor: "#A40C2D33", borderWidth: 1, borderColor: "#A40C2D" },
+  variationContent: { flexDirection: "row", alignItems: "center" },
+  variationImage: { width: 50, height: 50, borderRadius: 8, marginRight: 12 },
+  variationTextContainer: { flex: 1 },
+  variationName: { fontSize: 16, fontWeight: "500" },
+  variationPrice: { fontSize: 14, color: "#A40C2D", fontWeight: "600" },
 
   noteLabel: { fontSize: 14, fontWeight: "600", marginTop: 10, marginBottom: 5 },
   noteInput: { borderWidth: 1, borderColor: "#ccc", borderRadius: 6, padding: 10, minHeight: 50, marginBottom: 15 },

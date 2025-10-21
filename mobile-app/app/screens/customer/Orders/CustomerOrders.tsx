@@ -8,6 +8,7 @@ import {
   TextInput,
   Modal,
   TouchableOpacity,
+  Alert,
 } from "react-native";
 import { useFocusEffect, useNavigation } from "@react-navigation/native";
 import useStore from "../../../store";
@@ -146,33 +147,76 @@ const CustomerOrders = () => {
     setFilteredOrders(filtered);
   }, [searchQuery, statusFilter, sortBy, orders]);
 
-const renderItem = ({ item }: any) => (
-<TouchableOpacity
-  onPress={() => navigation.navigate("View Order", { orderId: item.id })}
->
+const renderItem = ({ item }: any) => {
+  const cancelOrder = async () => {
+    Alert.alert(
+      "Cancel Order",
+      "Are you sure you want to cancel this order? This action cannot be undone.",
+      [
+        {
+          text: "No",
+          style: "cancel",
+        },
+        {
+          text: "Yes, Cancel",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              await api.put(`/order/cancel/${item.id}`);
+              Alert.alert("Success", "Order cancelled successfully");
+              // Refresh the orders list
+              fetchOrders();
+            } catch (error: any) {
+              console.error("Error cancelling order:", error);
+              Alert.alert(
+                "Error",
+                error.response?.data?.error || "Failed to cancel order. Please try again."
+              );
+            }
+          },
+        },
+      ]
+    );
+  };
 
+  return (
     <View style={styles.card}>
-      {/* ✅ Order ID */}
-      <Text style={styles.orderId}>Order #{item.id}</Text>
+      <TouchableOpacity
+        onPress={() => navigation.navigate("View Order", { orderId: item.id })}
+        style={styles.cardContent}
+      >
+        {/* ✅ Order ID */}
+        <Text style={styles.orderId}>Order #{item.id}</Text>
 
-      <Text style={styles.title}>
-        {item.cafeteria_name} • {item.concession_name}
-      </Text>
-      <Text>
-        Status: <Text style={styles.status}>{item.order_status}</Text>
-      </Text>
-      <Text>Total: ₱{Number(item.total_price).toFixed(2)}</Text>
-      {item.schedule_time && (
-        <Text style={styles.scheduleTime}>
-          📅 Scheduled: {formatSchedule(item.schedule_time)}
+        <Text style={styles.title}>
+          {item.cafeteria_name} • {item.concession_name}
         </Text>
+        <Text>
+          Status: <Text style={styles.status}>{item.order_status}</Text>
+        </Text>
+        <Text>Total: ₱{Number(item.total_price).toFixed(2)}</Text>
+        {item.schedule_time && (
+          <Text style={styles.scheduleTime}>
+            📅 Scheduled: {formatSchedule(item.schedule_time)}
+          </Text>
+        )}
+        <Text style={styles.date}>
+          {formatDateTime(item.created_at)}
+        </Text>
+      </TouchableOpacity>
+
+      {/* Cancel Button - Only show for pending orders */}
+      {item.order_status === 'pending' && (
+        <TouchableOpacity
+          style={styles.cancelButton}
+          onPress={cancelOrder}
+        >
+          <Text style={styles.cancelButtonText}>Cancel</Text>
+        </TouchableOpacity>
       )}
-      <Text style={styles.date}>
-        {formatDateTime(item.created_at)}
-      </Text>
     </View>
-  </TouchableOpacity>
-);
+  );
+};
 
 
   return (
@@ -379,6 +423,22 @@ scheduleTime: {
   color: "#28a745",
   fontWeight: "500",
   marginTop: 3,
+},
+cardContent: {
+  flex: 1,
+},
+cancelButton: {
+  backgroundColor: "#d32f2f",
+  paddingVertical: 8,
+  paddingHorizontal: 16,
+  borderRadius: 6,
+  alignSelf: "flex-end",
+  marginTop: 8,
+},
+cancelButtonText: {
+  color: "#fff",
+  fontSize: 14,
+  fontWeight: "600",
 },
 
 });

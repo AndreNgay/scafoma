@@ -512,3 +512,50 @@ export const deleteOrder = async (req, res) => {
     res.status(500).json({ error: "Failed to delete order" });
   }
 };
+
+// ==========================
+// Cancel order (customer only)
+// ==========================
+export const cancelOrder = async (req, res) => {
+  const { id } = req.params;
+  const customerId = req.user.id; // from auth middleware
+  
+  try {
+    // First, check if the order exists and belongs to the customer
+    const orderResult = await pool.query(
+      `SELECT id, order_status, customer_id 
+       FROM tblorder 
+       WHERE id = $1 AND customer_id = $2`,
+      [id, customerId]
+    );
+    
+    if (orderResult.rowCount === 0) {
+      return res.status(404).json({ error: "Order not found or you don't have permission to cancel this order" });
+    }
+    
+    const order = orderResult.rows[0];
+    
+    // Only allow cancellation if order is still pending (not yet accepted)
+    if (order.order_status !== 'pending') {
+      return res.status(400).json({ 
+        error: "Order cannot be cancelled. Only pending orders can be cancelled." 
+      });
+    }
+    
+    // Update order status to cancelled
+    const updateResult = await pool.query(
+      `UPDATE tblorder 
+       SET order_status = 'cancelled', updated_at = NOW()
+       WHERE id = $1`,
+      [id]
+    );
+    
+    res.json({ 
+      message: "Order cancelled successfully",
+      order: updateResult.rows[0]
+    });
+  } catch (err) {
+    console.error("Error cancelling order:", err);
+    res.status(500).json({ error: "Failed to cancel order" });
+  }
+};

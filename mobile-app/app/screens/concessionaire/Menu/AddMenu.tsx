@@ -15,7 +15,7 @@ import { useNavigation } from "@react-navigation/native";
 import * as ImagePicker from "expo-image-picker";
 import api from "../../../libs/apiCall";
 
-type Variation = { name: string; price: string };
+type Variation = { name: string; price: string; image?: any };
 type VariationGroup = {
   label: string;
   variations: Variation[];
@@ -50,6 +50,18 @@ const AddMenu: React.FC = () => {
       quality: 0.8,
     });
     if (!result.canceled) setImage(result.assets[0]);
+  };
+
+  const pickVariationImage = async (gIndex: number, vIndex: number) => {
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      quality: 0.8,
+    });
+    if (!result.canceled) {
+      const updated = [...variationGroups];
+      updated[gIndex].variations[vIndex].image = result.assets[0];
+      setVariationGroups(updated);
+    }
   };
 
   const addVariationGroup = () =>
@@ -118,7 +130,13 @@ const AddMenu: React.FC = () => {
     formData.append("price", price.trim());
     formData.append("category", category.trim()); // ✅ send typed category
     formData.append("availability", availability ? "true" : "false");
-    formData.append("variations", JSON.stringify(variationGroups));
+    
+    // Separate variations with images from those without
+    const variationsWithoutImages = variationGroups.map(group => ({
+      ...group,
+      variations: group.variations.map(v => ({ name: v.name, price: v.price }))
+    }));
+    formData.append("variations", JSON.stringify(variationsWithoutImages));
 
     if (image?.uri) {
       formData.append("image", {
@@ -130,17 +148,68 @@ const AddMenu: React.FC = () => {
 
     try {
       setLoading(true);
-      await api.post("/menu-item", formData, {
+      const res = await api.post("/menu-item", formData, {
         headers: { "Content-Type": "multipart/form-data" },
       });
-      Alert.alert("Success", "Menu item added successfully", [
-        { text: "OK", onPress: () => navigation.goBack() },
-      ]);
+      
+      if (res.data.status === "success") {
+        const menuItemId = res.data.data.id;
+        
+        // Upload variation images separately
+        await uploadVariationImages(menuItemId);
+        
+        Alert.alert("Success", "Menu item added successfully", [
+          { text: "OK", onPress: () => navigation.goBack() },
+        ]);
+      } else {
+        Alert.alert("Error", res.data.message || "Failed to add menu item");
+      }
     } catch (err: unknown) {
       console.error(err);
       Alert.alert("Error", "Failed to add menu item.");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const uploadVariationImages = async (menuItemId: number) => {
+    try {
+      // Get the created variation groups
+      const groupsRes = await api.get(`/item-variation-group/${menuItemId}`);
+      const groups = groupsRes.data.data;
+      
+      for (let gIndex = 0; gIndex < variationGroups.length; gIndex++) {
+        const group = variationGroups[gIndex];
+        const createdGroup = groups.find((g: any) => g.variation_group_name === group.label);
+        
+        if (createdGroup) {
+          // Get variations for this group
+          const variationsRes = await api.get(`/item-variation/group/${createdGroup.id}`);
+          const createdVariations = variationsRes.data.data;
+          
+          for (let vIndex = 0; vIndex < group.variations.length; vIndex++) {
+            const variation = group.variations[vIndex];
+            const createdVariation = createdVariations.find((v: any) => v.variation_name === variation.name);
+            
+            if (createdVariation && variation.image) {
+              // Upload variation image
+              const imageFormData = new FormData();
+              imageFormData.append("image", {
+                uri: variation.image.uri,
+                type: "image/jpeg",
+                name: `variation-${Date.now()}.jpg`,
+              } as any);
+              
+              await api.put(`/item-variation/${createdVariation.id}/image`, imageFormData, {
+                headers: { "Content-Type": "multipart/form-data" },
+              });
+            }
+          }
+        }
+      }
+    } catch (error) {
+      console.error("Error uploading variation images:", error);
+      // Don't show error to user as the main menu item was created successfully
     }
   };
 
@@ -314,23 +383,45 @@ const AddMenu: React.FC = () => {
           {/* Variations */}
           {group.variations.map((v, vIndex) => (
             <View key={vIndex} style={styles.variationRow}>
-              <TextInput
-                style={[styles.input, styles.variationInput]}
-                placeholder="Name"
-                value={v.name}
-                onChangeText={(t) =>
-                  updateVariation(gIndex, vIndex, "name", t)
-                }
-              />
-              <TextInput
-                style={[styles.input, styles.priceInput]}
-                placeholder="Additional price"
-                keyboardType="numeric"
-                value={v.price}
-                onChangeText={(t) =>
-                  updateVariation(gIndex, vIndex, "price", t)
-                }
-              />
+              <View style={styles.variationInputs}>
+                <TextInput
+                  style={[styles.input, styles.variationInput]}
+                  placeholder="Name"
+                  value={v.name}
+                  onChangeText={(t) =>
+                    updateVariation(gIndex, vIndex, "name", t)
+                  }
+                />
+                <TextInput
+                  style={[styles.input, styles.priceInput]}
+                  placeholder="Additional price"
+                  keyboardType="numeric"
+                  value={v.price}
+                  onChangeText={(t) =>
+                    updateVariation(gIndex, vIndex, "price", t)
+                  }
+                />
+              </View>
+              <View style={styles.variationImageContainer}>
+                {v.image ? (
+                  <View style={styles.variationImagePreview}>
+                    <Image source={{ uri: v.image.uri }} style={styles.variationImage} />
+                    <TouchableOpacity
+                      style={styles.changeImageButton}
+                      onPress={() => pickVariationImage(gIndex, vIndex)}
+                    >
+                      <Text style={styles.changeImageText}>Change</Text>
+                    </TouchableOpacity>
+                  </View>
+                ) : (
+                  <TouchableOpacity
+                    style={styles.addImageButton}
+                    onPress={() => pickVariationImage(gIndex, vIndex)}
+                  >
+                    <Text style={styles.addImageText}>📷 Add Image</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
               <TouchableOpacity
                 style={styles.removeButton}
                 onPress={() => removeVariation(gIndex, vIndex)}
@@ -428,9 +519,17 @@ const styles = StyleSheet.create({
     marginTop: 12,
     backgroundColor: "#f9f9f9",
   },
-  variationRow: { flexDirection: "row", alignItems: "center", marginTop: 6 },
+  variationRow: { marginTop: 6, padding: 8, backgroundColor: "#f9f9f9", borderRadius: 8 },
+  variationInputs: { flexDirection: "row", alignItems: "center", marginBottom: 8 },
   variationInput: { flex: 2, marginRight: 6 },
   priceInput: { flex: 1, marginRight: 6 },
+  variationImageContainer: { marginBottom: 8 },
+  variationImagePreview: { alignItems: "center" },
+  variationImage: { width: 80, height: 80, borderRadius: 8, marginBottom: 4 },
+  changeImageButton: { backgroundColor: "#A40C2D", paddingHorizontal: 12, paddingVertical: 4, borderRadius: 4 },
+  changeImageText: { color: "#fff", fontSize: 12 },
+  addImageButton: { backgroundColor: "#f0f0f0", padding: 12, borderRadius: 8, alignItems: "center", borderWidth: 1, borderColor: "#ddd" },
+  addImageText: { color: "#666", fontSize: 14 },
   removeButton: {
     backgroundColor: "#ffdddd",
     paddingHorizontal: 10,
