@@ -223,13 +223,39 @@ export const updatePaymentProof = async (req, res) => {
   if (!file) return res.status(400).json({ error: "No file uploaded" });
 
   try {
+    // First check if the order exists, is accepted, and doesn't already have a screenshot
+    const orderCheck = await pool.query(
+      `SELECT order_status, gcash_screenshot FROM tblorder WHERE id = $1`,
+      [id]
+    );
+    
+    if (orderCheck.rowCount === 0) {
+      return res.status(404).json({ error: "Order not found" });
+    }
+    
+    const orderStatus = orderCheck.rows[0].order_status;
+    const existingScreenshot = orderCheck.rows[0].gcash_screenshot;
+    
+    if (orderStatus !== "accepted") {
+      return res.status(400).json({ 
+        error: "Payment proof can only be uploaded after the order has been accepted",
+        currentStatus: orderStatus
+      });
+    }
+    
+    if (existingScreenshot) {
+      return res.status(400).json({ 
+        error: "GCash screenshot has already been uploaded and cannot be changed",
+        hasScreenshot: true
+      });
+    }
+
     const result = await pool.query(
       `UPDATE tblorder 
        SET gcash_screenshot = $1, updated_at = NOW()
        WHERE id = $2 RETURNING *`,
       [file.buffer, id]
     );
-    if (result.rowCount === 0) return res.status(404).json({ error: "Order not found" });
 
     const order = result.rows[0];
     // Convert gcash_screenshot to base64 for frontend
@@ -291,11 +317,81 @@ export const addOrder = async (req, res) => {
 
 
 // ==========================
+// Clean up invalid cart items (unavailable items or items from closed concessions)
+// ==========================
+export const cleanupInvalidCartItems = async (customerId) => {
+  try {
+    // First, get all cart items with their availability and concession status
+    const checkQuery = `
+      SELECT od.id AS order_detail_id, od.item_id, m.available, c.status as concession_status
+      FROM tblorder o
+      JOIN tblorderdetail od ON o.id = od.order_id
+      JOIN tblmenuitem m ON od.item_id = m.id
+      JOIN tblconcession c ON o.concession_id = c.id
+      WHERE o.customer_id = $1 AND o.in_cart = TRUE
+    `;
+    
+    const checkResult = await pool.query(checkQuery, [customerId]);
+    
+    // Find invalid items (unavailable or from closed concessions)
+    const invalidItems = checkResult.rows.filter(row => 
+      !row.available || row.concession_status === 'closed'
+    );
+    
+    if (invalidItems.length > 0) {
+      const invalidOrderDetailIds = invalidItems.map(item => item.order_detail_id);
+      
+      // Delete order item variations for invalid items
+      await pool.query(
+        `DELETE FROM tblorderitemvariation 
+         WHERE order_detail_id = ANY($1::int[])`,
+        [invalidOrderDetailIds]
+      );
+      
+      // Delete order details for invalid items
+      await pool.query(
+        `DELETE FROM tblorderdetail 
+         WHERE id = ANY($1::int[])`,
+        [invalidOrderDetailIds]
+      );
+      
+      // Check if any orders are now empty and delete them
+      const emptyOrdersQuery = `
+        SELECT o.id as order_id
+        FROM tblorder o
+        LEFT JOIN tblorderdetail od ON o.id = od.order_id
+        WHERE o.customer_id = $1 AND o.in_cart = TRUE AND od.id IS NULL
+      `;
+      
+      const emptyOrdersResult = await pool.query(emptyOrdersQuery, [customerId]);
+      
+      if (emptyOrdersResult.rows.length > 0) {
+        const emptyOrderIds = emptyOrdersResult.rows.map(row => row.order_id);
+        await pool.query(
+          `DELETE FROM tblorder WHERE id = ANY($1::int[])`,
+          [emptyOrderIds]
+        );
+      }
+      
+      console.log(`Cleaned up ${invalidItems.length} invalid cart items for customer ${customerId}`);
+    }
+    
+    return invalidItems.length;
+  } catch (err) {
+    console.error("Error cleaning up invalid cart items:", err);
+    return 0;
+  }
+};
+
+// ==========================
 // Get items in cart for a customer
 // ==========================
 export const getCartByCustomerId = async (req, res) => {
   const { id } = req.params; // customer_id
   try {
+    // First, clean up any invalid cart items
+    await cleanupInvalidCartItems(id);
+    
     const query = `
       SELECT o.id AS order_id,
              o.total_price,
@@ -307,16 +403,20 @@ export const getCartByCustomerId = async (req, res) => {
              m.price AS base_price,
              c.concession_name,
              caf.cafeteria_name,
+             m.available,
+             c.status as concession_status,
              ARRAY_AGG(iv.variation_name) FILTER (WHERE iv.id IS NOT NULL) AS variations
       FROM tblorder o
       JOIN tblorderdetail od ON o.id = od.order_id
-      JOIN tblmenuitem m ON od.item_id = m.id   -- ✅ FIXED (was tblitem)
+      JOIN tblmenuitem m ON od.item_id = m.id
       JOIN tblconcession c ON o.concession_id = c.id
       JOIN tblcafeteria caf ON c.cafeteria_id = caf.id
       LEFT JOIN tblorderitemvariation oiv ON od.id = oiv.order_detail_id
       LEFT JOIN tblitemvariation iv ON oiv.variation_id = iv.id
       WHERE o.customer_id = $1 AND o.in_cart = TRUE
-      GROUP BY o.id, od.id, m.item_name, m.price, c.concession_name, caf.cafeteria_name, o.dining_option
+        AND m.available = TRUE 
+        AND c.status = 'open'
+      GROUP BY o.id, od.id, m.item_name, m.price, c.concession_name, caf.cafeteria_name, o.dining_option, m.available, c.status
       ORDER BY o.created_at DESC;
     `;
     const result = await pool.query(query, [id]);
@@ -332,16 +432,52 @@ export const getCartByCustomerId = async (req, res) => {
 // ==========================
 export const checkoutCart = async (req, res) => {
   const { id } = req.params; // customer_id
+  const { schedule_time } = req.body; // optional schedule_time from request body
+  
   try {
-    const result = await pool.query(
-      `UPDATE tblorder
-       SET in_cart = FALSE, order_status = 'pending', updated_at = NOW()
-       WHERE customer_id = $1 AND in_cart = TRUE
-       RETURNING *`,
-      [id]
-    );
+    // First, clean up any invalid cart items before checkout
+    const cleanedCount = await cleanupInvalidCartItems(id);
+    
+    if (cleanedCount > 0) {
+      console.log(`Removed ${cleanedCount} invalid items before checkout for customer ${id}`);
+    }
+    
+    // Validate schedule_time if provided
+    if (schedule_time) {
+      const scheduledDate = new Date(schedule_time);
+      const now = new Date();
+      
+      if (scheduledDate <= now) {
+        return res.status(400).json({ 
+          error: "Schedule time must be in the future" 
+        });
+      }
+    }
+    
+    // Update orders with schedule_time if provided
+    const updateQuery = schedule_time 
+      ? `UPDATE tblorder
+         SET in_cart = FALSE, order_status = 'pending', schedule_time = $2, updated_at = NOW()
+         WHERE customer_id = $1 AND in_cart = TRUE
+         RETURNING *`
+      : `UPDATE tblorder
+         SET in_cart = FALSE, order_status = 'pending', updated_at = NOW()
+         WHERE customer_id = $1 AND in_cart = TRUE
+         RETURNING *`;
+    
+    const params = schedule_time ? [id, schedule_time] : [id];
+    const result = await pool.query(updateQuery, params);
 
-    res.json({ message: "Checkout successful", orders: result.rows });
+    let message = "Checkout successful";
+    if (schedule_time) {
+      message += ` - Scheduled for ${new Date(schedule_time).toLocaleString()}`;
+    }
+
+    res.json({ 
+      message, 
+      orders: result.rows,
+      cleanedItems: cleanedCount > 0 ? `${cleanedCount} invalid items were removed before checkout` : null
+    });
   } catch (err) {
     console.error("Error during checkout:", err);
     res.status(500).json({ error: "Checkout failed" });

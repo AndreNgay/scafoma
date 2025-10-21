@@ -25,6 +25,53 @@ const CustomerOrders = () => {
   const [filtersVisible, setFiltersVisible] = useState(false);
   const [statusFilter, setStatusFilter] = useState<string | null>(null);
 
+  const formatManila = (value: any) => {
+    if (!value) return "";
+    try {
+      if (typeof value === "string") {
+        // If the string has timezone info, use it but render in Asia/Manila
+        if (/[zZ]|[+-]\d{2}:?\d{2}/.test(value)) {
+          const d = new Date(value);
+          return new Intl.DateTimeFormat("en-PH", {
+            timeZone: "Asia/Manila",
+            year: "numeric",
+            month: "short",
+            day: "2-digit",
+            hour: "numeric",
+            minute: "2-digit",
+          }).format(d);
+        }
+        // No timezone info: assume it's already Asia/Manila local time; format manually
+        const cleaned = value.replace("T", " ");
+        const [datePart, timePartFull] = cleaned.split(" ");
+        if (!datePart || !timePartFull) return cleaned;
+        const [year, month, day] = datePart.split("-").map((p) => parseInt(p, 10));
+        const [hStr, mStr] = timePartFull.split(":");
+        if (!year || !month || !day || !hStr || !mStr) return cleaned;
+        let hour = parseInt(hStr, 10);
+        const ampm = hour >= 12 ? "PM" : "AM";
+        hour = hour % 12;
+        if (hour === 0) hour = 12;
+        const monthNames = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+        return `${monthNames[month - 1]} ${day}, ${year} ${hour}:${mStr} ${ampm}`;
+      }
+      // Non-string dates
+      return new Intl.DateTimeFormat("en-PH", {
+        timeZone: "Asia/Manila",
+        year: "numeric",
+        month: "short",
+        day: "2-digit",
+        hour: "numeric",
+        minute: "2-digit",
+      }).format(new Date(value));
+    } catch {
+      return String(value);
+    }
+  };
+
+  const formatSchedule = (value: any) => formatManila(value);
+  const formatDateTime = (value: any) => formatManila(value);
+
   // Fetch customer orders
   const fetchOrders = async () => {
     if (!user) return;
@@ -83,8 +130,13 @@ const renderItem = ({ item }: any) => (
         Status: <Text style={styles.status}>{item.order_status}</Text>
       </Text>
       <Text>Total: ₱{Number(item.total_price).toFixed(2)}</Text>
+      {item.schedule_time && (
+        <Text style={styles.scheduleTime}>
+          📅 Scheduled: {formatSchedule(item.schedule_time)}
+        </Text>
+      )}
       <Text style={styles.date}>
-        {new Date(item.created_at).toLocaleString()}
+        {formatDateTime(item.created_at)}
       </Text>
     </View>
   </TouchableOpacity>
@@ -220,6 +272,12 @@ const styles = StyleSheet.create({
   fontWeight: "600",
   color: "#555",
   marginBottom: 3,
+},
+scheduleTime: {
+  fontSize: 12,
+  color: "#28a745",
+  fontWeight: "500",
+  marginTop: 3,
 },
 
 });

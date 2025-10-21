@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
-import { View, Text, FlatList, StyleSheet, ActivityIndicator, Button, TouchableOpacity } from "react-native";
+import { View, Text, FlatList, StyleSheet, ActivityIndicator, Button, TouchableOpacity, Platform } from "react-native";
+import DateTimePicker from '@react-native-community/datetimepicker';
 import useStore from "../../../store";
 import api from "../../../libs/apiCall";
 
@@ -7,13 +8,20 @@ const Cart = ({ navigation }: any) => {
   const user = useStore((state: any) => state.user);
   const [cartItems, setCartItems] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
+  const [previousCartCount, setPreviousCartCount] = useState(0);
+  const [scheduleTime, setScheduleTime] = useState<Date | null>(null);
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [showTimePicker, setShowTimePicker] = useState(false);
 
   const fetchCart = async () => {
     if (!user) return;
     try {
       setLoading(true);
       const res = await api.get(`/order/cart/${user.id}`);
-      setCartItems(res.data || []);
+      const newCartItems = res.data || [];
+      
+      setCartItems(newCartItems);
+      setPreviousCartCount(newCartItems.length);
     } catch (err) {
       console.error("Error fetching cart:", err);
     } finally {
@@ -44,14 +52,85 @@ const removeItem = async (orderDetailId: number) => {
     return unsubscribe;
   }, [navigation, user?.id]);
 
+  const handleDateChange = (event: any, selectedDate?: Date) => {
+    setShowDatePicker(false);
+    // Do not save if user cancelled the picker
+    if (Platform.OS === 'android' && event?.type === 'dismissed') return;
+    if (!selectedDate) return;
+
+    // If we already have a time selected, preserve it
+    if (scheduleTime) {
+      const newDateTime = new Date(selectedDate);
+      newDateTime.setHours(scheduleTime.getHours());
+      newDateTime.setMinutes(scheduleTime.getMinutes());
+      newDateTime.setSeconds(0);
+      newDateTime.setMilliseconds(0);
+      setScheduleTime(newDateTime);
+    } else {
+      // Just set the date, time will be set to current time
+      const newDateTime = new Date(selectedDate);
+      newDateTime.setHours(new Date().getHours());
+      newDateTime.setMinutes(new Date().getMinutes());
+      newDateTime.setSeconds(0);
+      newDateTime.setMilliseconds(0);
+      setScheduleTime(newDateTime);
+    }
+  };
+
+  const handleTimeChange = (event: any, selectedTime?: Date) => {
+    setShowTimePicker(false);
+    // Do not save if user cancelled the picker
+    if (Platform.OS === 'android' && event?.type === 'dismissed') return;
+    if (!selectedTime) return;
+
+    // Use existing scheduleTime date or current date if no date selected yet
+    const baseDate = scheduleTime || new Date();
+    const combinedDateTime = new Date(baseDate);
+    combinedDateTime.setHours(selectedTime.getHours());
+    combinedDateTime.setMinutes(selectedTime.getMinutes());
+    combinedDateTime.setSeconds(0);
+    combinedDateTime.setMilliseconds(0);
+    setScheduleTime(combinedDateTime);
+  };
+
+  const clearScheduleTime = () => {
+    setScheduleTime(null);
+  };
+
   const checkout = async () => {
     try {
-      await api.put(`/order/checkout/${user.id}`);
-      alert("Checkout successful!");
+      // Validate schedule time if set
+      if (scheduleTime && scheduleTime <= new Date()) {
+        alert("Please select a future date and time for scheduling.");
+        return;
+      }
+      
+      const checkoutData: any = {};
+      
+      // Add schedule_time if set
+      if (scheduleTime) {
+        checkoutData.schedule_time = scheduleTime.toISOString();
+      }
+      
+      const response = await api.put(`/order/checkout/${user.id}`, checkoutData);
+      let message = "Checkout successful!";
+      
+      if (scheduleTime) {
+        message += `\n\nScheduled for: ${scheduleTime.toLocaleString()}`;
+      }
+      
+      // Check if any items were cleaned up during checkout
+      if (response.data.cleanedItems) {
+        message += `\n\nNote: ${response.data.cleanedItems}`;
+      }
+      
+      alert(message);
+      setScheduleTime(null); // Clear schedule time after checkout
       fetchCart();
-    } catch (err) {
+    } catch (err: any) {
       console.error("Checkout failed:", err);
-      alert("Checkout failed");
+      const errorMessage = err.response?.data?.error || "Checkout failed";
+      alert(errorMessage);
     }
   };
 const renderItem = ({ item }: any) => (
@@ -100,10 +179,70 @@ const renderItem = ({ item }: any) => (
             renderItem={renderItem}
             contentContainerStyle={{ paddingBottom: 80 }}
           />
+          
+          {/* Schedule Time Section */}
+          <View style={styles.scheduleContainer}>
+            <Text style={styles.scheduleTitle}>Schedule Pickup (Optional)</Text>
+            <Text style={styles.scheduleSubtitle}>
+              Order ahead for bulk orders or future pickup
+            </Text>
+            
+            <View style={styles.scheduleButtons}>
+              <TouchableOpacity 
+                style={[styles.scheduleBtn, showDatePicker && styles.activeScheduleBtn]} 
+                onPress={() => setShowDatePicker(true)}
+              >
+                <Text style={[styles.scheduleBtnText, showDatePicker && styles.activeScheduleBtnText]}>
+                  📅 Select Date
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={[styles.scheduleBtn, showTimePicker && styles.activeScheduleBtn]} 
+                onPress={() => setShowTimePicker(true)}
+              >
+                <Text style={[styles.scheduleBtnText, showTimePicker && styles.activeScheduleBtnText]}>
+                  🕐 Select Time
+                </Text>
+              </TouchableOpacity>
+            </View>
+            
+            {scheduleTime && (
+              <View style={styles.scheduledTimeContainer}>
+                <Text style={styles.scheduledTimeText}>
+                  📅 Scheduled for: {scheduleTime.toLocaleString()}
+                </Text>
+                <TouchableOpacity onPress={clearScheduleTime} style={styles.clearScheduleBtn}>
+                  <Text style={styles.clearScheduleText}>Clear</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+          </View>
+          
           <View style={styles.checkoutContainer}>
-            <Button title="Checkout" onPress={checkout} color="#A40C2D" />
+            <Button title={scheduleTime ? "Schedule Order" : "Place Order"} onPress={checkout} color="#A40C2D" />
           </View>
         </>
+      )}
+      
+      {/* Date Picker */}
+      {showDatePicker && (
+        <DateTimePicker
+          value={scheduleTime || new Date()}
+          mode="date"
+          display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+          onChange={handleDateChange}
+          minimumDate={new Date()}
+        />
+      )}
+      
+      {/* Time Picker */}
+      {showTimePicker && (
+        <DateTimePicker
+          value={scheduleTime || new Date()}
+          mode="time"
+          display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+          onChange={handleTimeChange}
+        />
       )}
     </View>
   );
@@ -127,10 +266,7 @@ const styles = StyleSheet.create({
   subtotal: { marginTop: 5, fontWeight: "600", color: "#A40C2D" },
   concession: { fontSize: 12, color: "#666", marginTop: 5 },
   checkoutContainer: {
-    position: "absolute",
-    bottom: 20,
-    left: 20,
-    right: 20,
+    marginTop: 16,
   },
   emptyText: { textAlign: "center", marginTop: 20, color: "#888" },
   quantityRow: {
@@ -153,6 +289,80 @@ removeBtn: {
   borderRadius: 6,
   marginTop: 8,
   alignSelf: "flex-start",
+},
+scheduleContainer: {
+  backgroundColor: "#f8f9fa",
+  padding: 15,
+  borderRadius: 10,
+  marginBottom: 15,
+  borderWidth: 1,
+  borderColor: "#e9ecef",
+},
+scheduleTitle: {
+  fontSize: 16,
+  fontWeight: "600",
+  color: "#A40C2D",
+  marginBottom: 5,
+},
+scheduleSubtitle: {
+  fontSize: 12,
+  color: "#666",
+  marginBottom: 15,
+},
+scheduleButtons: {
+  flexDirection: "row",
+  gap: 10,
+},
+scheduleBtn: {
+  flex: 1,
+  backgroundColor: "#fff",
+  padding: 12,
+  borderRadius: 8,
+  borderWidth: 1,
+  borderColor: "#ddd",
+  alignItems: "center",
+},
+scheduleBtnText: {
+  fontSize: 14,
+  fontWeight: "500",
+  color: "#A40C2D",
+},
+activeScheduleBtn: {
+  backgroundColor: "#A40C2D",
+  borderColor: "#A40C2D",
+},
+activeScheduleBtnText: {
+  color: "#fff",
+},
+disabledText: {
+  color: "#ccc",
+},
+scheduledTimeContainer: {
+  backgroundColor: "#e8f5e8",
+  padding: 12,
+  borderRadius: 8,
+  borderWidth: 1,
+  borderColor: "#28a745",
+  flexDirection: "row",
+  justifyContent: "space-between",
+  alignItems: "center",
+},
+scheduledTimeText: {
+  fontSize: 14,
+  fontWeight: "500",
+  color: "#28a745",
+  flex: 1,
+},
+clearScheduleBtn: {
+  backgroundColor: "#dc3545",
+  paddingHorizontal: 12,
+  paddingVertical: 6,
+  borderRadius: 4,
+},
+clearScheduleText: {
+  color: "#fff",
+  fontSize: 12,
+  fontWeight: "500",
 },
 
 });

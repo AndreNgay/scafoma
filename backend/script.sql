@@ -301,3 +301,5 @@ CREATE TABLE IF NOT EXISTS tblnotification (
         ON DELETE CASCADE
         ON UPDATE CASCADE
 );
+
+ALTER DATABASE scafoma_38uo SET timezone TO 'Asia/Manila';

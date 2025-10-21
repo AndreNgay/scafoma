@@ -23,11 +23,27 @@ const MenuItemDetails = () => {
   const [quantity, setQuantity] = useState(1);
   const [note, setNote] = useState("");
   const [diningOption, setDiningOption] = useState<'dine-in' | 'take-out'>('dine-in');
+  const [paymentMethod, setPaymentMethod] = useState<'gcash' | 'on-counter'>('on-counter');
   const [groupedVariations, setGroupedVariations] = useState<any>({});
   const [selectedVariations, setSelectedVariations] = useState<any[]>([]);
   const [placingOrder, setPlacingOrder] = useState(false);
   const [feedbacks, setFeedbacks] = useState<any[]>([]);
   const user = useStore.getState().user;
+
+  // Determine available payment methods
+  const availablePaymentMethods = {
+    gcash: item.gcash_payment_available || false,
+    onCounter: item.oncounter_payment_available || false,
+  };
+
+  // Set default payment method based on availability
+  useEffect(() => {
+    if (!availablePaymentMethods.gcash && availablePaymentMethods.onCounter) {
+      setPaymentMethod('on-counter');
+    } else if (availablePaymentMethods.gcash && !availablePaymentMethods.onCounter) {
+      setPaymentMethod('gcash');
+    }
+  }, [availablePaymentMethods]);
 
   // Fetch variations + feedbacks
   useEffect(() => {
@@ -107,6 +123,16 @@ const MenuItemDetails = () => {
         }
       }
 
+      // Validate payment method availability
+      if (paymentMethod === 'gcash' && !availablePaymentMethods.gcash) {
+        setPlacingOrder(false);
+        return Alert.alert("Payment Method Unavailable", "GCash payment is not available for this concession.");
+      }
+      if (paymentMethod === 'on-counter' && !availablePaymentMethods.onCounter) {
+        setPlacingOrder(false);
+        return Alert.alert("Payment Method Unavailable", "On-counter payment is not available for this concession.");
+      }
+
       // Create order
       const orderRes = await api.post("/order", {
         customer_id: user.id,
@@ -115,7 +141,7 @@ const MenuItemDetails = () => {
         order_status: inCart ? "cart" : "pending",
         total_price: 0,
         in_cart: inCart,
-        payment_method: null,
+        payment_method: paymentMethod,
       });
 
       const orderId = orderRes.data.id;
@@ -231,6 +257,58 @@ const MenuItemDetails = () => {
           </View>
         </View>
 
+        {/* Payment Method */}
+        <View style={styles.paymentMethodContainer}>
+          <Text style={styles.paymentMethodTitle}>Payment Method</Text>
+          {!availablePaymentMethods.gcash && !availablePaymentMethods.onCounter ? (
+            <Text style={styles.noPaymentMethodsText}>
+              ⚠️ No payment methods are currently available for this concession.
+            </Text>
+          ) : (
+            <>
+              <View style={styles.paymentMethodButtons}>
+                {availablePaymentMethods.gcash && (
+                  <TouchableOpacity
+                    style={[
+                      styles.paymentMethodButton,
+                      paymentMethod === 'gcash' && styles.paymentMethodSelected
+                    ]}
+                    onPress={() => setPaymentMethod('gcash')}
+                  >
+                    <Text style={[
+                      styles.paymentMethodText,
+                      paymentMethod === 'gcash' && styles.paymentMethodTextSelected
+                    ]}>
+                      💳 GCash
+                    </Text>
+                  </TouchableOpacity>
+                )}
+                {availablePaymentMethods.onCounter && (
+                  <TouchableOpacity
+                    style={[
+                      styles.paymentMethodButton,
+                      paymentMethod === 'on-counter' && styles.paymentMethodSelected
+                    ]}
+                    onPress={() => setPaymentMethod('on-counter')}
+                  >
+                    <Text style={[
+                      styles.paymentMethodText,
+                      paymentMethod === 'on-counter' && styles.paymentMethodTextSelected
+                    ]}>
+                      💰 On-Counter
+                    </Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+              {paymentMethod === 'gcash' && item.gcash_number && (
+                <Text style={styles.gcashNumberText}>
+                  GCash Number: {item.gcash_number}
+                </Text>
+              )}
+            </>
+          )}
+        </View>
+
         {/* Variations */}
         {Object.entries<any>(groupedVariations).map(([groupName, group]) => (
           <View key={group.id} style={styles.group}>
@@ -266,11 +344,23 @@ const MenuItemDetails = () => {
         />
 
         {/* Buttons */}
-        <TouchableOpacity style={styles.btn} onPress={() => submitOrder(true)} disabled={placingOrder}>
-          <Text style={styles.btnText}>Add to Cart</Text>
+        <TouchableOpacity 
+          style={[styles.btn, (!availablePaymentMethods.gcash && !availablePaymentMethods.onCounter) && styles.btnDisabled]} 
+          onPress={() => submitOrder(true)} 
+          disabled={placingOrder || (!availablePaymentMethods.gcash && !availablePaymentMethods.onCounter)}
+        >
+          <Text style={[styles.btnText, (!availablePaymentMethods.gcash && !availablePaymentMethods.onCounter) && styles.btnTextDisabled]}>
+            Add to Cart
+          </Text>
         </TouchableOpacity>
-        <TouchableOpacity style={[styles.btn, styles.btnAlt]} onPress={() => submitOrder(false)} disabled={placingOrder}>
-          <Text style={styles.btnText}>Place Order</Text>
+        <TouchableOpacity 
+          style={[styles.btn, styles.btnAlt, (!availablePaymentMethods.gcash && !availablePaymentMethods.onCounter) && styles.btnDisabled]} 
+          onPress={() => submitOrder(false)} 
+          disabled={placingOrder || (!availablePaymentMethods.gcash && !availablePaymentMethods.onCounter)}
+        >
+          <Text style={[styles.btnText, (!availablePaymentMethods.gcash && !availablePaymentMethods.onCounter) && styles.btnTextDisabled]}>
+            Place Order
+          </Text>
         </TouchableOpacity>
 
         {/* Feedback Section */}
@@ -353,6 +443,48 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
   
+  paymentMethodContainer: { marginBottom: 20 },
+  paymentMethodTitle: { fontSize: 16, fontWeight: "600", marginBottom: 10 },
+  paymentMethodButtons: { flexDirection: "row", gap: 10 },
+  paymentMethodButton: {
+    flex: 1,
+    padding: 12,
+    borderRadius: 8,
+    borderWidth: 2,
+    borderColor: "#ddd",
+    backgroundColor: "#f9f9f9",
+    alignItems: "center",
+  },
+  paymentMethodSelected: {
+    borderColor: "#A40C2D",
+    backgroundColor: "#A40C2D22",
+  },
+  paymentMethodText: {
+    fontSize: 14,
+    fontWeight: "500",
+    color: "#666",
+  },
+  paymentMethodTextSelected: {
+    color: "#A40C2D",
+    fontWeight: "600",
+  },
+  gcashNumberText: {
+    fontSize: 12,
+    color: "#666",
+    marginTop: 8,
+    textAlign: "center",
+    fontStyle: "italic",
+  },
+  noPaymentMethodsText: {
+    fontSize: 14,
+    color: "#ff6b6b",
+    textAlign: "center",
+    fontStyle: "italic",
+    padding: 10,
+    backgroundColor: "#ffe0e0",
+    borderRadius: 8,
+  },
+  
   group: { marginBottom: 20 },
   groupTitle: { fontSize: 16, fontWeight: "600", marginBottom: 8 },
   required: { color: "red", fontSize: 14 },
@@ -365,7 +497,9 @@ const styles = StyleSheet.create({
 
   btn: { backgroundColor: "#A40C2D", padding: 15, borderRadius: 8, alignItems: "center", marginBottom: 10 },
   btnAlt: { backgroundColor: "#444" },
+  btnDisabled: { backgroundColor: "#ccc", opacity: 0.6 },
   btnText: { color: "#fff", fontWeight: "bold", fontSize: 16 },
+  btnTextDisabled: { color: "#999" },
 
   feedbackContainer: { marginTop: 20 },
   feedbackTitle: { fontSize: 18, fontWeight: "bold", marginBottom: 10 },

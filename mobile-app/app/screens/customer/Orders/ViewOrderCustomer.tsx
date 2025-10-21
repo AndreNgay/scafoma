@@ -11,7 +11,6 @@ import {
   TouchableOpacity,
   Platform,
 } from "react-native";
-import { Picker } from "@react-native-picker/picker";
 import { useRoute } from "@react-navigation/native";
 import * as ImagePicker from "expo-image-picker";
 import api from "../../../libs/apiCall";
@@ -22,8 +21,51 @@ const ViewOrderCustomer = () => {
 
   const [order, setOrder] = useState<any>(null);
   const [loading, setLoading] = useState(true);
-  const [updatingPayment, setUpdatingPayment] = useState(false);
   const [uploading, setUploading] = useState(false);
+
+  const formatManila = (value: any) => {
+    if (!value) return "";
+    try {
+      if (typeof value === "string") {
+        if (/[zZ]|[+-]\d{2}:?\d{2}/.test(value)) {
+          const d = new Date(value);
+          return new Intl.DateTimeFormat("en-PH", {
+            timeZone: "Asia/Manila",
+            year: "numeric",
+            month: "short",
+            day: "2-digit",
+            hour: "numeric",
+            minute: "2-digit",
+          }).format(d);
+        }
+        const cleaned = value.replace("T", " ");
+        const [datePart, timePartFull] = cleaned.split(" ");
+        if (!datePart || !timePartFull) return cleaned;
+        const [year, month, day] = datePart.split("-").map((p) => parseInt(p, 10));
+        const [hStr, mStr] = timePartFull.split(":");
+        if (!year || !month || !day || !hStr || !mStr) return cleaned;
+        let hour = parseInt(hStr, 10);
+        const ampm = hour >= 12 ? "PM" : "AM";
+        hour = hour % 12;
+        if (hour === 0) hour = 12;
+        const monthNames = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+        return `${monthNames[month - 1]} ${day}, ${year} ${hour}:${mStr} ${ampm}`;
+      }
+      return new Intl.DateTimeFormat("en-PH", {
+        timeZone: "Asia/Manila",
+        year: "numeric",
+        month: "short",
+        day: "2-digit",
+        hour: "numeric",
+        minute: "2-digit",
+      }).format(new Date(value));
+    } catch {
+      return String(value);
+    }
+  };
+
+  const formatSchedule = (value: any) => formatManila(value);
+  const formatDateTime = (value: any) => formatManila(value);
 
   // ===============================
   // Fetch order by ID
@@ -50,30 +92,6 @@ const ViewOrderCustomer = () => {
     fetchOrder();
   }, [orderId]);
 
-  // ===============================
-  // Change payment method
-  // ===============================
-  const handlePaymentChange = async (newMethod: "gcash" | "on-counter") => {
-    if (!order) return;
-    try {
-      setUpdatingPayment(true);
-      const res = await api.patch(`/order/${order.id}/payment-method`, {
-        payment_method: newMethod,
-      });
-
-      setOrder((prev: any) => ({
-        ...prev,
-        payment_method: res.data.payment_method,
-        // reset payment proof if switched to On-Counter
-        payment_proof: newMethod === "gcash" ? prev.payment_proof || null : null,
-      }));
-    } catch (err) {
-      console.error(err);
-      Alert.alert("Error", "Failed to update payment method");
-    } finally {
-      setUpdatingPayment(false);
-    }
-  };
 
   // ===============================
   // Pick and upload GCash screenshot
@@ -125,9 +143,10 @@ const ViewOrderCustomer = () => {
         payment_proof: res.data.payment_proof || res.data.gcash_screenshot,
       }));
       Alert.alert("Success", "GCash screenshot uploaded!");
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
-      Alert.alert("Error", "Failed to upload screenshot");
+      const errorMessage = err.response?.data?.error || "Failed to upload screenshot";
+      Alert.alert("Error", errorMessage);
     } finally {
       setUploading(false);
     }
@@ -146,10 +165,6 @@ const ViewOrderCustomer = () => {
       </View>
     );
 
-  const paymentOptions = [];
-  if (order.oncounter_payment_available)
-    paymentOptions.push({ label: "On-Counter", value: "on-counter" });
-  if (order.gcash_payment_available) paymentOptions.push({ label: "GCash", value: "gcash" });
 
   return (
     <ScrollView style={styles.container}>
@@ -159,48 +174,72 @@ const ViewOrderCustomer = () => {
       </Text>
       <Text>Total: ₱{Number(order.total_price).toFixed(2)}</Text>
       {order.note && <Text>Note: {order.note}</Text>}
-      <Text>Date: {new Date(order.created_at).toLocaleString()}</Text>
-
-      {paymentOptions.length > 0 && (
-        <View style={{ marginTop: 15 }}>
-          <Text style={styles.paymentLabel}>Payment Method</Text>
-          <Picker
-            selectedValue={order.payment_method || paymentOptions[0].value}
-            onValueChange={(val: string) =>
-              handlePaymentChange(val as "gcash" | "on-counter")
-            }
-            enabled={!updatingPayment}
-          >
-            {paymentOptions.map((opt) => (
-              <Picker.Item key={opt.value} label={opt.label} value={opt.value} />
-            ))}
-          </Picker>
-        </View>
+      {order.schedule_time && (
+        <Text style={styles.scheduleTime}>
+          📅 Scheduled for: {formatSchedule(order.schedule_time)}
+        </Text>
       )}
+      <Text>Date: {formatDateTime(order.created_at)}</Text>
+
+      <View style={{ marginTop: 15 }}>
+        <Text style={styles.paymentLabel}>Payment Method</Text>
+        <Text style={styles.paymentMethodDisplay}>
+          {order.payment_method === "gcash" ? "💳 GCash" : "💰 On-Counter"}
+        </Text>
+      </View>
 
       {order.payment_method === "gcash" ? (
         <View style={{ marginTop: 15 }}>
-          <Text style={styles.paymentLabel}>GCash Screenshot (Required)</Text>
+          <Text style={styles.paymentLabel}>
+            GCash Screenshot {order.payment_proof ? "(Uploaded)" : "(Required)"}
+          </Text>
           {order.payment_proof ? (
-            <Image source={{ uri: order.payment_proof }} style={styles.paymentProof} />
+            <View>
+              <Image source={{ uri: order.payment_proof }} style={styles.paymentProof} />
+              <Text style={styles.uploadedIndicator}>
+                ✅ Screenshot uploaded successfully
+              </Text>
+            </View>
           ) : (
             <Text style={{ color: "#888", marginBottom: 10 }}>
               No screenshot uploaded
             </Text>
           )}
-          <TouchableOpacity
-            style={styles.uploadBtn}
-            onPress={pickImage}
-            disabled={uploading}
-          >
-            <Text>
-              {uploading
-                ? "Uploading..."
-                : order.payment_proof
-                ? "Change Screenshot"
-                : "Upload Screenshot"}
-            </Text>
-          </TouchableOpacity>
+          
+          {order.order_status === "accepted" ? (
+            order.payment_proof ? (
+              <View style={styles.uploadDisabledContainer}>
+                <Text style={styles.uploadDisabledText}>
+                  ✅ GCash screenshot uploaded successfully. Screenshot cannot be changed once uploaded.
+                </Text>
+              </View>
+            ) : (
+              <TouchableOpacity
+                style={styles.uploadBtn}
+                onPress={pickImage}
+                disabled={uploading}
+              >
+                <Text>
+                  {uploading ? "Uploading..." : "Upload Screenshot"}
+                </Text>
+              </TouchableOpacity>
+            )
+          ) : (
+            <View style={styles.uploadDisabledContainer}>
+              <Text style={styles.uploadDisabledText}>
+                {order.order_status === "pending" 
+                  ? "⏳ Please wait for your order to be accepted before uploading payment proof."
+                  : order.order_status === "declined"
+                  ? "❌ This order has been declined. No payment proof needed."
+                  : order.order_status === "ready for pickup"
+                  ? "✅ Order is ready for pickup. Payment proof already processed."
+                  : order.order_status === "completed"
+                  ? "✅ Order completed. Payment proof already processed."
+                  : "⏳ Please wait for your order to be accepted before uploading payment proof."
+                }
+              </Text>
+            </View>
+          )}
         </View>
       ) : (
         <View style={{ marginTop: 15 }}>
@@ -256,6 +295,48 @@ const styles = StyleSheet.create({
     marginTop: 10,
   },
   paymentLabel: { fontWeight: "600", color: "#A40C2D", marginBottom: 5 },
+  paymentMethodDisplay: { 
+    fontSize: 16, 
+    fontWeight: "500", 
+    color: "#333", 
+    backgroundColor: "#f9f9f9", 
+    padding: 12, 
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "#ddd"
+  },
+  uploadDisabledContainer: {
+    backgroundColor: "#f0f0f0",
+    padding: 15,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "#ddd",
+    marginTop: 10,
+  },
+  uploadDisabledText: {
+    fontSize: 14,
+    color: "#666",
+    textAlign: "center",
+    lineHeight: 20,
+  },
+  uploadedIndicator: {
+    fontSize: 12,
+    color: "#28a745",
+    textAlign: "center",
+    marginTop: 8,
+    fontWeight: "500",
+  },
+  scheduleTime: {
+    fontSize: 14,
+    color: "#28a745",
+    fontWeight: "500",
+    marginTop: 5,
+    backgroundColor: "#e8f5e8",
+    padding: 8,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: "#28a745",
+  },
 });
 
 export default ViewOrderCustomer;
