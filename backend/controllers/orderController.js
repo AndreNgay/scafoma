@@ -168,14 +168,25 @@ export const getOrderById = async (req, res) => {
 // ==========================
 export const updateOrderStatus = async (req, res) => {
   const { id } = req.params;
-  const { order_status } = req.body;
+  const { order_status, decline_reason } = req.body;
   try {
-    const result = await pool.query(
-      `UPDATE tblorder 
-       SET order_status = $1, updated_at = NOW()
-       WHERE id = $2 RETURNING *`,
-      [order_status, id]
-    );
+    let query, params;
+    
+    if (order_status === 'declined' && decline_reason) {
+      // Update with decline reason
+      query = `UPDATE tblorder 
+               SET order_status = $1, decline_reason = $2, updated_at = NOW()
+               WHERE id = $3 RETURNING *`;
+      params = [order_status, decline_reason, id];
+    } else {
+      // Update without decline reason
+      query = `UPDATE tblorder 
+               SET order_status = $1, updated_at = NOW()
+               WHERE id = $2 RETURNING *`;
+      params = [order_status, id];
+    }
+    
+    const result = await pool.query(query, params);
     if (result.rowCount === 0) return res.status(404).json({ error: "Order not found" });
     res.json(result.rows[0]);
   } catch (err) {
@@ -236,9 +247,9 @@ export const updatePaymentProof = async (req, res) => {
     const orderStatus = orderCheck.rows[0].order_status;
     const existingScreenshot = orderCheck.rows[0].gcash_screenshot;
     
-    if (orderStatus !== "accepted") {
+    if (orderStatus !== "accepted" && orderStatus !== "ready for pickup") {
       return res.status(400).json({ 
-        error: "Payment proof can only be uploaded after the order has been accepted",
+        error: "Payment proof can only be uploaded after the order has been accepted or is ready for pickup",
         currentStatus: orderStatus
       });
     }

@@ -23,7 +23,8 @@ const CustomerOrders = () => {
   // Search & filter state
   const [searchQuery, setSearchQuery] = useState("");
   const [filtersVisible, setFiltersVisible] = useState(false);
-  const [statusFilter, setStatusFilter] = useState<string | null>(null);
+  const [statusFilter, setStatusFilter] = useState<string[]>([]);
+  const [sortBy, setSortBy] = useState<string>("date_desc");
 
   const formatManila = (value: any) => {
     if (!value) return "";
@@ -90,6 +91,8 @@ const CustomerOrders = () => {
   // Refresh when screen is focused
   useFocusEffect(
     useCallback(() => {
+      setStatusFilter([]); // No default filter - show all orders
+      setSortBy("date_desc"); // Default sort by newest to oldest
       fetchOrders();
     }, [user?.id])
   );
@@ -107,12 +110,41 @@ const CustomerOrders = () => {
     }
 
     // Filter by status
-    if (statusFilter) {
-      filtered = filtered.filter((o) => o.order_status === statusFilter);
+    if (statusFilter.length > 0) {
+      filtered = filtered.filter((o) => statusFilter.includes(o.order_status));
+    }
+
+    // Sort orders
+    if (sortBy) {
+      switch (sortBy) {
+        case "date_desc":
+          filtered.sort(
+            (a, b) =>
+              new Date(b.created_at).getTime() -
+              new Date(a.created_at).getTime()
+          );
+          break;
+        case "date_asc":
+          filtered.sort(
+            (a, b) =>
+              new Date(a.created_at).getTime() -
+              new Date(b.created_at).getTime()
+          );
+          break;
+        case "price_asc":
+          filtered.sort((a, b) => a.total_price - b.total_price);
+          break;
+        case "price_desc":
+          filtered.sort((a, b) => b.total_price - a.total_price);
+          break;
+        case "status":
+          filtered.sort((a, b) => a.order_status.localeCompare(b.order_status));
+          break;
+      }
     }
 
     setFilteredOrders(filtered);
-  }, [searchQuery, statusFilter, orders]);
+  }, [searchQuery, statusFilter, sortBy, orders]);
 
 const renderItem = ({ item }: any) => (
 <TouchableOpacity
@@ -180,32 +212,74 @@ const renderItem = ({ item }: any) => (
       {/* Filter modal */}
       <Modal visible={filtersVisible} animationType="slide">
         <View style={styles.filterContainer}>
-          <Text style={styles.filterHeader}>Filter Orders</Text>
+          <View style={styles.filterHeaderContainer}>
+            <Text style={styles.filterHeader}>Filter Orders</Text>
+            <TouchableOpacity
+              style={styles.closeBtn}
+              onPress={() => setFiltersVisible(false)}
+            >
+              <Text style={styles.closeBtnText}>✕</Text>
+            </TouchableOpacity>
+          </View>
 
           {/* Status filter */}
-          <Text style={styles.label}>Status</Text>
+          <Text style={styles.label}>Status (Select Multiple)</Text>
           {["pending", "accepted", "ready-for-pickup", "completed", "declined"].map(
             (status) => (
               <TouchableOpacity
                 key={status}
-                onPress={() =>
-                  setStatusFilter(statusFilter === status ? null : status)
-                }
+                onPress={() => {
+                  if (statusFilter.includes(status)) {
+                    setStatusFilter(statusFilter.filter(s => s !== status));
+                  } else {
+                    setStatusFilter([...statusFilter, status]);
+                  }
+                }}
               >
-                <Text style={statusFilter === status ? styles.active : styles.option}>
+                <Text style={statusFilter.includes(status) ? styles.active : styles.option}>
                   {status}
                 </Text>
               </TouchableOpacity>
             )
           )}
 
+          {/* Sort options */}
+          <Text style={styles.label}>Sort by</Text>
+          {[
+            { key: "date_desc", label: "Date (Newest → Oldest)" },
+            { key: "date_asc", label: "Date (Oldest → Newest)" },
+            { key: "price_asc", label: "Total Price (Low → High)" },
+            { key: "price_desc", label: "Total Price (High → Low)" },
+            { key: "status", label: "Status (A → Z)" },
+          ].map((opt) => (
+            <TouchableOpacity
+              key={opt.key}
+              onPress={() => setSortBy(opt.key)}
+            >
+              <Text style={sortBy === opt.key ? styles.active : styles.option}>
+                {opt.label}
+              </Text>
+            </TouchableOpacity>
+          ))}
+
           {/* Close modal */}
-          <TouchableOpacity
-            style={styles.applyBtn}
-            onPress={() => setFiltersVisible(false)}
-          >
-            <Text style={styles.applyText}>Apply</Text>
-          </TouchableOpacity>
+          <View style={styles.buttonRow}>
+            <TouchableOpacity
+              style={styles.clearBtn}
+              onPress={() => {
+                setStatusFilter([]);
+                setSortBy("date_desc");
+              }}
+            >
+              <Text style={styles.clearText}>Clear All</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.applyBtn}
+              onPress={() => setFiltersVisible(false)}
+            >
+              <Text style={styles.applyText}>Apply</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       </Modal>
     </View>
@@ -250,7 +324,22 @@ const styles = StyleSheet.create({
   date: { fontSize: 12, color: "#666", marginTop: 5 },
   emptyText: { textAlign: "center", marginTop: 20, color: "#888" },
   filterContainer: { flex: 1, padding: 20, backgroundColor: "#fff" },
-  filterHeader: { fontSize: 18, fontWeight: "bold", marginBottom: 10 },
+  filterHeaderContainer: { 
+    flexDirection: "row", 
+    justifyContent: "space-between", 
+    alignItems: "center", 
+    marginBottom: 20 
+  },
+  filterHeader: { fontSize: 18, fontWeight: "bold" },
+  closeBtn: {
+    backgroundColor: "#ccc",
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  closeBtnText: { color: "#fff", fontWeight: "bold", fontSize: 16 },
   label: { marginTop: 15, fontWeight: "600" },
   option: { padding: 8, fontSize: 14 },
   active: {
@@ -260,11 +349,23 @@ const styles = StyleSheet.create({
     color: "#fff",
     borderRadius: 6,
   },
+  buttonRow: { 
+    flexDirection: "row", 
+    marginTop: 20, 
+    gap: 10 
+  },
+  clearBtn: {
+    flex: 1,
+    backgroundColor: "#ccc",
+    padding: 12,
+    borderRadius: 8,
+  },
+  clearText: { color: "#fff", textAlign: "center", fontWeight: "bold" },
   applyBtn: {
+    flex: 1,
     backgroundColor: "#A40C2D",
     padding: 12,
     borderRadius: 8,
-    marginTop: 20,
   },
   applyText: { color: "#fff", textAlign: "center", fontWeight: "bold" },
   orderId: {

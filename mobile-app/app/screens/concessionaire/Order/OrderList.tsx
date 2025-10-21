@@ -40,7 +40,7 @@ const OrderList = () => {
   // Search & filter state
   const [searchQuery, setSearchQuery] = useState("");
   const [filtersVisible, setFiltersVisible] = useState(false);
-  const [statusFilter, setStatusFilter] = useState<string | null>(null);
+  const [statusFilter, setStatusFilter] = useState<string[]>([]);
   const [sortBy, setSortBy] = useState<string | null>(null);
 
   // Pagination
@@ -90,6 +90,7 @@ const OrderList = () => {
   useFocusEffect(
     useCallback(() => {
       setPage(1);
+      setStatusFilter(["pending"]); // Set pending as default filter
       fetchOrders(1, true);
     }, [user.id])
   );
@@ -124,8 +125,8 @@ const OrderList = () => {
       );
     }
 
-    if (statusFilter) {
-      filtered = filtered.filter((o) => o.order_status === statusFilter);
+    if (statusFilter.length > 0) {
+      filtered = filtered.filter((o) => statusFilter.includes(o.order_status));
     }
 
     if (sortBy) {
@@ -248,9 +249,17 @@ const OrderList = () => {
 
       <Modal visible={filtersVisible} animationType="slide">
         <View style={styles.filterContainer}>
-          <Text style={styles.filterHeader}>Filter Orders</Text>
+          <View style={styles.filterHeaderContainer}>
+            <Text style={styles.filterHeader}>Filter Orders</Text>
+            <TouchableOpacity
+              style={styles.closeBtn}
+              onPress={() => setFiltersVisible(false)}
+            >
+              <Text style={styles.closeBtnText}>✕</Text>
+            </TouchableOpacity>
+          </View>
 
-          <Text style={styles.label}>Status</Text>
+          <Text style={styles.label}>Status (Select Multiple)</Text>
           {[
             "pending",
             "accepted",
@@ -260,13 +269,17 @@ const OrderList = () => {
           ].map((status) => (
             <TouchableOpacity
               key={status}
-              onPress={() =>
-                setStatusFilter(statusFilter === status ? null : status)
-              }
+              onPress={() => {
+                if (statusFilter.includes(status)) {
+                  setStatusFilter(statusFilter.filter(s => s !== status));
+                } else {
+                  setStatusFilter([...statusFilter, status]);
+                }
+              }}
             >
               <Text
                 style={
-                  statusFilter === status ? styles.active : styles.option
+                  statusFilter.includes(status) ? styles.active : styles.option
                 }
               >
                 {status}
@@ -295,12 +308,20 @@ const OrderList = () => {
             </TouchableOpacity>
           ))}
 
-          <TouchableOpacity
-            style={styles.applyBtn}
-            onPress={() => setFiltersVisible(false)}
-          >
-            <Text style={styles.applyText}>Apply</Text>
-          </TouchableOpacity>
+          <View style={styles.buttonRow}>
+            <TouchableOpacity
+              style={styles.clearBtn}
+              onPress={() => setStatusFilter([])}
+            >
+              <Text style={styles.clearText}>Clear All</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.applyBtn}
+              onPress={() => setFiltersVisible(false)}
+            >
+              <Text style={styles.applyText}>Apply</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       </Modal>
     </View>
@@ -336,7 +357,22 @@ const styles = StyleSheet.create({
   emptyText: { textAlign: "center", color: "#888", marginTop: 20 },
   errorText: { textAlign: "center", color: "red", marginTop: 20 },
   filterContainer: { flex: 1, padding: 20, backgroundColor: "#fff" },
-  filterHeader: { fontSize: 18, fontWeight: "bold", marginBottom: 10 },
+  filterHeaderContainer: { 
+    flexDirection: "row", 
+    justifyContent: "space-between", 
+    alignItems: "center", 
+    marginBottom: 20 
+  },
+  filterHeader: { fontSize: 18, fontWeight: "bold" },
+  closeBtn: {
+    backgroundColor: "#ccc",
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  closeBtnText: { color: "#fff", fontWeight: "bold", fontSize: 16 },
   label: { marginTop: 15, fontWeight: "600" },
   option: { padding: 8, fontSize: 14 },
   active: {
@@ -346,11 +382,23 @@ const styles = StyleSheet.create({
     color: "#fff",
     borderRadius: 6,
   },
+  buttonRow: { 
+    flexDirection: "row", 
+    marginTop: 20, 
+    gap: 10 
+  },
+  clearBtn: {
+    flex: 1,
+    backgroundColor: "#ccc",
+    padding: 12,
+    borderRadius: 8,
+  },
+  clearText: { color: "#fff", textAlign: "center", fontWeight: "bold" },
   applyBtn: {
+    flex: 1,
     backgroundColor: "#A40C2D",
     padding: 12,
     borderRadius: 8,
-    marginTop: 20,
   },
   applyText: { color: "#fff", textAlign: "center", fontWeight: "bold" },
   avatar: {

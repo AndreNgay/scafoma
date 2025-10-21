@@ -3,6 +3,7 @@ import {
   View,
   Text,
   FlatList,
+  SectionList,
   Image,
   ActivityIndicator,
   StyleSheet,
@@ -43,6 +44,7 @@ const Menu = () => {
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc");
   const [imageError, setImageError] = useState<Record<number, boolean>>({});
   const [categoryFilter, setCategoryFilter] = useState("all");
+  const [groupByCategory, setGroupByCategory] = useState(true);
 
   const navigation = useNavigation<any>();
 
@@ -112,6 +114,29 @@ const Menu = () => {
     return items;
   }, [menuItems, search, categoryFilter, sortOption, sortOrder]);
 
+  const groupedItems = useMemo(() => {
+    if (!groupByCategory) {
+      return [{ title: "All Items", data: processedItems }];
+    }
+
+    const groups: { [key: string]: MenuItem[] } = {};
+    
+    processedItems.forEach(item => {
+      const category = item.category || "Uncategorized";
+      if (!groups[category]) {
+        groups[category] = [];
+      }
+      groups[category].push(item);
+    });
+
+    return Object.keys(groups)
+      .sort()
+      .map(category => ({
+        title: category,
+        data: groups[category]
+      }));
+  }, [processedItems, groupByCategory]);
+
   if (loading && !refreshing) {
     return (
       <View style={styles.center}>
@@ -160,13 +185,25 @@ const Menu = () => {
         </Picker>
       </View>
 
+      {/* Group by Category Toggle */}
+      <View style={styles.toggleContainer}>
+        <TouchableOpacity
+          style={[styles.toggleButton, groupByCategory && styles.toggleButtonActive]}
+          onPress={() => setGroupByCategory(!groupByCategory)}
+        >
+          <Text style={[styles.toggleButtonText, groupByCategory && styles.toggleButtonTextActive]}>
+            {groupByCategory ? "📁 Grouped by Category" : "📄 List View"}
+          </Text>
+        </TouchableOpacity>
+      </View>
+
       {processedItems.length === 0 ? (
         <View style={styles.center}>
           <Text>No menu items found.</Text>
         </View>
       ) : (
-        <FlatList
-          data={processedItems}
+        <SectionList
+          sections={groupedItems}
           keyExtractor={(item) => item.id.toString()}
           contentContainerStyle={styles.list}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
@@ -175,6 +212,11 @@ const Menu = () => {
           ListFooterComponent={
             loadingMore ? <ActivityIndicator size="small" color="darkred" style={{ margin: 10 }} /> : null
           }
+          renderSectionHeader={({ section: { title } }) => (
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionHeaderText}>{title}</Text>
+            </View>
+          )}
           renderItem={({ item }) => (
             <TouchableOpacity
               style={styles.card}
@@ -277,4 +319,44 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   editButtonText: { color: "white", fontWeight: "bold", fontSize: 16 },
+  toggleContainer: {
+    marginHorizontal: 12,
+    marginBottom: 10,
+    alignItems: "center",
+  },
+  toggleButton: {
+    backgroundColor: "#f0f0f0",
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: "#ddd",
+  },
+  toggleButtonActive: {
+    backgroundColor: "darkred",
+    borderColor: "darkred",
+  },
+  toggleButtonText: {
+    color: "#666",
+    fontWeight: "600",
+    fontSize: 14,
+  },
+  toggleButtonTextActive: {
+    color: "white",
+  },
+  sectionHeader: {
+    backgroundColor: "#f8f9fa",
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    marginTop: 10,
+    marginBottom: 5,
+    borderLeftWidth: 4,
+    borderLeftColor: "darkred",
+  },
+  sectionHeaderText: {
+    fontSize: 16,
+    fontWeight: "bold",
+    color: "darkred",
+    textTransform: "uppercase",
+  },
 });

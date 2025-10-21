@@ -179,6 +179,15 @@ const ViewOrderCustomer = () => {
           📅 Scheduled for: {formatSchedule(order.schedule_time)}
         </Text>
       )}
+      
+      {/* Decline Reason */}
+      {order.order_status === "declined" && order.decline_reason && (
+        <View style={styles.declineReasonContainer}>
+          <Text style={styles.declineReasonLabel}>Decline Reason:</Text>
+          <Text style={styles.declineReasonText}>{order.decline_reason}</Text>
+        </View>
+      )}
+      
       <Text>Date: {formatDateTime(order.created_at)}</Text>
 
       <View style={{ marginTop: 15 }}>
@@ -197,7 +206,7 @@ const ViewOrderCustomer = () => {
             <View>
               <Image source={{ uri: order.payment_proof }} style={styles.paymentProof} />
               <Text style={styles.uploadedIndicator}>
-                ✅ Screenshot uploaded successfully
+                Screenshot uploaded successfully
               </Text>
             </View>
           ) : (
@@ -206,7 +215,7 @@ const ViewOrderCustomer = () => {
             </Text>
           )}
           
-          {order.order_status === "accepted" ? (
+          {(order.order_status === "accepted" || order.order_status === "ready for pickup") ? (
             order.payment_proof ? (
               <View style={styles.uploadDisabledContainer}>
                 <Text style={styles.uploadDisabledText}>
@@ -227,12 +236,10 @@ const ViewOrderCustomer = () => {
           ) : (
             <View style={styles.uploadDisabledContainer}>
               <Text style={styles.uploadDisabledText}>
-                {order.order_status === "pending" 
+                {order.order_status === "pending"
                   ? "⏳ Please wait for your order to be accepted before uploading payment proof."
                   : order.order_status === "declined"
                   ? "❌ This order has been declined. No payment proof needed."
-                  : order.order_status === "ready for pickup"
-                  ? "✅ Order is ready for pickup. Payment proof already processed."
                   : order.order_status === "completed"
                   ? "✅ Order completed. Payment proof already processed."
                   : "⏳ Please wait for your order to be accepted before uploading payment proof."
@@ -336,6 +343,25 @@ const styles = StyleSheet.create({
     borderRadius: 6,
     borderWidth: 1,
     borderColor: "#28a745",
+  },
+  declineReasonContainer: {
+    backgroundColor: "#ffe6e6",
+    padding: 10,
+    borderRadius: 8,
+    marginTop: 10,
+    borderLeftWidth: 4,
+    borderLeftColor: "#dc3545",
+  },
+  declineReasonLabel: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#dc3545",
+    marginBottom: 5,
+  },
+  declineReasonText: {
+    fontSize: 13,
+    color: "#666",
+    fontStyle: "italic",
   },
 });
 

@@ -130,6 +130,7 @@ CREATE TABLE IF NOT EXISTS tblorder (
     payment_method VARCHAR(20) CHECK (payment_method IN ('gcash', 'on-counter')) DEFAULT 'on-counter',
     in_cart BOOLEAN DEFAULT FALSE,
     gcash_screenshot BYTEA,
+    decline_reason TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 
