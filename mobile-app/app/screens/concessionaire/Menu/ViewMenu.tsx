@@ -14,7 +14,6 @@ type Variation = { name: string; price: string };
 type VariationGroup = {
   label: string;
   variations: Variation[];
-  multiple_selection: boolean;
   required_selection: boolean;
 };
 
@@ -70,9 +69,6 @@ const ViewMenu: React.FC = () => {
           {variationGroups.map((group, gIndex) => (
             <View key={gIndex} style={styles.groupBox}>
               <Text style={styles.groupLabel}>{group.label}</Text>
-              <Text style={styles.optionText}>
-                Multiple Selection: {group.multiple_selection ? "Yes" : "No"}
-              </Text>
               <Text style={styles.optionText}>
                 Required Selection: {group.required_selection ? "Yes" : "No"}
               </Text>

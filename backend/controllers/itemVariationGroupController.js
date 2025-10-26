@@ -6,7 +6,7 @@ export const getVariationGroupsById = async (req, res) => {
 
   try {
     const query = `
-      SELECT id, variation_group_name, multiple_selection, required_selection
+      SELECT id, variation_group_name, multiple_selection, required_selection, max_selection
       FROM tblitemvariationgroup
       WHERE menu_item_id = $1
       ORDER BY variation_group_name ASC;
@@ -25,7 +25,7 @@ export const getVariationGroupsById = async (req, res) => {
 
 // Add group
 export const addVariationGroup = async (req, res) => {
-  const { variation_group_name, menu_item_id, multiple_selection, required_selection } = req.body;
+  const { variation_group_name, menu_item_id, multiple_selection, required_selection, max_selection } = req.body;
 
   if (!variation_group_name || !menu_item_id) {
     return res.status(400).json({ success: false, message: "Group name and menu item ID are required" });
@@ -33,8 +33,8 @@ export const addVariationGroup = async (req, res) => {
 
   try {
     const query = `
-      INSERT INTO tblitemvariationgroup (variation_group_name, menu_item_id, multiple_selection, required_selection)
-      VALUES ($1, $2, $3, $4)
+      INSERT INTO tblitemvariationgroup (variation_group_name, menu_item_id, multiple_selection, required_selection, max_selection)
+      VALUES ($1, $2, $3, $4, $5)
       RETURNING *;
     `;
 
@@ -43,6 +43,7 @@ export const addVariationGroup = async (req, res) => {
       menu_item_id,
       multiple_selection || false,
       required_selection || false,
+      max_selection || 1,
     ]);
 
     return res.status(201).json({
@@ -61,7 +62,7 @@ export const addVariationGroup = async (req, res) => {
 // Update group
 export const updateVariationGroup = async (req, res) => {
   const { id } = req.params;
-  const { variation_group_name, multiple_selection, required_selection } = req.body;
+  const { variation_group_name, multiple_selection, required_selection, max_selection } = req.body;
 
   try {
     const query = `
@@ -69,12 +70,13 @@ export const updateVariationGroup = async (req, res) => {
       SET variation_group_name = COALESCE($1, variation_group_name),
           multiple_selection = COALESCE($2, multiple_selection),
           required_selection = COALESCE($3, required_selection),
+          max_selection = COALESCE($4, max_selection),
           updated_at = CURRENT_TIMESTAMP
-      WHERE id = $4
+      WHERE id = $5
       RETURNING *;
     `;
 
-    const result = await pool.query(query, [variation_group_name, multiple_selection, required_selection, id]);
+    const result = await pool.query(query, [variation_group_name, multiple_selection, required_selection, max_selection, id]);
 
     if (result.rows.length === 0) {
       return res.status(404).json({ success: false, message: "Variation group not found" });

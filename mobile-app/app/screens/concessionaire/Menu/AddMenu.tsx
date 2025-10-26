@@ -13,14 +13,15 @@ import {
 } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import * as ImagePicker from "expo-image-picker";
+import { z } from "zod";
 import api from "../../../libs/apiCall";
 
 type Variation = { name: string; price: string; image?: any };
 type VariationGroup = {
   label: string;
   variations: Variation[];
-  multiple_selection: boolean;
   required_selection: boolean;
+  max_selection: number;
 };
 
 const AddMenu: React.FC = () => {
@@ -70,8 +71,8 @@ const AddMenu: React.FC = () => {
       {
         label: "",
         variations: [],
-        multiple_selection: false,
         required_selection: false,
+        max_selection: 1,
       },
     ]);
 
@@ -99,6 +100,42 @@ const AddMenu: React.FC = () => {
     setVariationGroups(updated);
   };
 
+  const updateMaxSelection = (index: number, value: string) => {
+    const updated = [...variationGroups];
+    const numValue = parseInt(value) || 1;
+    const numVariations = updated[index].variations.length;
+    const maxAllowed = numVariations > 0 ? numVariations : 1;
+    
+    // Limit max_selection to number of variations
+    if (numValue > maxAllowed) {
+      Alert.alert("Invalid Value", `Max selection cannot exceed the number of variations (${numVariations})`);
+      updated[index].max_selection = maxAllowed;
+    } else {
+      updated[index].max_selection = numValue > 0 ? numValue : 1;
+    }
+    setVariationGroups(updated);
+  };
+
+  const incrementMaxSelection = (index: number) => {
+    const updated = [...variationGroups];
+    const currentValue = updated[index].max_selection || 1;
+    const numVariations = updated[index].variations.length;
+    const maxAllowed = numVariations > 0 ? numVariations : 1;
+    if (currentValue < maxAllowed) {
+      updated[index].max_selection = currentValue + 1;
+      setVariationGroups(updated);
+    } else {
+      Alert.alert("Limit Reached", `Max selection cannot exceed the number of variations (${numVariations})`);
+    }
+  };
+
+  const decrementMaxSelection = (index: number) => {
+    const updated = [...variationGroups];
+    const currentValue = updated[index].max_selection || 1;
+    updated[index].max_selection = currentValue > 1 ? currentValue - 1 : 1;
+    setVariationGroups(updated);
+  };
+
   const updateVariation = (
     gIndex: number,
     vIndex: number,
@@ -112,17 +149,51 @@ const AddMenu: React.FC = () => {
 
   const toggleGroupOption = (
     gIndex: number,
-    key: "multiple_selection" | "required_selection"
+    key: "required_selection"
   ) => {
     const updated = [...variationGroups];
     updated[gIndex][key] = !updated[gIndex][key];
     setVariationGroups(updated);
   };
 
+  // Validation schema
+  const variationGroupSchema = z.object({
+    label: z.string().min(1, "Group label is required"),
+    max_selection: z.number().int().positive().max(100, "Max selection must be between 1 and 100"),
+  });
+
   const handleAddMenu = async () => {
     if (!itemName.trim() || !price.trim()) {
       Alert.alert("Error", "Please fill in item name and price.");
       return;
+    }
+
+    // Validate variation groups
+    for (const group of variationGroups) {
+      try {
+        // Check if variation group has no variations
+        if (group.variations.length === 0) {
+          Alert.alert("Validation Error", `Variation group "${group.label}" has no variations. Please add at least one variation or remove the group.`);
+          return;
+        }
+        
+        const numVariations = group.variations.length;
+        const maxAllowed = numVariations > 0 ? numVariations : 1;
+        
+        // Check if max_selection exceeds number of variations
+        if (group.max_selection > maxAllowed) {
+          Alert.alert("Validation Error", `${group.label}: Max selection (${group.max_selection}) cannot exceed the number of variations (${numVariations})`);
+          return;
+        }
+        
+        variationGroupSchema.parse({
+          label: group.label,
+          max_selection: group.max_selection,
+        });
+      } catch (err: any) {
+        Alert.alert("Validation Error", err.errors[0].message);
+        return;
+      }
     }
 
     const formData = new FormData();
@@ -229,13 +300,13 @@ const AddMenu: React.FC = () => {
         message =
           "Add groups and variations like sizes or flavors with additional prices.";
         break;
-      case "multi":
-        message =
-          "Allow customers to pick more than one option in this group.";
-        break;
       case "required":
         message =
           "Customer must select at least one option in this group.";
+        break;
+      case "max":
+        message =
+          "Maximum number of options customers can select from this group.";
         break;
     }
 
@@ -341,26 +412,6 @@ const AddMenu: React.FC = () => {
 
           {/* Group Options */}
           <View style={styles.toggleRow}>
-            <Text>Multiple Selection</Text>
-            <Switch
-              value={group.multiple_selection}
-              onValueChange={() =>
-                toggleGroupOption(gIndex, "multiple_selection")
-              }
-              trackColor={{ false: "#ccc", true: "#A40C2D" }}
-              thumbColor="#fff"
-            />
-            <TouchableOpacity
-              onPress={() =>
-                setTooltip(tooltip === "multi" ? null : "multi")
-              }
-            >
-              <Text style={styles.infoIcon}>ℹ️</Text>
-            </TouchableOpacity>
-          </View>
-          <Tooltip id="multi" />
-
-          <View style={styles.toggleRow}>
             <Text>Required Selection</Text>
             <Switch
               value={group.required_selection}
@@ -380,53 +431,87 @@ const AddMenu: React.FC = () => {
           </View>
           <Tooltip id="required" />
 
+          {/* Max Selection */}
+          <View style={styles.maxSelectionRowWithLabel}>
+            <View style={styles.maxSelectionLabelContainer}>
+              <Text style={styles.label}>Max Selection *</Text>
+              <TouchableOpacity
+                onPress={() => setTooltip(tooltip === "max" ? null : "max")}
+              >
+                <Text style={styles.infoIcon}>ℹ️</Text>
+              </TouchableOpacity>
+            </View>
+            <Tooltip id="max" />
+            <TouchableOpacity
+              style={styles.maxSelectionButton}
+              onPress={() => decrementMaxSelection(gIndex)}
+            >
+              <Text style={styles.maxSelectionButtonText}>−</Text>
+            </TouchableOpacity>
+            <TextInput
+              style={styles.maxSelectionInput}
+              keyboardType="numeric"
+              value={group.max_selection?.toString() || "1"}
+              onChangeText={(t) => updateMaxSelection(gIndex, t)}
+            />
+            <TouchableOpacity
+              style={styles.maxSelectionButton}
+              onPress={() => incrementMaxSelection(gIndex)}
+            >
+              <Text style={styles.maxSelectionButtonText}>+</Text>
+            </TouchableOpacity>
+          </View>
+          <Text style={styles.maxSelectionHint}>
+            Max: {group.variations.length || 0} (based on number of variations)
+          </Text>
+
           {/* Variations */}
           {group.variations.map((v, vIndex) => (
             <View key={vIndex} style={styles.variationRow}>
-              <View style={styles.variationInputs}>
-                <TextInput
-                  style={[styles.input, styles.variationInput]}
-                  placeholder="Name"
-                  value={v.name}
-                  onChangeText={(t) =>
-                    updateVariation(gIndex, vIndex, "name", t)
-                  }
-                />
-                <TextInput
-                  style={[styles.input, styles.priceInput]}
-                  placeholder="Additional price"
-                  keyboardType="numeric"
-                  value={v.price}
-                  onChangeText={(t) =>
-                    updateVariation(gIndex, vIndex, "price", t)
-                  }
-                />
-              </View>
-              <View style={styles.variationImageContainer}>
-                {v.image ? (
-                  <View style={styles.variationImagePreview}>
-                    <Image source={{ uri: v.image.uri }} style={styles.variationImage} />
-                    <TouchableOpacity
-                      style={styles.changeImageButton}
-                      onPress={() => pickVariationImage(gIndex, vIndex)}
-                    >
-                      <Text style={styles.changeImageText}>Change</Text>
-                    </TouchableOpacity>
-                  </View>
-                ) : (
-                  <TouchableOpacity
-                    style={styles.addImageButton}
-                    onPress={() => pickVariationImage(gIndex, vIndex)}
-                  >
-                    <Text style={styles.addImageText}>📷 Add Image</Text>
-                  </TouchableOpacity>
-                )}
-              </View>
+              {/* Image */}
               <TouchableOpacity
-                style={styles.removeButton}
+                style={styles.variationImageButton}
+                onPress={() => pickVariationImage(gIndex, vIndex)}
+              >
+                {v.image ? (
+                  <Image 
+                    source={{ uri: v.image.uri }} 
+                    style={styles.variationImagePreview} 
+                  />
+                ) : (
+                  <View style={styles.variationImagePlaceholder}>
+                    <Text style={styles.variationImagePlaceholderText}>📷</Text>
+                  </View>
+                )}
+              </TouchableOpacity>
+
+              {/* Name Input */}
+              <TextInput
+                style={[styles.input, styles.variationNameInput]}
+                placeholder="Name"
+                value={v.name}
+                onChangeText={(t) =>
+                  updateVariation(gIndex, vIndex, "name", t)
+                }
+              />
+
+              {/* Price Input */}
+              <TextInput
+                style={[styles.input, styles.variationPriceInput]}
+                placeholder="Price"
+                keyboardType="numeric"
+                value={v.price}
+                onChangeText={(t) =>
+                  updateVariation(gIndex, vIndex, "price", t)
+                }
+              />
+
+              {/* Remove Button */}
+              <TouchableOpacity
+                style={styles.removeVariationButton}
                 onPress={() => removeVariation(gIndex, vIndex)}
               >
-                <Text style={styles.removeButtonText}>✕</Text>
+                <Text style={styles.removeVariationButtonText}>✕</Text>
               </TouchableOpacity>
             </View>
           ))}
@@ -519,17 +604,103 @@ const styles = StyleSheet.create({
     marginTop: 12,
     backgroundColor: "#f9f9f9",
   },
-  variationRow: { marginTop: 6, padding: 8, backgroundColor: "#f9f9f9", borderRadius: 8 },
-  variationInputs: { flexDirection: "row", alignItems: "center", marginBottom: 8 },
-  variationInput: { flex: 2, marginRight: 6 },
-  priceInput: { flex: 1, marginRight: 6 },
-  variationImageContainer: { marginBottom: 8 },
-  variationImagePreview: { alignItems: "center" },
-  variationImage: { width: 80, height: 80, borderRadius: 8, marginBottom: 4 },
-  changeImageButton: { backgroundColor: "#A40C2D", paddingHorizontal: 12, paddingVertical: 4, borderRadius: 4 },
-  changeImageText: { color: "#fff", fontSize: 12 },
-  addImageButton: { backgroundColor: "#f0f0f0", padding: 12, borderRadius: 8, alignItems: "center", borderWidth: 1, borderColor: "#ddd" },
-  addImageText: { color: "#666", fontSize: 14 },
+  variationRow: { 
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: 6,
+    gap: 6,
+  },
+  variationImageButton: {
+    width: 50,
+    height: 50,
+    borderRadius: 8,
+    overflow: "hidden",
+    borderWidth: 1,
+    borderColor: "#ddd",
+  },
+  variationImagePreview: {
+    width: "100%",
+    height: "100%",
+  },
+  variationImagePlaceholder: {
+    width: "100%",
+    height: "100%",
+    backgroundColor: "#f0f0f0",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  variationImagePlaceholderText: {
+    fontSize: 20,
+  },
+  variationNameInput: {
+    flex: 2,
+    marginTop: 0,
+  },
+  variationPriceInput: {
+    flex: 1,
+    marginTop: 0,
+  },
+  removeVariationButton: {
+    width: 40,
+    height: 40,
+    backgroundColor: "#ffdddd",
+    borderRadius: 8,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  removeVariationButtonText: {
+    color: "darkred",
+    fontSize: 20,
+    fontWeight: "bold",
+  },
+  maxSelectionContainer: {
+    marginTop: 8,
+  },
+  maxSelectionRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  maxSelectionRowWithLabel: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginTop: 8,
+  },
+  maxSelectionLabelContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    minWidth: 120,
+  },
+  maxSelectionButton: {
+    width: 40,
+    height: 40,
+    backgroundColor: "#A40C2D",
+    borderRadius: 8,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  maxSelectionButtonText: {
+    color: "#fff",
+    fontSize: 24,
+    fontWeight: "bold",
+  },
+  maxSelectionInput: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: "#ccc",
+    padding: 10,
+    borderRadius: 8,
+    textAlign: "center",
+    fontSize: 16,
+    backgroundColor: "#fff",
+  },
+  maxSelectionHint: {
+    fontSize: 12,
+    color: "#666",
+    marginTop: 4,
+    marginLeft: 8,
+  },
   removeButton: {
     backgroundColor: "#ffdddd",
     paddingHorizontal: 10,

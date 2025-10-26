@@ -91,14 +91,22 @@ const MenuItemDetails = () => {
   // Handle variation selection
   const toggleVariation = (group: any, variation: any) => {
     const alreadySelected = selectedVariations.find((v) => v.id === variation.id);
-
-    if (group.multiple_selection) {
+    const maxSelection = group.max_selection || 1;
+    
+    // Get currently selected variations for this group
+    const selectionsInGroup = selectedVariations.filter((v) => v.group_id === group.id);
+    
+    if (maxSelection > 1) {
+      // Multiple selection allowed up to max_selection
       if (alreadySelected) {
         setSelectedVariations(selectedVariations.filter((v) => v.id !== variation.id));
-      } else {
+      } else if (selectionsInGroup.length < maxSelection) {
         setSelectedVariations([...selectedVariations, { ...variation, group_id: group.id }]);
+      } else {
+        Alert.alert("Selection Limit", `You can only select up to ${maxSelection} option(s) from this group.`);
       }
     } else {
+      // Single selection only
       setSelectedVariations([
         ...selectedVariations.filter((v) => v.group_id !== group.id),
         { ...variation, group_id: group.id },
@@ -112,7 +120,7 @@ const MenuItemDetails = () => {
       setPlacingOrder(true);
       if (!user) return Alert.alert("Error", "You must be logged in to place an order.");
 
-      // Validate required selections
+      // Validate required selections and max selections
       for (const [groupName, group] of Object.entries<any>(groupedVariations)) {
         if (group.required_selection) {
           const hasSelection = selectedVariations.some((v) => v.group_id === group.id);
@@ -120,6 +128,14 @@ const MenuItemDetails = () => {
             setPlacingOrder(false);
             return Alert.alert("Missing Selection", `Please select at least one option from "${groupName}".`);
           }
+        }
+        
+        // Validate max_selection limit
+        const selectionsInGroup = selectedVariations.filter((v) => v.group_id === group.id);
+        const maxSelection = group.max_selection || 1;
+        if (selectionsInGroup.length > maxSelection) {
+          setPlacingOrder(false);
+          return Alert.alert("Too Many Selections", `You can only select up to ${maxSelection} option(s) from "${groupName}".`);
         }
       }
 
@@ -310,14 +326,21 @@ const MenuItemDetails = () => {
         </View>
 
         {/* Variations */}
-        {Object.entries<any>(groupedVariations).map(([groupName, group]) => (
-          <View key={group.id} style={styles.group}>
-            <Text style={styles.groupTitle}>
-              {groupName}{" "}
-              {group.multiple_selection && <Text style={styles.multiple}>(Multiple choices allowed)</Text>}
-              {group.required_selection && <Text style={styles.required}>*Required</Text>}
-              
-            </Text>
+        {Object.entries<any>(groupedVariations).map(([groupName, group]) => {
+          const selectionsInGroup = selectedVariations.filter((v) => v.group_id === group.id);
+          const maxSelection = group.max_selection || 1;
+          
+          return (
+            <View key={group.id} style={styles.group}>
+              <Text style={styles.groupTitle}>
+                {groupName}{" "}
+                {group.required_selection && <Text style={styles.required}>*Required</Text>}
+              </Text>
+              {maxSelection > 1 && (
+                <Text style={styles.selectionCounter}>
+                  Selected: {selectionsInGroup.length} / {maxSelection}
+                </Text>
+              )}
             {group.variations.map((variation: any) => {
               const isSelected = selectedVariations.some((v) => v.id === variation.id);
               return (
@@ -343,7 +366,8 @@ const MenuItemDetails = () => {
               );
             })}
           </View>
-        ))}
+          );
+        })}
 
         {/* Note */}
         <Text style={styles.noteLabel}>Add Note:</Text>
@@ -501,6 +525,7 @@ const styles = StyleSheet.create({
   groupTitle: { fontSize: 16, fontWeight: "600", marginBottom: 8 },
   required: { color: "red", fontSize: 14 },
   multiple: { fontSize: 12, color: "#555", marginLeft: 5 },
+  selectionCounter: { fontSize: 12, color: "#666", marginTop: 4, fontWeight: "500" },
   option: { padding: 10, backgroundColor: "#f2f2f2", borderRadius: 8, marginBottom: 6 },
   optionSelected: { backgroundColor: "#A40C2D33", borderWidth: 1, borderColor: "#A40C2D" },
   variationContent: { flexDirection: "row", alignItems: "center" },

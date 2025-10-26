@@ -87,11 +87,10 @@ CREATE TABLE IF NOT EXISTS tblitemvariationgroup (
     id SERIAL PRIMARY KEY,
     variation_group_name VARCHAR(100) NOT NULL,
     menu_item_id INT NOT NULL,
-    multiple_selection BOOLEAN DEFAULT FALSE,
     required_selection BOOLEAN DEFAULT FALSE,
+    max_selection INT DEFAULT 1,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-
     CONSTRAINT fk_menuitem_variation_group
         FOREIGN KEY (menu_item_id)
         REFERENCES tblmenuitem (id)

@@ -349,8 +349,8 @@ export const getMenuItemsByConcessionaire = async (req, res) => {
       const vRes = await pool.query(
         `SELECT ivg.id AS group_id, ivg.menu_item_id, 
                 ivg.variation_group_name AS label,
-                ivg.multiple_selection, ivg.required_selection,
-                iv.variation_name, iv.additional_price
+                ivg.multiple_selection, ivg.required_selection, ivg.max_selection,
+                iv.variation_name, iv.additional_price, iv.image, iv.id AS variation_id
         FROM tblitemvariationgroup ivg
         LEFT JOIN tblitemvariation iv 
           ON iv.item_variation_group_id = ivg.id
@@ -365,6 +365,7 @@ export const getMenuItemsByConcessionaire = async (req, res) => {
             label: v.label,
             multiple_selection: v.multiple_selection,
             required_selection: v.required_selection,
+            max_selection: v.max_selection,
             variations: []
           };
         }
@@ -372,6 +373,8 @@ export const getMenuItemsByConcessionaire = async (req, res) => {
           variationsMap[v.menu_item_id][v.label].variations.push({
             name: v.variation_name,
             price: Number(v.additional_price),
+            image_url: makeImageDataUrl(v.image),
+            variation_id: v.variation_id,
           });
         }
       }
@@ -481,10 +484,10 @@ export const addMenuItem = async (req, res) => {
       for (const group of parsed) {
         const groupRes = await client.query(
           `INSERT INTO tblitemvariationgroup 
-            (menu_item_id, variation_group_name, multiple_selection, required_selection)
-           VALUES ($1,$2,$3,$4)
+            (menu_item_id, variation_group_name, multiple_selection, required_selection, max_selection)
+           VALUES ($1,$2,$3,$4,$5)
            RETURNING id`,
-          [menuItemId, group.label, parseBool(group.multiple_selection), parseBool(group.required_selection)]
+          [menuItemId, group.label, parseBool(group.multiple_selection), parseBool(group.required_selection), group.max_selection || 1]
         );
 
         const groupId = groupRes.rows[0].id;
@@ -609,13 +612,14 @@ export const updateMenuItem = async (req, res) => {
     for (const group of variations) {
       const insertGroup = await client.query(
         `INSERT INTO tblitemvariationgroup 
-          (variation_group_name, menu_item_id, multiple_selection, required_selection) 
-        VALUES ($1, $2, $3, $4) RETURNING id`,
+          (variation_group_name, menu_item_id, multiple_selection, required_selection, max_selection) 
+        VALUES ($1, $2, $3, $4, $5) RETURNING id`,
         [
           group.label || "Default",
           id,
           group.multiple_selection || false,
           group.required_selection || false,
+          group.max_selection || 1,
         ]
       );
       const groupId = insertGroup.rows[0].id;
