@@ -131,6 +131,7 @@ CREATE TABLE IF NOT EXISTS tblorder (
     in_cart BOOLEAN DEFAULT FALSE,
     gcash_screenshot BYTEA,
     decline_reason TEXT,
+    
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 

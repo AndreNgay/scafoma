@@ -98,7 +98,6 @@ export const getUser = async (req, res) => {
 
     const user = result.rows[0];
 
-    // 🔥 Convert binary to Base64 string for frontend
     if (user.profile_image) {
       user.profile_image_url = `data:image/jpeg;base64,${user.profile_image.toString("base64")}`;
     } else {
@@ -109,6 +108,32 @@ export const getUser = async (req, res) => {
     res.status(200).json({ user });
   } catch (error) {
     console.error("Error fetching user:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+export const getUserById = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const result = await pool.query("SELECT id, first_name, last_name, email, role, profile_image, created_at, updated_at FROM tbluser WHERE id = $1", [id]);
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    const user = result.rows[0];
+
+    if (user.profile_image) {
+      user.profile_image_url = `data:image/jpeg;base64,${user.profile_image.toString("base64")}`;
+    } else {
+      user.profile_image_url = null;
+    }
+    delete user.profile_image;
+
+    res.status(200).json(user);
+  } catch (error) {
+    console.error("Error fetching user by ID:", error);
     res.status(500).json({ message: "Server error" });
   }
 };
@@ -131,7 +156,7 @@ export const getAllUsers = async (req, res) => {
 
 export const changePassword = async (req, res) => {
   try {
-    const { id } = req.params;  // ✅ get from URL param
+    const { id } = req.params;  
     const { currentPassword, newPassword, confirmPassword } = req.body;
 
     const userExists = await pool.query({

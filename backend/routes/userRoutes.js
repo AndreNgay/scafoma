@@ -8,7 +8,8 @@ import {
   deleteUser,
   createConcessionaire,
   resetPassword,
-  getUser
+  getUser,
+  getUserById
 } from "../controllers/userController.js";
 import multer from "multer";
 
@@ -17,6 +18,9 @@ const router = express.Router();
 
 // Get currently logged-in user
 router.get("/", authMiddleware, getUser);
+
+// Get user by ID
+router.get("/:id", getUserById);
 
 // Get all users
 router.get("/all", getAllUsers);

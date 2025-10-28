@@ -12,11 +12,12 @@ import {
   Modal,
   TextInput,
 } from "react-native";
-import { useRoute } from "@react-navigation/native";
+import { useRoute, useNavigation } from "@react-navigation/native";
 import api from "../../../libs/apiCall";
 
 const ViewOrderConcessionaire = () => {
   const route = useRoute<any>();
+  const navigation = useNavigation<any>();
   const { orderId } = route.params;
 
   const [order, setOrder] = useState<any>(null);
@@ -192,6 +193,28 @@ const ViewOrderConcessionaire = () => {
 
   return (
     <ScrollView style={styles.container}>
+      {/* Customer Info Section */}
+      <TouchableOpacity 
+        style={styles.customerSection}
+        onPress={() => navigation.navigate("View Customer Profile", { customerId: order.customer_id })}
+      >
+        {order.profile_image ? (
+          <Image source={{ uri: order.profile_image }} style={styles.customerAvatar} />
+        ) : (
+          <View style={styles.customerAvatarPlaceholder}>
+            <Text style={styles.customerInitials}>
+              {order.first_name?.[0]}{order.last_name?.[0]}
+            </Text>
+          </View>
+        )}
+        <View style={styles.customerInfo}>
+          <Text style={styles.customerName}>
+            {order.first_name} {order.last_name}
+          </Text>
+          <Text style={styles.customerEmail}>{order.email}</Text>
+        </View>
+      </TouchableOpacity>
+
       <Text style={styles.header}>Order #{order.id}</Text>
       
       {/* Order Status */}
@@ -365,6 +388,46 @@ const ViewOrderConcessionaire = () => {
 
 const styles = StyleSheet.create({
   container: { flex: 1, padding: 15, backgroundColor: "#fff" },
+  customerSection: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#f9f9f9",
+    padding: 15,
+    borderRadius: 10,
+    marginBottom: 20,
+  },
+  customerAvatar: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+  },
+  customerAvatarPlaceholder: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: "#A40C2D",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  customerInitials: {
+    color: "#fff",
+    fontSize: 20,
+    fontWeight: "bold",
+  },
+  customerInfo: {
+    flex: 1,
+    marginLeft: 15,
+  },
+  customerName: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#333",
+    marginBottom: 4,
+  },
+  customerEmail: {
+    fontSize: 14,
+    color: "#666",
+  },
   header: { fontSize: 20, fontWeight: "bold", marginBottom: 15, color: "#A40C2D" },
   infoSection: { 
     flexDirection: "row", 

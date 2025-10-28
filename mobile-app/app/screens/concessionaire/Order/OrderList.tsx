@@ -24,6 +24,7 @@ interface Order {
   last_name: string;
   concession_name: string;
   profile_image?: string | null;
+  customer_id: number;
 }
 
 const PAGE_SIZE = 10;
@@ -163,14 +164,25 @@ const OrderList = () => {
       onPress={() => navigation.navigate("View Order", { orderId: item.id })}
     >
       <View style={{ flexDirection: "row", alignItems: "center" }}>
-        <Image
-          source={{
-            uri: item.profile_image
-              ? item.profile_image
-              : "https://static.vecteezy.com/system/resources/previews/006/487/917/non_2x/man-avatar-icon-free-vector.jpg",
+        <TouchableOpacity
+          onPress={(e) => {
+            e.stopPropagation();
+            navigation.navigate("View Customer Profile", { customerId: item.customer_id });
           }}
-          style={styles.avatar}
-        />
+        >
+          {item.profile_image ? (
+            <Image
+              source={{ uri: item.profile_image }}
+              style={styles.avatar}
+            />
+          ) : (
+            <View style={styles.avatarPlaceholder}>
+              <Text style={styles.avatarInitials}>
+                {item.first_name?.[0]}{item.last_name?.[0]}
+              </Text>
+            </View>
+          )}
+        </TouchableOpacity>
         <View style={{ flex: 1, marginLeft: 10 }}>
           <Text style={styles.orderId}>Order #{item.id}</Text>
           <Text style={styles.customer}>
@@ -405,7 +417,19 @@ const styles = StyleSheet.create({
     width: 50,
     height: 50,
     borderRadius: 25,
-    backgroundColor: "#ddd",
+  },
+  avatarPlaceholder: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: "#A40C2D",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  avatarInitials: {
+    color: "#fff",
+    fontSize: 16,
+    fontWeight: "bold",
   },
   fullLoader: {
     flex: 1,

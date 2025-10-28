@@ -28,6 +28,7 @@ import Cart from "./screens/customer/Cart/Cart";
 import OrderList from "./screens/concessionaire/Order/OrderList";
 import ViewOrderCustomer from "./screens/customer/Orders/ViewOrderCustomer";
 import ViewOrderConcessionaire from "./screens/concessionaire/Order/ViewOrderConcessionaire";
+import ViewCustomerProfile from "./screens/concessionaire/Order/ViewCustomerProfile";
 import AddMenu from "./screens/concessionaire/Menu/AddMenu";
 import ViewMenu from "./screens/concessionaire/Menu/ViewMenu";
 import Notifications from "./screens/Notifications";
@@ -126,6 +127,11 @@ function OrderListStack() {
       <MenuStackNav.Screen
         name="View Order"
         component={ViewOrderConcessionaire}
+        options={{ headerShown: false }}
+      />
+      <MenuStackNav.Screen
+        name="View Customer Profile"
+        component={ViewCustomerProfile}
         options={{ headerShown: false }}
       />
     </MenuStackNav.Navigator>
