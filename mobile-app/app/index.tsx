@@ -2,12 +2,15 @@ import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   View,
+  Text,
+  StyleSheet,
 } from "react-native";
 import { NavigationContainer } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { Ionicons } from "@expo/vector-icons";
 import useStore from "./store";
+import api from "./libs/apiCall";
 
 // Screens
 import SignIn from "./screens/auth/SignIn";
@@ -130,6 +133,25 @@ function OrderListStack() {
 }
 
 function CustomerTabs() {
+  const { user } = useStore();
+  const [notificationCount, setNotificationCount] = useState(0);
+
+  useEffect(() => {
+    const fetchUnreadCount = async () => {
+      if (!user?.id) return;
+      try {
+        const res = await api.get(`/notification/${user.id}/unread-count`);
+        setNotificationCount(res.data.count || 0);
+      } catch (err) {
+        console.error("Error fetching unread count:", err);
+      }
+    };
+
+    fetchUnreadCount();
+    const interval = setInterval(fetchUnreadCount, 30000); // Poll every 30 seconds
+    return () => clearInterval(interval);
+  }, [user?.id]);
+
   return (
     <Tab.Navigator 
       screenOptions={{ 
@@ -205,8 +227,20 @@ function CustomerTabs() {
           title: "",
           tabBarLabel: 'Notifications',
           tabBarIcon: ({ color, size }) => (
-            <Ionicons name="notifications" size={size} color={color} />
+            <View>
+              <Ionicons name="notifications" size={size} color={color} />
+              {notificationCount > 0 && (
+                <View style={styles.badgeContainer}>
+                  <Text style={styles.badgeText}>
+                    {notificationCount > 99 ? '99+' : notificationCount}
+                  </Text>
+                </View>
+              )}
+            </View>
           ),
+        }}
+        listeners={{
+          tabPress: () => setNotificationCount(0),
         }}
       />
       <Tab.Screen 
@@ -225,6 +259,25 @@ function CustomerTabs() {
 }
 
 function ConcessionaireTabs() {
+  const { user } = useStore();
+  const [notificationCount, setNotificationCount] = useState(0);
+
+  useEffect(() => {
+    const fetchUnreadCount = async () => {
+      if (!user?.id) return;
+      try {
+        const res = await api.get(`/notification/${user.id}/unread-count`);
+        setNotificationCount(res.data.count || 0);
+      } catch (err) {
+        console.error("Error fetching unread count:", err);
+      }
+    };
+
+    fetchUnreadCount();
+    const interval = setInterval(fetchUnreadCount, 30000); // Poll every 30 seconds
+    return () => clearInterval(interval);
+  }, [user?.id]);
+
   return (
     <Tab.Navigator 
       screenOptions={{ 
@@ -283,8 +336,20 @@ function ConcessionaireTabs() {
           title: "",
           tabBarLabel: 'Notifications',
           tabBarIcon: ({ color, size }) => (
-            <Ionicons name="notifications" size={size} color={color} />
+            <View>
+              <Ionicons name="notifications" size={size} color={color} />
+              {notificationCount > 0 && (
+                <View style={styles.badgeContainer}>
+                  <Text style={styles.badgeText}>
+                    {notificationCount > 99 ? '99+' : notificationCount}
+                  </Text>
+                </View>
+              )}
+            </View>
           ),
+        }}
+        listeners={{
+          tabPress: () => setNotificationCount(0),
         }}
       />
       <Tab.Screen 
@@ -348,3 +413,23 @@ export default function RootNavigator() {
     </Stack.Navigator>
   );
 }
+
+const styles = StyleSheet.create({
+  badgeContainer: {
+    position: 'absolute',
+    top: -5,
+    right: -8,
+    backgroundColor: '#A40C2D',
+    borderRadius: 10,
+    minWidth: 20,
+    height: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 6,
+  },
+  badgeText: {
+    color: '#fff',
+    fontSize: 11,
+    fontWeight: 'bold',
+  },
+});

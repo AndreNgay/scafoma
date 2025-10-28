@@ -1,5 +1,6 @@
 import { pool } from "../libs/database.js";
 import multer from "multer";
+import { notifyNewOrder, notifyOrderStatusChange } from "../services/notificationService.js";
 
 const storage = multer.memoryStorage();
 export const upload = multer({ storage });
@@ -189,7 +190,29 @@ export const updateOrderStatus = async (req, res) => {
     
     const result = await pool.query(query, params);
     if (result.rowCount === 0) return res.status(404).json({ error: "Order not found" });
-    res.json(result.rows[0]);
+    
+    const order = result.rows[0];
+    
+    // Send notification to customer about order status change
+    try {
+      const concessionResult = await pool.query(
+        `SELECT c.concession_name FROM tblconcession c WHERE c.id = $1`,
+        [order.concession_id]
+      );
+      const concessionName = concessionResult.rows[0]?.concession_name || '';
+      
+      await notifyOrderStatusChange(
+        order.id,
+        order.customer_id,
+        order_status,
+        concessionName
+      );
+    } catch (notifErr) {
+      console.error("Error creating order status notification:", notifErr);
+      // Don't fail the status update if notification fails
+    }
+    
+    res.json(order);
   } catch (err) {
     console.error("Error updating order status:", err);
     res.status(500).json({ error: "Failed to update order status" });
@@ -479,6 +502,48 @@ export const checkoutCart = async (req, res) => {
     
     const params = schedule_time ? [id, schedule_time] : [id];
     const result = await pool.query(updateQuery, params);
+
+    // Create notifications for concessionaires for each order
+    console.log(`📦 Creating notifications for ${result.rows.length} orders`);
+    
+    for (const order of result.rows) {
+      try {
+        // Get concessionaire_id for this concession
+        const concessionResult = await pool.query(
+          `SELECT c.concessionaire_id, c.concession_name
+           FROM tblconcession c
+           WHERE c.id = $1`,
+          [order.concession_id]
+        );
+        
+        // Get customer name
+        const customerResult = await pool.query(
+          `SELECT first_name, last_name FROM tbluser WHERE id = $1`,
+          [id]
+        );
+        
+        if (concessionResult.rows.length > 0 && customerResult.rows.length > 0) {
+          const concessionaireId = concessionResult.rows[0].concessionaire_id;
+          const customer = customerResult.rows[0];
+          const customerName = `${customer.first_name} ${customer.last_name}`;
+          
+          // Get order item count
+          const itemCountResult = await pool.query(
+            `SELECT COUNT(*) as count FROM tblorderdetail WHERE order_id = $1`,
+            [order.id]
+          );
+          const itemCount = parseInt(itemCountResult.rows[0].count);
+          
+          // Create notification for concessionaire
+          await notifyNewOrder(order.id, concessionaireId, customerName, itemCount);
+        }
+      } catch (notifErr) {
+        console.error("Error creating notification:", notifErr);
+        // Don't fail the checkout if notification fails
+      }
+    }
+    
+    console.log('✅ Notification creation complete');
 
     let message = "Checkout successful";
     if (schedule_time) {

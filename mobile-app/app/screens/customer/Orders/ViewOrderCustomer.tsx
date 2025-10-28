@@ -23,6 +23,7 @@ const ViewOrderCustomer = () => {
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [cancelling, setCancelling] = useState(false);
+  const [updatingPayment, setUpdatingPayment] = useState(false);
 
   const formatManila = (value: any) => {
     if (!value) return "";
@@ -191,6 +192,32 @@ const ViewOrderCustomer = () => {
   };
 
   // ===============================
+  // Change payment method
+  // ===============================
+  const changePaymentMethod = async (method: 'gcash' | 'on-counter') => {
+    if (!order) return;
+    if (order.payment_method === method) return;
+    // Only allow change when order is pending
+    if (order.order_status !== 'pending') {
+      return Alert.alert('Not Allowed', 'Payment method can only be changed while the order is pending.');
+    }
+    // Guard against unavailable methods
+    if (method === 'gcash' && !order.gcash_payment_available) return;
+    if (method === 'on-counter' && !order.oncounter_payment_available) return;
+
+    try {
+      setUpdatingPayment(true);
+      await api.patch(`/order/${order.id}/payment-method`, { payment_method: method });
+      await fetchOrder();
+    } catch (err: any) {
+      console.error('Error updating payment method:', err);
+      Alert.alert('Error', err.response?.data?.error || 'Failed to update payment method');
+    } finally {
+      setUpdatingPayment(false);
+    }
+  };
+
+  // ===============================
   // Render
   // ===============================
   if (loading)
@@ -230,9 +257,49 @@ const ViewOrderCustomer = () => {
 
       <View style={{ marginTop: 15 }}>
         <Text style={styles.paymentLabel}>Payment Method</Text>
-        <Text style={styles.paymentMethodDisplay}>
-          {order.payment_method === "gcash" ? "💳 GCash" : "💰 On-Counter"}
-        </Text>
+        <View style={styles.paymentMethodButtons}>
+          {/* GCash option */}
+          <TouchableOpacity
+            style={[
+              styles.paymentMethodButton,
+              order.payment_method === 'gcash' && styles.paymentMethodSelected,
+              !order.gcash_payment_available && styles.paymentMethodDisabled,
+            ]}
+            disabled={!order.gcash_payment_available || updatingPayment}
+            onPress={() => changePaymentMethod('gcash')}
+          >
+            <Text
+              style={[
+                styles.paymentMethodText,
+                order.payment_method === 'gcash' && styles.paymentMethodTextSelected,
+                !order.gcash_payment_available && styles.paymentMethodTextDisabled,
+              ]}
+            >
+              💳 GCash {(!order.gcash_payment_available) ? '(Unavailable)' : ''}
+            </Text>
+          </TouchableOpacity>
+
+          {/* On-Counter option */}
+          <TouchableOpacity
+            style={[
+              styles.paymentMethodButton,
+              order.payment_method === 'on-counter' && styles.paymentMethodSelected,
+              !order.oncounter_payment_available && styles.paymentMethodDisabled,
+            ]}
+            disabled={!order.oncounter_payment_available || updatingPayment}
+            onPress={() => changePaymentMethod('on-counter')}
+          >
+            <Text
+              style={[
+                styles.paymentMethodText,
+                order.payment_method === 'on-counter' && styles.paymentMethodTextSelected,
+                !order.oncounter_payment_available && styles.paymentMethodTextDisabled,
+              ]}
+            >
+              💰 On-Counter {(!order.oncounter_payment_available) ? '(Unavailable)' : ''}
+            </Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
       {order.payment_method === "gcash" ? (
@@ -357,15 +424,34 @@ const styles = StyleSheet.create({
     marginTop: 10,
   },
   paymentLabel: { fontWeight: "600", color: "#A40C2D", marginBottom: 5 },
-  paymentMethodDisplay: { 
-    fontSize: 16, 
-    fontWeight: "500", 
-    color: "#333", 
-    backgroundColor: "#f9f9f9", 
-    padding: 12, 
+  paymentMethodButtons: { flexDirection: "row", gap: 10 },
+  paymentMethodButton: {
+    flex: 1,
+    padding: 12,
     borderRadius: 8,
-    borderWidth: 1,
-    borderColor: "#ddd"
+    borderWidth: 2,
+    borderColor: "#ddd",
+    backgroundColor: "#f9f9f9",
+    alignItems: "center",
+  },
+  paymentMethodSelected: {
+    borderColor: "#A40C2D",
+    backgroundColor: "#A40C2D22",
+  },
+  paymentMethodDisabled: {
+    opacity: 0.5,
+  },
+  paymentMethodText: {
+    fontSize: 14,
+    fontWeight: "500",
+    color: "#666",
+  },
+  paymentMethodTextSelected: {
+    color: "#A40C2D",
+    fontWeight: "600",
+  },
+  paymentMethodTextDisabled: {
+    color: "#999",
   },
   uploadDisabledContainer: {
     backgroundColor: "#f0f0f0",

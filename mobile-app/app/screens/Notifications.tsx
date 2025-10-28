@@ -5,12 +5,17 @@ import {
   FlatList,
   ActivityIndicator,
   StyleSheet,
+  TouchableOpacity,
+  Alert,
 } from "react-native";
+import { useFocusEffect, useNavigation } from "@react-navigation/native";
 import api from "../libs/apiCall";
 import useStore from "../store";
+import { scheduleLocalNotification } from "../libs/notificationService";
 
 const Notifications = () => {
   const { user } = useStore();
+  const navigation = useNavigation<any>();
   const [notifications, setNotifications] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
@@ -53,19 +58,60 @@ const Notifications = () => {
     fetchNotifications();
   }, [user?.id]);
 
+  // Refresh notifications when screen comes into focus
+  useFocusEffect(
+    React.useCallback(() => {
+      if (user?.id) {
+        fetchNotifications();
+      }
+    }, [user?.id])
+  );
+
+  const unreadCount = notifications.filter(n => !n.is_read).length;
+
+  const handleNotificationPress = async (item: any) => {
+    // Mark as read
+    if (!item.is_read) {
+      try {
+        await api.put(`/notification/${item.id}/read`);
+        setNotifications(prev => 
+          prev.map(n => n.id === item.id ? { ...n, is_read: true } : n)
+        );
+      } catch (err) {
+        console.error("Error marking notification as read:", err);
+      }
+    }
+
+    // Navigate based on notification type and user role
+    if (item.notification_type === 'new_order' && user?.role === 'concessionaire') {
+      // Extract order ID from message or navigate to orders list
+      navigation.navigate('Order List');
+    } else if (item.notification_type === 'order_update' && user?.role === 'customer') {
+      navigation.navigate('Orders');
+    }
+  };
+
   const renderItem = ({ item }: { item: any }) => (
-    <View
-      style={[
-        styles.notificationCard,
-        { backgroundColor: item.is_read ? "#f5f5f5" : "#ffe5e5" },
-      ]}
+    <TouchableOpacity
+      onPress={() => handleNotificationPress(item)}
     >
-      <Text style={styles.type}>{item.notification_type}</Text>
-      <Text style={styles.message}>{item.message}</Text>
-      <Text style={styles.date}>
-        {new Date(item.created_at).toLocaleString()}
-      </Text>
-    </View>
+      <View
+        style={[
+          styles.notificationCard,
+          { backgroundColor: item.is_read ? "#f5f5f5" : "#ffe5e5" },
+          !item.is_read && styles.unreadCard,
+        ]}
+      >
+        {!item.is_read && <View style={styles.unreadDot} />}
+        <View style={styles.cardContent}>
+          <Text style={styles.type}>{item.notification_type}</Text>
+          <Text style={styles.message}>{item.message}</Text>
+          <Text style={styles.date}>
+            {new Date(item.created_at).toLocaleString()}
+          </Text>
+        </View>
+      </View>
+    </TouchableOpacity>
   );
 
   if (loading)
@@ -75,7 +121,14 @@ const Notifications = () => {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.header}>Notifications</Text>
+      <View style={styles.headerContainer}>
+        <Text style={styles.header}>Notifications</Text>
+        {unreadCount > 0 && (
+          <View style={styles.badge}>
+            <Text style={styles.badgeText}>{unreadCount}</Text>
+          </View>
+        )}
+      </View>
 
       {error ? (
         <Text style={styles.error}>{error}</Text>
@@ -97,13 +150,49 @@ const Notifications = () => {
 
 const styles = StyleSheet.create({
   container: { flex: 1, padding: 15, backgroundColor: "#fff" },
-  header: { fontSize: 20, fontWeight: "bold", color: "#A40C2D", marginBottom: 10 },
+  headerContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 10,
+  },
+  header: { fontSize: 20, fontWeight: "bold", color: "#A40C2D" },
+  badge: {
+    backgroundColor: "#A40C2D",
+    borderRadius: 12,
+    minWidth: 24,
+    height: 24,
+    paddingHorizontal: 8,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  badgeText: {
+    color: "#fff",
+    fontSize: 12,
+    fontWeight: "bold",
+  },
   notificationCard: {
     padding: 12,
     borderRadius: 10,
     marginBottom: 10,
     borderWidth: 1,
     borderColor: "#ddd",
+    flexDirection: "row",
+  },
+  unreadCard: {
+    borderWidth: 2,
+    borderColor: "#A40C2D",
+  },
+  unreadDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: "#A40C2D",
+    marginRight: 10,
+    marginTop: 6,
+  },
+  cardContent: {
+    flex: 1,
   },
   type: { fontWeight: "600", color: "#A40C2D", marginBottom: 5 },
   message: { fontSize: 14, marginBottom: 5 },
