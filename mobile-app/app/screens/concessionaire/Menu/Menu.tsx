@@ -40,7 +40,7 @@ const Menu = () => {
   const [hasMore, setHasMore] = useState(true);
   const [search, setSearch] = useState("");
   const [imageError, setImageError] = useState<Record<number, boolean>>({});
-  const [groupByCategory, setGroupByCategory] = useState(true);
+  // Align with customer menu UI: simple list (no grouping toggle)
 
   const navigation = useNavigation<any>();
 
@@ -86,28 +86,18 @@ const Menu = () => {
     return items;
   }, [menuItems, search]);
 
+  // Group items by category for a SectionList
   const groupedItems = useMemo(() => {
-    if (!groupByCategory) {
-      return [{ title: "All Items", data: processedItems }];
-    }
-
     const groups: { [key: string]: MenuItem[] } = {};
-    
-    processedItems.forEach(item => {
+    processedItems.forEach((item) => {
       const category = item.category || "Uncategorized";
-      if (!groups[category]) {
-        groups[category] = [];
-      }
+      if (!groups[category]) groups[category] = [];
       groups[category].push(item);
     });
-
     return Object.keys(groups)
       .sort()
-      .map(category => ({
-        title: category,
-        data: groups[category]
-      }));
-  }, [processedItems, groupByCategory]);
+      .map((category) => ({ title: category, data: groups[category] }));
+  }, [processedItems]);
 
   if (loading && !refreshing) {
     return (
@@ -126,19 +116,7 @@ const Menu = () => {
         onChangeText={setSearch}
       />
 
-      {/* Group by Category Toggle */}
-      <View style={styles.toggleContainer}>
-        <TouchableOpacity
-          style={[styles.toggleButton, groupByCategory && styles.toggleButtonActive]}
-          onPress={() => setGroupByCategory(!groupByCategory)}
-        >
-          <Text style={[styles.toggleButtonText, groupByCategory && styles.toggleButtonTextActive]}>
-            {groupByCategory ? "📁 Grouped by Category" : "📄 List View"}
-          </Text>
-        </TouchableOpacity>
-      </View>
-
-      {processedItems.length === 0 ? (
+      {groupedItems.length === 0 ? (
         <View style={styles.center}>
           <Text>No menu items found.</Text>
         </View>
@@ -151,7 +129,7 @@ const Menu = () => {
           onEndReached={loadMore}
           onEndReachedThreshold={0.5}
           ListFooterComponent={
-            loadingMore ? <ActivityIndicator size="small" color="darkred" style={{ margin: 10 }} /> : null
+            loadingMore ? <ActivityIndicator size="small" color="#A40C2D" style={{ margin: 10 }} /> : null
           }
           renderSectionHeader={({ section: { title } }) => (
             <View style={styles.sectionHeader}>
@@ -163,29 +141,24 @@ const Menu = () => {
               style={styles.card}
               onPress={() => navigation.navigate("View Menu", { menuItem: item })}
             >
-              <Image
-                source={{
-                  uri: !imageError[item.id] && item.image_url
-                    ? item.image_url
-                    : "https://cdn-icons-png.flaticon.com/512/9417/9417083.png",
-                }}
-                style={styles.image}
-                onError={() => setImageError((prev) => ({ ...prev, [item.id]: true }))}
-              />
+              {(!imageError[item.id] && item.image_url) ? (
+                <Image
+                  source={{ uri: item.image_url }}
+                  style={styles.image}
+                  onError={() => setImageError((prev) => ({ ...prev, [item.id]: true }))}
+                />
+              ) : (
+                <View style={styles.placeholder} />
+              )}
               <View style={styles.info}>
                 <Text style={styles.name}>{item.item_name}</Text>
-                <Text style={styles.price}>₱ {item.price.toFixed(2)}</Text>
-                {item.category && <Text style={styles.category}>Category: {item.category}</Text>}
+                {item.category ? (
+                  <Text style={styles.categoryTag}>{item.category}</Text>
+                ) : null}
+                <Text style={styles.price}>₱{item.price.toFixed(2)}</Text>
                 <Text style={{ color: item.availability ? "green" : "red", marginTop: 2 }}>
                   {item.availability ? "Available" : "Unavailable"}
                 </Text>
-                {item.variations && item.variations.length > 0 &&
-                  item.variations.map((v) => (
-                    <Text key={v.label} style={styles.subInfo}>
-                      {v.label}: {v.variations.map((x) => x.name).join(", ")}
-                    </Text>
-                  ))
-                }
               </View>
 
               {/* Edit button */}
@@ -227,13 +200,15 @@ const styles = StyleSheet.create({
     position: "relative",
   },
   image: { width: 70, height: 70, borderRadius: 8, marginRight: 12 },
+  placeholder: { width: 70, height: 70, borderRadius: 8, backgroundColor: "#ddd", marginRight: 12 },
   info: { flex: 1 },
   name: { fontSize: 16, fontWeight: "600" },
-  price: { marginTop: 2, fontSize: 14, color: "darkred", fontWeight: "500" },
-  category: { fontSize: 13, color: "#444", marginTop: 2 },
+  price: { marginTop: 5, fontSize: 14, color: "#A40C2D", fontWeight: "600" },
+  categoryTag: { marginTop: 3, fontSize: 12, color: "#A40C2D", fontWeight: "600" },
   subInfo: { fontSize: 12, color: "#555", marginTop: 1 },
   searchInput: {
     marginHorizontal: 12,
+    marginTop: 12, // space from header
     marginBottom: 8,
     padding: 10,
     borderWidth: 1,
@@ -260,38 +235,13 @@ const styles = StyleSheet.create({
     marginTop: 10,
     marginBottom: 5,
     borderLeftWidth: 4,
-    borderLeftColor: "darkred",
+    borderLeftColor: "#A40C2D",
   },
   sectionHeaderText: {
     fontSize: 16,
     fontWeight: "bold",
-    color: "darkred",
+    color: "#A40C2D",
     textTransform: "uppercase",
-  },
-  toggleContainer: {
-    marginHorizontal: 12,
-    marginBottom: 10,
-    alignItems: "center",
-  },
-  toggleButton: {
-    backgroundColor: "#f0f0f0",
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: "#ddd",
-  },
-  toggleButtonActive: {
-    backgroundColor: "darkred",
-    borderColor: "darkred",
-  },
-  toggleButtonText: {
-    color: "#666",
-    fontWeight: "600",
-    fontSize: 14,
-  },
-  toggleButtonTextActive: {
-    color: "white",
   },
 
   floatingAddButton: {

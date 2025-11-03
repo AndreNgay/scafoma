@@ -381,7 +381,9 @@ const styles = StyleSheet.create({
     borderColor: "#ccc",
     borderRadius: 8,
     padding: 10,
-    margin: 10,
+    marginHorizontal: 10,
+    marginBottom: 10,
+    marginTop: 14, // space from header
     backgroundColor: "#fff",
   },
   filterBtn: {

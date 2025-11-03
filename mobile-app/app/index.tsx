@@ -180,7 +180,7 @@ function CustomerTabs() {
         name="Home" 
         component={Home}
         options={{
-          title: "",
+          title: "Home",
           tabBarLabel: 'Home',
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="home" size={size} color={color} />
@@ -191,7 +191,7 @@ function CustomerTabs() {
         name="Menu Items"
         component={MenuItemsStack}
         options={{
-          title: "",
+          title: "Menu",
           tabBarLabel: 'Menu',
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="restaurant" size={size} color={color} />
@@ -208,7 +208,7 @@ function CustomerTabs() {
         name="Cart" 
         component={Cart}
         options={{
-          title: "",
+          title: "Cart",
           tabBarLabel: 'Cart',
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="cart" size={size} color={color} />
@@ -219,7 +219,7 @@ function CustomerTabs() {
         name="Orders" 
         component={OrdersStack}
         options={{
-          title: "",
+          title: "Orders",
           tabBarLabel: 'Orders',
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="receipt" size={size} color={color} />
@@ -230,7 +230,7 @@ function CustomerTabs() {
         name="Notifications" 
         component={Notifications}
         options={{
-          title: "",
+          title: "Notifications",
           tabBarLabel: 'Notifications',
           tabBarIcon: ({ color, size }) => (
             <View>
@@ -253,7 +253,7 @@ function CustomerTabs() {
         name="Profile" 
         component={Profile}
         options={{
-          title: "",
+          title: "Profile",
           tabBarLabel: 'Profile',
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="person" size={size} color={color} />
@@ -306,7 +306,7 @@ function ConcessionaireTabs() {
         name="Order List" 
         component={OrderListStack}
         options={{
-          title: "",
+          title: "Orders",
           tabBarLabel: 'Orders',
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="list" size={size} color={color} />
@@ -317,7 +317,7 @@ function ConcessionaireTabs() {
         name="Menu" 
         component={MenuManagementStack}
         options={{
-          title: "",
+          title: "Menu",
           tabBarLabel: 'Menu',
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="restaurant" size={size} color={color} />
@@ -328,7 +328,7 @@ function ConcessionaireTabs() {
         name="Concession" 
         component={ConcessionaireConcessionStack}
         options={{
-          title: "",
+          title: "Concession",
           tabBarLabel: 'Concession',
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="storefront" size={size} color={color} />
@@ -339,7 +339,7 @@ function ConcessionaireTabs() {
         name="Notifications" 
         component={Notifications}
         options={{
-          title: "",
+          title: "Notifications",
           tabBarLabel: 'Notifications',
           tabBarIcon: ({ color, size }) => (
             <View>
@@ -362,7 +362,7 @@ function ConcessionaireTabs() {
         name="Profile" 
         component={Profile}
         options={{
-          title: "",
+          title: "Profile",
           tabBarLabel: 'Profile',
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="person" size={size} color={color} />
