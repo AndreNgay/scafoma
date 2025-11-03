@@ -3,6 +3,7 @@ import {
   View,
   Text,
   FlatList,
+  SectionList,
   StyleSheet,
   TouchableOpacity,
   ActivityIndicator,
@@ -91,7 +92,7 @@ const OrderList = () => {
   useFocusEffect(
     useCallback(() => {
       setPage(1);
-      setStatusFilter(["pending"]); // Set pending as default filter
+      setStatusFilter([]); // Show all by default
       fetchOrders(1, true);
     }, [user.id])
   );
@@ -198,6 +199,35 @@ const OrderList = () => {
     </TouchableOpacity>
   );
 
+  // Group orders by status when no explicit status filter is applied
+  const groupedSections = (() => {
+    if (statusFilter.length > 0) return [] as { title: string; data: Order[] }[];
+    const groups: Record<string, Order[]> = {};
+    for (const o of filteredOrders) {
+      const key = (o.order_status || 'unknown').toLowerCase();
+      if (!groups[key]) groups[key] = [];
+      groups[key].push(o);
+    }
+    const orderStatusPriority = [
+      'pending',
+      'accepted',
+      'ready for pickup',
+      'completed',
+      'declined',
+      'cancelled',
+    ];
+    const toLabel = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+    const keys = Object.keys(groups).sort((a, b) => {
+      const ai = orderStatusPriority.indexOf(a);
+      const bi = orderStatusPriority.indexOf(b);
+      if (ai === -1 && bi === -1) return a.localeCompare(b);
+      if (ai === -1) return 1;
+      if (bi === -1) return -1;
+      return ai - bi;
+    });
+    return keys.map((k) => ({ title: toLabel(k), data: groups[k] }));
+  })();
+
   // full-screen loader
   if (initialLoading) {
     return (
@@ -236,26 +266,54 @@ const OrderList = () => {
           <Text style={styles.emptyText}>No orders found</Text>
         </View>
       ) : (
-        <FlatList
-          data={filteredOrders}
-          keyExtractor={(item) => item.id.toString()}
-          renderItem={renderOrder}
-          contentContainerStyle={{ paddingBottom: 20 }}
-          onEndReached={loadMore}
-          onEndReachedThreshold={0.5}
-          refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-          }
-          ListFooterComponent={
-            loading && page > 1 ? (
-              <ActivityIndicator
-                size="small"
-                color="#A40C2D"
-                style={{ marginVertical: 10 }}
-              />
-            ) : null
-          }
-        />
+        statusFilter.length > 0 ? (
+          <FlatList
+            data={filteredOrders}
+            keyExtractor={(item) => item.id.toString()}
+            renderItem={renderOrder}
+            contentContainerStyle={{ paddingBottom: 20 }}
+            onEndReached={loadMore}
+            onEndReachedThreshold={0.5}
+            refreshControl={
+              <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+            }
+            ListFooterComponent={
+              loading && page > 1 ? (
+                <ActivityIndicator
+                  size="small"
+                  color="#A40C2D"
+                  style={{ marginVertical: 10 }}
+                />
+              ) : null
+            }
+          />
+        ) : (
+          <SectionList
+            sections={groupedSections}
+            keyExtractor={(item) => item.id.toString()}
+            renderItem={renderOrder}
+            contentContainerStyle={{ paddingBottom: 20 }}
+            onEndReached={loadMore}
+            onEndReachedThreshold={0.5}
+            refreshControl={
+              <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+            }
+            renderSectionHeader={({ section }) => (
+              <View style={styles.sectionHeader}>
+                <Text style={styles.sectionHeaderText}>{section.title}</Text>
+              </View>
+            )}
+            ListFooterComponent={
+              loading && page > 1 ? (
+                <ActivityIndicator
+                  size="small"
+                  color="#A40C2D"
+                  style={{ marginVertical: 10 }}
+                />
+              ) : null
+            }
+          />
+        )
       )}
 
       <Modal visible={filtersVisible} animationType="slide">
@@ -376,6 +434,20 @@ const styles = StyleSheet.create({
     marginBottom: 20 
   },
   filterHeader: { fontSize: 18, fontWeight: "bold" },
+  sectionHeader: {
+    backgroundColor: "#f8f9fa",
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    marginTop: 10,
+    borderLeftWidth: 4,
+    borderLeftColor: "#A40C2D",
+  },
+  sectionHeaderText: {
+    fontSize: 14,
+    fontWeight: "bold",
+    color: "#A40C2D",
+    textTransform: "capitalize",
+  },
   closeBtn: {
     backgroundColor: "#ccc",
     width: 30,

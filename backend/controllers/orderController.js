@@ -349,6 +349,36 @@ export const addOrder = async (req, res) => {
   }
 };
 
+// Notify concessionaire for a given order (used for direct orders created from MenuItemDetails)
+export const notifyConcessionaireForOrder = async (req, res) => {
+  const { id } = req.params; // order_id
+  try {
+    // Load order and concessionaire
+    const orderRes = await pool.query(`SELECT customer_id, concession_id FROM tblorder WHERE id = $1`, [id]);
+    if (orderRes.rowCount === 0) return res.status(404).json({ error: "Order not found" });
+    const order = orderRes.rows[0];
+
+    const consRes = await pool.query(`SELECT concessionaire_id FROM tblconcession WHERE id = $1`, [order.concession_id]);
+    if (consRes.rowCount === 0) return res.status(400).json({ error: "Concession not found for order" });
+    const concessionaireId = consRes.rows[0].concessionaire_id;
+
+    // Get customer name
+    const custRes = await pool.query(`SELECT first_name, last_name FROM tbluser WHERE id = $1`, [order.customer_id]);
+    const customer = custRes.rows[0] || { first_name: '', last_name: '' };
+    const customerName = `${customer.first_name || ''} ${customer.last_name || ''}`.trim();
+
+    // Item count
+    const itemCountRes = await pool.query(`SELECT COUNT(*) AS count FROM tblorderdetail WHERE order_id = $1`, [id]);
+    const itemCount = parseInt(itemCountRes.rows[0]?.count || '0', 10);
+
+    await notifyNewOrder(Number(id), concessionaireId, customerName, itemCount);
+    res.json({ success: true });
+  } catch (err) {
+    console.error("Error notifying concessionaire for order:", err);
+    res.status(500).json({ error: "Failed to notify concessionaire" });
+  }
+};
+
 
 
 // ==========================

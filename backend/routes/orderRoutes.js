@@ -1,5 +1,5 @@
 import express from "express";
-import { getOrdersByConcessionaireId, getOrdersByCustomerId, updateOrderStatus, updateOrderTotal, addOrder, deleteOrder, updatePaymentProof, getCartByCustomerId, checkoutCart, updatePaymentMethod, getOrderById, cancelOrder } from "../controllers/orderController.js";
+import { getOrdersByConcessionaireId, getOrdersByCustomerId, updateOrderStatus, updateOrderTotal, addOrder, deleteOrder, updatePaymentProof, getCartByCustomerId, checkoutCart, updatePaymentMethod, getOrderById, cancelOrder, notifyConcessionaireForOrder } from "../controllers/orderController.js";
 import { upload } from "./concessionRoutes.js";
 import authMiddleware from "../middleware/authMiddleware.js";
 
@@ -17,5 +17,6 @@ router.put("/cancel/:id", authMiddleware, cancelOrder) // Cancel order (customer
 router.get("/cart/:id", getCartByCustomerId) //fetch cart
 router.put("/checkout/:id", checkoutCart) 
 router.patch("/:id/payment-method", updatePaymentMethod)
+router.post("/:id/notify", authMiddleware, notifyConcessionaireForOrder)
 
 export default router;

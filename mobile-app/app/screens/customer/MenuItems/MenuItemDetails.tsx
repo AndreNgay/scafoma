@@ -184,6 +184,15 @@ const MenuItemDetails = () => {
 
       await api.put(`/order/${orderId}/recalculate`);
 
+      // Notify concessionaire for direct order placement (not via cart checkout)
+      if (!inCart) {
+        try {
+          await api.post(`/order/${orderId}/notify`);
+        } catch (notifyErr) {
+          console.error('Failed to notify concessionaire:', notifyErr);
+        }
+      }
+
       Alert.alert("Success", inCart ? "Item added to cart!" : "Order placed successfully!");
       if (inCart) {
         navigation.navigate("Cart");

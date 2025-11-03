@@ -59,7 +59,8 @@ const SignIn: React.FC<Props> = ({ navigation }) => {
   return (
     <View style={styles.container}>
       <View style={styles.card}>
-        <Text style={styles.title}>Sign In</Text>
+        <Text style={styles.title}>Welcome back</Text>
+        <Text style={styles.subtitle}>Sign in to continue</Text>
 
         {/* Email Field */}
         <Controller
@@ -127,7 +128,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     justifyContent: "center",
-    backgroundColor: "#f3f4f6",
+    backgroundColor: "#fff",
     padding: 16,
   },
   card: {
@@ -143,17 +144,25 @@ const styles = StyleSheet.create({
     fontSize: 22,
     fontWeight: "700",
     textAlign: "center",
-    marginBottom: 20,
+    marginBottom: 6,
+    color: "#A40C2D",
+  },
+  subtitle: {
+    textAlign: "center",
+    color: "#666",
+    marginBottom: 18,
+    fontSize: 13,
   },
   input: {
     borderWidth: 1,
-    borderColor: "#d1d5db",
+    borderColor: "#ddd",
     borderRadius: 8,
     padding: 12,
     marginBottom: 8,
+    backgroundColor: "#fff",
   },
   button: {
-    backgroundColor: "#4f46e5",
+    backgroundColor: "#A40C2D",
     paddingVertical: 14,
     borderRadius: 8,
     alignItems: "center",
@@ -178,7 +187,7 @@ const styles = StyleSheet.create({
     color: "#374151",
   },
   linkHighlight: {
-    color: "#4f46e5",
+    color: "#A40C2D",
     fontWeight: "600",
   },
 });
