@@ -194,6 +194,9 @@ const renderItem = ({ item }: any) => {
         <Text>
           Status: <Text style={styles.status}>{item.order_status}</Text>
         </Text>
+        {item.order_status === 'declined' && !!item.decline_reason && (
+          <Text style={styles.declineReason}>Reason: {item.decline_reason}</Text>
+        )}
         <Text>Total: ₱{Number(item.total_price).toFixed(2)}</Text>
         {item.schedule_time && (
           <Text style={styles.scheduleTime}>
@@ -365,6 +368,7 @@ const styles = StyleSheet.create({
   },
   title: { fontSize: 16, fontWeight: "600", marginBottom: 5 },
   status: { color: "#A40C2D", fontWeight: "600" },
+  declineReason: { color: "#dc3545", fontSize: 12, fontStyle: "italic", marginTop: 2 },
   date: { fontSize: 12, color: "#666", marginTop: 5 },
   emptyText: { textAlign: "center", marginTop: 20, color: "#888" },
   filterContainer: { flex: 1, padding: 20, backgroundColor: "#fff" },

@@ -34,7 +34,7 @@ export const createNotification = async (userId, type, message, metadata = {}) =
 export const notifyNewOrder = async (orderId, concessionaireId, customerName, itemCount) => {
   const message = `New order from ${customerName}! Order #${orderId} (${itemCount} item${itemCount > 1 ? 's' : ''})`;
   console.log(`📬 Notifying concessionaire ${concessionaireId} about new order ${orderId}`);
-  return await createNotification(concessionaireId, 'new_order', message, { order_id: orderId });
+  return await createNotification(concessionaireId, 'New Order', message, { order_id: orderId });
 };
 
 /**
@@ -42,13 +42,13 @@ export const notifyNewOrder = async (orderId, concessionaireId, customerName, it
  */
 export const notifyOrderCancelledForConcessionaire = async (orderId, concessionaireId, customerName) => {
   const message = `Order #${orderId} was cancelled by ${customerName}`;
-  return await createNotification(concessionaireId, 'order_cancelled', message, { order_id: orderId });
+  return await createNotification(concessionaireId, 'Order Cancelled', message, { order_id: orderId });
 };
 
 /**
  * Notify customer about order status change
  */
-export const notifyOrderStatusChange = async (orderId, customerId, status, concessionName = '') => {
+export const notifyOrderStatusChange = async (orderId, customerId, status, concessionName = '', declineReason = '') => {
   const statusMessages = {
     'accepted': 'Your order has been accepted!',
     'declined': 'Your order has been declined.',
@@ -56,8 +56,11 @@ export const notifyOrderStatusChange = async (orderId, customerId, status, conce
     'completed': 'Your order has been completed.',
   };
   
-  const message = `${concessionName ? `${concessionName}: ` : ''}${statusMessages[status] || `Order status updated to ${status}`}`;
-  return await createNotification(customerId, 'order_update', message, { order_id: orderId, order_status: status });
+  let message = `${concessionName ? `${concessionName}: ` : ''}${statusMessages[status] || `Order status updated to ${status}`} (Order #${orderId})`;
+  if (status === 'declined' && declineReason) {
+    message += `\nReason: ${declineReason}`;
+  }
+  return await createNotification(customerId, 'Order Update', message, { order_id: orderId, order_status: status });
 };
 
 /**

@@ -205,7 +205,8 @@ export const updateOrderStatus = async (req, res) => {
         order.id,
         order.customer_id,
         order_status,
-        concessionName
+        concessionName,
+        decline_reason
       );
     } catch (notifErr) {
       console.error("Error creating order status notification:", notifErr);

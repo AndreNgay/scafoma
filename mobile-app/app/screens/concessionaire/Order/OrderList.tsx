@@ -192,6 +192,9 @@ const OrderList = () => {
           <Text>
             Status: <Text style={styles.status}>{item.order_status}</Text>
           </Text>
+          {item.order_status === 'declined' && (item as any).decline_reason ? (
+            <Text style={styles.declineReason}>Reason: {(item as any).decline_reason}</Text>
+          ) : null}
           <Text>Total: ₱{Number(item.total_price).toFixed(2)}</Text>
           <Text>Date: {new Date(item.created_at).toLocaleString()}</Text>
         </View>
@@ -423,6 +426,7 @@ const styles = StyleSheet.create({
   orderId: { fontWeight: "bold", fontSize: 16, color: "#A40C2D" },
   customer: { fontSize: 14, marginTop: 4 },
   status: { fontWeight: "600", color: "#A40C2D" },
+  declineReason: { color: "#dc3545", fontSize: 12, fontStyle: "italic", marginTop: 2 },
   emptyContainer: { flex: 1, justifyContent: "center", alignItems: "center", paddingVertical: 40 },
   emptyText: { textAlign: "center", color: "#888", fontSize: 16 },
   errorText: { textAlign: "center", color: "red", marginTop: 20 },
