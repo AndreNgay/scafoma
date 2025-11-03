@@ -101,11 +101,11 @@ const ViewConcession = () => {
       <Text style={styles.sectionHeader}>Available Payments</Text>
       {details?.gcash_payment_available && (
         <Text style={styles.paymentText}>
-          ✅ GCash {details?.gcash_number ? `(${details.gcash_number})` : ""}
+          GCash {details?.gcash_number ? `(${details.gcash_number})` : ""}
         </Text>
       )}
       {details?.oncounter_payment_available && (
-        <Text style={styles.paymentText}>✅ On-Counter</Text>
+        <Text style={styles.paymentText}>On-Counter</Text>
       )}
 
       {/* Search */}

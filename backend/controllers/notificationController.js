@@ -13,7 +13,7 @@ export const getNotificationsByUserId = async (req, res) => {
 
     // Fetch notifications for the user, newest first
     const result = await pool.query(
-      `SELECT id, user_id, notification_type, message, is_read, created_at, updated_at
+      `SELECT id, user_id, notification_type, message, is_read, order_id, created_at, updated_at
        FROM tblnotification
        WHERE user_id = $1
        ORDER BY created_at DESC`,

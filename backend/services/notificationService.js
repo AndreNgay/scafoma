@@ -11,11 +11,12 @@ import { pool } from "../libs/database.js";
 export const createNotification = async (userId, type, message, metadata = {}) => {
   try {
     console.log(`Attempting to create notification for user ${userId}, type: ${type}`);
+    const orderId = metadata?.order_id ?? null;
     const result = await pool.query(
-      `INSERT INTO tblnotification (user_id, notification_type, message, is_read)
-       VALUES ($1, $2, $3, FALSE)
+      `INSERT INTO tblnotification (user_id, notification_type, message, is_read, order_id)
+       VALUES ($1, $2, $3, FALSE, $4)
        RETURNING *`,
-      [userId, type, message]
+      [userId, type, message, orderId]
     );
     
     console.log(`✅ Notification created successfully: ${type} for user ${userId}`, result.rows[0]);
@@ -34,6 +35,14 @@ export const notifyNewOrder = async (orderId, concessionaireId, customerName, it
   const message = `New order from ${customerName}! Order #${orderId} (${itemCount} item${itemCount > 1 ? 's' : ''})`;
   console.log(`📬 Notifying concessionaire ${concessionaireId} about new order ${orderId}`);
   return await createNotification(concessionaireId, 'new_order', message, { order_id: orderId });
+};
+
+/**
+ * Notify concessionaire about a customer order cancellation
+ */
+export const notifyOrderCancelledForConcessionaire = async (orderId, concessionaireId, customerName) => {
+  const message = `Order #${orderId} was cancelled by ${customerName}`;
+  return await createNotification(concessionaireId, 'order_cancelled', message, { order_id: orderId });
 };
 
 /**

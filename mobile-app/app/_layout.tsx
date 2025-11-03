@@ -6,7 +6,7 @@ export default function RootLayout() {
   
   return (
     <Stack screenOptions={{ headerShown: true }}>
-      <Stack.Screen name="index" options={{ title: "Scafoma" }} />
+      <Stack.Screen name="index" options={{ title: "SCaFOMA-UB" }} />
     </Stack>
   );
 }

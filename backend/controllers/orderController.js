@@ -1,6 +1,6 @@
 import { pool } from "../libs/database.js";
 import multer from "multer";
-import { notifyNewOrder, notifyOrderStatusChange } from "../services/notificationService.js";
+import { notifyNewOrder, notifyOrderStatusChange, notifyOrderCancelledForConcessionaire } from "../services/notificationService.js";
 
 const storage = multer.memoryStorage();
 export const upload = multer({ storage });
@@ -615,6 +615,23 @@ export const cancelOrder = async (req, res) => {
       [id]
     );
     
+    // Notify concessionaire about cancellation
+    try {
+      const consResult = await pool.query(
+        `SELECT c.concessionaire_id FROM tblorder o JOIN tblconcession c ON o.concession_id = c.id WHERE o.id = $1`,
+        [id]
+      );
+      const userRes = await pool.query(`SELECT first_name, last_name FROM tbluser WHERE id = $1`, [customerId]);
+      if (consResult.rows.length && userRes.rows.length) {
+        const concessionaireId = consResult.rows[0].concessionaire_id;
+        const customer = userRes.rows[0];
+        const customerName = `${customer.first_name} ${customer.last_name}`.trim();
+        await notifyOrderCancelledForConcessionaire(id, concessionaireId, customerName);
+      }
+    } catch (notifyErr) {
+      console.error("Error notifying concessionaire about cancellation:", notifyErr);
+    }
+
     res.json({ 
       message: "Order cancelled successfully",
       order: updateResult.rows[0]

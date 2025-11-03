@@ -185,7 +185,12 @@ const MenuItemDetails = () => {
       await api.put(`/order/${orderId}/recalculate`);
 
       Alert.alert("Success", inCart ? "Item added to cart!" : "Order placed successfully!");
-      navigation.navigate(inCart ? "Cart" : "Orders");
+      if (inCart) {
+        navigation.navigate("Cart");
+      } else {
+        // Ensure we land on the Orders root list, not a previously open details screen
+        (navigation as any).navigate("Orders", { screen: "Customer Orders" });
+      }
     } catch (err: any) {
       console.error(err.response?.data || err);
       Alert.alert("Error", err.response?.data?.message ?? "Failed to submit order.");

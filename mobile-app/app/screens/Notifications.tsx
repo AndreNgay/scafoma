@@ -82,12 +82,15 @@ const Notifications = () => {
       }
     }
 
-    // Navigate based on notification type and user role
-    if (item.notification_type === 'new_order' && user?.role === 'concessionaire') {
-      // Extract order ID from message or navigate to orders list
-      navigation.navigate('Order List');
-    } else if (item.notification_type === 'order_update' && user?.role === 'customer') {
-      navigation.navigate('Orders');
+    // Navigate to order if present
+    const orderId = item.order_id;
+    if (orderId) {
+      if (user?.role === 'concessionaire') {
+        navigation.navigate('Order List', { screen: 'View Order', params: { orderId } });
+      } else if (user?.role === 'customer') {
+        navigation.navigate('Orders', { screen: 'View Order', params: { orderId } });
+      }
+      return;
     }
   };
 

@@ -294,12 +294,19 @@ CREATE TABLE IF NOT EXISTS tblnotification (
     notification_type VARCHAR(50) NOT NULL,
     message TEXT NOT NULL,
     is_read BOOLEAN DEFAULT FALSE,
+    order_id INT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT fk_user_notification
         FOREIGN KEY (user_id)
         REFERENCES tbluser (id)
+        ON DELETE CASCADE
+        ON UPDATE CASCADE
+    
+    CONSTRAINT fk_order_notification
+        FOREIGN KEY (order_id)
+        REFERENCES tblorder (id)
         ON DELETE CASCADE
         ON UPDATE CASCADE
 );

@@ -33,6 +33,7 @@ import AddMenu from "./screens/concessionaire/Menu/AddMenu";
 import ViewMenu from "./screens/concessionaire/Menu/ViewMenu";
 import Notifications from "./screens/Notifications";
 import ForgotPassword from "./screens/auth/ForgotPassword";
+import { useNotifications } from "./hooks/useNotifications";
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -225,6 +226,12 @@ function CustomerTabs() {
             <Ionicons name="receipt" size={size} color={color} />
           ),
         }}
+        listeners={({ navigation }) => ({
+          tabPress: () => {
+            // Force Orders tab to show the root list screen
+            navigation.navigate('Orders', { screen: 'Customer Orders' });
+          },
+        })}
       />
       <Tab.Screen 
         name="Notifications" 
@@ -388,6 +395,9 @@ function AuthStack() {
 export default function RootNavigator() {
   const { user, loadStorage } = useStore();
   const [loading, setLoading] = useState(true);
+
+  // Enable cross-role notification polling/local notifications
+  useNotifications();
 
   useEffect(() => {
     const init = async () => {
