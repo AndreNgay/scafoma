@@ -216,7 +216,7 @@ const MenuItems = () => {
         {item.category && (
           <Text style={styles.categoryTag}>{item.category}</Text>
         )}
-        <Text style={styles.price}>₱{item.price.toFixed(2)}</Text>
+        <Text style={styles.price}>₱{Number(item.price || 0).toFixed(2)}</Text>
       </View>
     </TouchableOpacity>
   );

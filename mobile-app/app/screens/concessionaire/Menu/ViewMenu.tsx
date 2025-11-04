@@ -55,7 +55,7 @@ const ViewMenu: React.FC = () => {
       )}
 
       <Text style={styles.label}>Base Price</Text>
-      <Text style={styles.value}>₱ {menuItem.price.toFixed(2)}</Text>
+      <Text style={styles.value}>₱ {Number(menuItem.price || 0).toFixed(2)}</Text>
 
       <Text style={styles.label}>Availability</Text>
       <Text style={[styles.value, { color: menuItem.availability ? "green" : "red" }]}>

@@ -155,7 +155,7 @@ const Menu = () => {
                 {item.category ? (
                   <Text style={styles.categoryTag}>{item.category}</Text>
                 ) : null}
-                <Text style={styles.price}>₱{item.price.toFixed(2)}</Text>
+                <Text style={styles.price}>₱{Number(item.price || 0).toFixed(2)}</Text>
                 <Text style={{ color: item.availability ? "green" : "red", marginTop: 2 }}>
                   {item.availability ? "Available" : "Unavailable"}
                 </Text>

@@ -238,7 +238,7 @@ const MenuItemDetails = () => {
 
         {/* Price & Quantity */}
         <View style={styles.priceQtyWrapper}>
-          <Text style={styles.price}>₱{displayPrice.toFixed(2)}</Text>
+          <Text style={styles.price}>₱{Number(displayPrice || 0).toFixed(2)}</Text>
           <View style={styles.quantityContainer}>
             <TouchableOpacity onPress={() => setQuantity(Math.max(1, quantity - 1))} style={styles.qtyBtn}>
               <Text style={styles.qtyText}>-</Text>
