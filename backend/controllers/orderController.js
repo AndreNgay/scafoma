@@ -14,37 +14,97 @@ const makeImageDataUrl = (imageBuffer, mime = "jpeg") => {
 
 export const getOrdersByConcessionaireId = async (req, res) => {
   const { id } = req.params; // concessionaire_id
-  const { page = 1, limit = 10 } = req.query;
+  const { page = 1, limit = 10, segment } = req.query;
 
   try {
     const offset = (page - 1) * limit;
 
-    const result = await pool.query(
+    const activeStatuses = ["pending", "accepted", "ready-for-pickup", "ready for pickup"]; // handle both spellings
+    const historyStatuses = ["completed", "declined", "cancelled"];
+    const isActiveSegment = segment === 'active';
+
+    if (isActiveSegment) {
+      const activeRes = await pool.query(
+        `SELECT o.*, 
+                u.first_name, u.last_name, u.email, u.profile_image,
+                c.concession_name,
+                (
+                  SELECT ARRAY(
+                    SELECT m.item_name
+                    FROM tblorderdetail d
+                    JOIN tblmenuitem m ON d.item_id = m.id
+                    WHERE d.order_id = o.id
+                    ORDER BY d.id
+                    LIMIT 3
+                  )
+                ) AS item_names_preview,
+                (
+                  SELECT COUNT(*)::int FROM tblorderdetail d2 WHERE d2.order_id = o.id
+                ) AS item_count
+         FROM tblorder o
+         JOIN tbluser u ON o.customer_id = u.id
+         JOIN tblconcession c ON o.concession_id = c.id
+         WHERE c.concessionaire_id = $1
+           AND LOWER(o.order_status) = ANY($2)
+         ORDER BY o.created_at DESC`,
+        [id, activeStatuses.map(s => s.toLowerCase())]
+      );
+
+      const orders = activeRes.rows.map((order) => ({
+        ...order,
+        profile_image: makeImageDataUrl(order.profile_image),
+      }));
+
+      return res.status(200).json({
+        page: 1,
+        limit: Number(limit),
+        total: orders.length,
+        totalPages: 1,
+        data: orders,
+      });
+    }
+
+    // Default: history segment paginated
+    const histRes = await pool.query(
       `SELECT o.*, 
               u.first_name, u.last_name, u.email, u.profile_image,
-              c.concession_name
+              c.concession_name,
+              (
+                SELECT ARRAY(
+                  SELECT m.item_name
+                  FROM tblorderdetail d
+                  JOIN tblmenuitem m ON d.item_id = m.id
+                  WHERE d.order_id = o.id
+                  ORDER BY d.id
+                  LIMIT 3
+                )
+              ) AS item_names_preview,
+              (
+                SELECT COUNT(*)::int FROM tblorderdetail d2 WHERE d2.order_id = o.id
+              ) AS item_count
        FROM tblorder o
        JOIN tbluser u ON o.customer_id = u.id
        JOIN tblconcession c ON o.concession_id = c.id
        WHERE c.concessionaire_id = $1
+         AND LOWER(o.order_status) = ANY($2)
        ORDER BY o.created_at DESC
-       LIMIT $2 OFFSET $3`,
-      [id, limit, offset]
+       LIMIT $3 OFFSET $4`,
+      [id, historyStatuses.map(s => s.toLowerCase()), limit, offset]
     );
 
-    const orders = result.rows.map((order) => ({
-      ...order,
-      profile_image: makeImageDataUrl(order.profile_image),
-    }));
-
-    // Get total count for frontend pagination
     const countResult = await pool.query(
       `SELECT COUNT(*) AS total
        FROM tblorder o
        JOIN tblconcession c ON o.concession_id = c.id
-       WHERE c.concessionaire_id = $1`,
-      [id]
+       WHERE c.concessionaire_id = $1
+         AND LOWER(o.order_status) = ANY($2)`,
+      [id, historyStatuses.map(s => s.toLowerCase())]
     );
+
+    const orders = histRes.rows.map((order) => ({
+      ...order,
+      profile_image: makeImageDataUrl(order.profile_image),
+    }));
 
     const totalOrders = parseInt(countResult.rows[0].total, 10);
 

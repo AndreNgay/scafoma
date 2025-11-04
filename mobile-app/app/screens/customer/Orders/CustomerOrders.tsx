@@ -413,6 +413,13 @@ const renderItem = ({ item }: any) => {
           </View>
         </View>
       </Modal>
+      {loading && !initialLoading && (
+        <ActivityIndicator
+          size="large"
+          color="#A40C2D"
+          style={styles.overlayLoader}
+        />
+      )}
     </View>
   );
 };
@@ -534,6 +541,11 @@ fullLoader: {
   justifyContent: "center",
   alignItems: "center",
 },
+  overlayLoader: {
+    position: "absolute",
+    bottom: 16,
+    alignSelf: "center",
+  },
 
 });
 

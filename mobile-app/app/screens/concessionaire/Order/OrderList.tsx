@@ -33,6 +33,7 @@ const PAGE_SIZE = 10;
 const OrderList = () => {
   const navigation = useNavigation<any>();
   const [orders, setOrders] = useState<Order[]>([]);
+  const [activeOrders, setActiveOrders] = useState<Order[]>([]);
   const [filteredOrders, setFilteredOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(false); // general loading
   const [initialLoading, setInitialLoading] = useState(true); // first load
@@ -45,36 +46,32 @@ const OrderList = () => {
   const [statusFilter, setStatusFilter] = useState<string[]>([]);
   const [sortBy, setSortBy] = useState<string | null>(null);
 
-  // Pagination
-  const [page, setPage] = useState(1);
-  const [hasMore, setHasMore] = useState(true);
+  // History pagination
+  const [historyPage, setHistoryPage] = useState(0);
+  const [historyStarted, setHistoryStarted] = useState(false);
+  const [hasMoreHistory, setHasMoreHistory] = useState(true);
 
   const user = useStore((state: any) => state.user);
 
   const fetchOrders = useCallback(async (pageNum = 1, refresh = false) => {
     try {
-      if (!refresh && pageNum > 1) {
-        setLoading(true); // show footer loader
-      }
-      if (pageNum === 1 && !refresh) {
-        setInitialLoading(true); // full screen loader
-      }
+      if (refresh || pageNum === 1) setInitialLoading(true);
 
       setError(null);
 
-      const res = await api.get(
-        `/order/concessionare/${user.id}?page=${pageNum}&limit=${PAGE_SIZE}`
-      );
-      const { data: newOrders, totalPages } = res.data;
-
+      // Initial load/refresh: only fetch active orders, do NOT fetch history yet
       if (refresh || pageNum === 1) {
-        setOrders(newOrders);
-      } else {
-        // Use functional update to avoid stale closure
-        setOrders((prev) => [...prev, ...newOrders]);
+        const activeRes = await api.get(
+          `/order/concessionare/${user.id}?segment=active&limit=${PAGE_SIZE}`
+        );
+        const freshActive: Order[] = activeRes.data?.data || [];
+        setActiveOrders(freshActive);
+        setOrders(freshActive);
+        setHistoryStarted(false);
+        setHistoryPage(0);
+        setHasMoreHistory(true);
+        return;
       }
-
-      setHasMore(pageNum < totalPages);
     } catch (err) {
       console.error(err);
       setError("Failed to fetch orders");
@@ -87,7 +84,6 @@ const OrderList = () => {
 
   useFocusEffect(
     useCallback(() => {
-      setPage(1);
       setStatusFilter([]); // Show all by default
       fetchOrders(1, true);
     }, [fetchOrders])
@@ -96,20 +92,53 @@ const OrderList = () => {
   // Pull to refresh
   const onRefresh = () => {
     setRefreshing(true);
-    setPage(1);
     fetchOrders(1, true);
   };
 
   // Load more on scroll
-  const loadMore = useCallback(() => {
-    if (!loading && hasMore) {
-      setPage((prevPage) => {
-        const nextPage = prevPage + 1;
-        fetchOrders(nextPage);
-        return nextPage;
-      });
+  const loadMore = useCallback(async () => {
+    if (loading) return;
+    // Start history on first reach to bottom
+    if (!historyStarted) {
+      try {
+        setLoading(true);
+        const next = 1;
+        const histRes = await api.get(
+          `/order/concessionare/${user.id}?segment=history&page=${next}&limit=${PAGE_SIZE}`
+        );
+        const { data: chunk, totalPages } = histRes.data;
+        setOrders((prev) => [...prev, ...chunk]);
+        setHistoryStarted(true);
+        setHistoryPage(next);
+        setHasMoreHistory(next < totalPages);
+      } catch (e) {
+        console.error(e);
+        setError("Failed to fetch orders");
+      } finally {
+        setLoading(false);
+      }
+      return;
     }
-  }, [loading, hasMore, fetchOrders]);
+    // Continue history pagination
+    if (hasMoreHistory) {
+      try {
+        setLoading(true);
+        const next = historyPage + 1;
+        const histRes = await api.get(
+          `/order/concessionare/${user.id}?segment=history&page=${next}&limit=${PAGE_SIZE}`
+        );
+        const { data: chunk, totalPages } = histRes.data;
+        setOrders((prev) => [...prev, ...chunk]);
+        setHistoryPage(next);
+        setHasMoreHistory(next < totalPages);
+      } catch (e) {
+        console.error(e);
+        setError("Failed to fetch orders");
+      } finally {
+        setLoading(false);
+      }
+    }
+  }, [loading, historyStarted, historyPage, hasMoreHistory, user?.id]);
 
   // Apply search, filter, and sort
   useEffect(() => {
@@ -187,6 +216,14 @@ const OrderList = () => {
           <Text style={styles.customer}>
             Customer: {item.first_name} {item.last_name}
           </Text>
+          {Array.isArray((item as any).item_names_preview) && (item as any).item_names_preview.length > 0 && (
+            <Text style={styles.itemsPreview}>
+              Items: {(item as any).item_names_preview.join(', ')}
+              {typeof (item as any).item_count === 'number' && (item as any).item_count > (item as any).item_names_preview.length
+                ? ` +${(item as any).item_count - (item as any).item_names_preview.length} more`
+                : ''}
+            </Text>
+          )}
           <Text>
             Status: <Text style={styles.status}>{item.order_status}</Text>
           </Text>
@@ -280,7 +317,7 @@ const OrderList = () => {
               <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
             }
             ListFooterComponent={
-              loading && page > 1 ? (
+              loading && historyStarted ? (
                 <ActivityIndicator
                   size="small"
                   color="#A40C2D"
@@ -307,7 +344,7 @@ const OrderList = () => {
               </View>
             )}
             ListFooterComponent={
-              loading && page > 1 ? (
+              loading && historyStarted ? (
                 <ActivityIndicator
                   size="small"
                   color="#A40C2D"
@@ -396,6 +433,13 @@ const OrderList = () => {
           </View>
         </View>
       </Modal>
+      {loading && !initialLoading && (
+        <ActivityIndicator
+          size="large"
+          color="#A40C2D"
+          style={styles.overlayLoader}
+        />
+      )}
     </View>
   );
 };
@@ -426,6 +470,7 @@ const styles = StyleSheet.create({
   orderId: { fontWeight: "bold", fontSize: 16, color: "#A40C2D" },
   customer: { fontSize: 14, marginTop: 4 },
   status: { fontWeight: "600", color: "#A40C2D" },
+  itemsPreview: { fontSize: 12, color: "#333", marginTop: 2 },
   declineReason: { color: "#dc3545", fontSize: 12, fontStyle: "italic", marginTop: 2 },
   emptyContainer: { flex: 1, justifyContent: "center", alignItems: "center", paddingVertical: 40 },
   emptyText: { textAlign: "center", color: "#888", fontSize: 16 },
@@ -511,6 +556,11 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
+  },
+  overlayLoader: {
+    position: "absolute",
+    bottom: 16,
+    alignSelf: "center",
   },
 });
 
