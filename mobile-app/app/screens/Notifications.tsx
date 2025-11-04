@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import {
   View,
   Text,
@@ -13,59 +13,84 @@ import api from "../libs/apiCall";
 import useStore from "../store";
 import { scheduleLocalNotification } from "../libs/notificationService";
 
+const PAGE_SIZE = 10;
+
 const Notifications = () => {
   const { user } = useStore();
   const navigation = useNavigation<any>();
   const [notifications, setNotifications] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
+  const [initialLoading, setInitialLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState("");
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
 
-  // Fetch notifications for the current user
-  const fetchNotifications = async () => {
+  // Fetch notifications for the current user, paginated
+  const fetchNotifications = useCallback(async (pageNum = 1, refresh = false) => {
     if (!user?.id) return;
 
     try {
-      setLoading(true);
+      if (!refresh && pageNum > 1) {
+        setLoading(true); // footer loader
+      }
+      if (pageNum === 1 && !refresh) {
+        setInitialLoading(true); // full screen loader
+      }
       setError("");
 
-      const res = await api.get(`/notification/${user.id}`);
-      setNotifications(res.data.notifications || []);
+      const res = await api.get(`/notification/${user.id}?page=${pageNum}&limit=${PAGE_SIZE}`);
+      const responseData = res.data.data || res.data.notifications || [];
+      const totalPages = Number(res.data.totalPages) || 1;
+
+      if (refresh || pageNum === 1) {
+        setNotifications(responseData);
+      } else {
+        setNotifications(prev => [...prev, ...responseData]);
+      }
+      setHasMore(pageNum < totalPages);
     } catch (err) {
       console.error(err);
       setError("Failed to load notifications");
+      if (pageNum === 1) {
+        setNotifications([]);
+      }
     } finally {
       setLoading(false);
+      setInitialLoading(false);
+      if (refresh) setRefreshing(false);
     }
-  };
+  }, [user?.id]);
 
   // Pull-to-refresh handler
   const onRefresh = async () => {
     setRefreshing(true);
-    try {
-      const res = await api.get(`/notification/${user.id}`);
-      setNotifications(res.data.notifications || []);
-      setError("");
-    } catch (err) {
-      console.error(err);
-      setError("Failed to refresh notifications");
-    } finally {
-      setRefreshing(false);
-    }
+    setPage(1);
+    await fetchNotifications(1, true);
   };
 
   useEffect(() => {
-    fetchNotifications();
-  }, [user?.id]);
+    setPage(1);
+    fetchNotifications(1, true);
+  }, [fetchNotifications]);
 
   // Refresh notifications when screen comes into focus
   useFocusEffect(
     React.useCallback(() => {
-      if (user?.id) {
-        fetchNotifications();
-      }
-    }, [user?.id])
+      setPage(1);
+      fetchNotifications(1, true);
+    }, [fetchNotifications])
   );
+
+  const loadMore = useCallback(() => {
+    if (!loading && hasMore) {
+      setPage(prev => {
+        const next = prev + 1;
+        fetchNotifications(next);
+        return next;
+      });
+    }
+  }, [loading, hasMore, fetchNotifications]);
 
   const unreadCount = notifications.filter(n => !n.is_read).length;
 
@@ -117,7 +142,7 @@ const Notifications = () => {
     </TouchableOpacity>
   );
 
-  if (loading)
+  if (initialLoading)
     return (
       <ActivityIndicator size="large" color="#A40C2D" style={{ flex: 1 }} />
     );
@@ -145,6 +170,14 @@ const Notifications = () => {
           contentContainerStyle={{ paddingBottom: 20 }}
           refreshing={refreshing}
           onRefresh={onRefresh} // Pull-to-refresh
+          onEndReached={loadMore}
+          onEndReachedThreshold={0.5}
+          removeClippedSubviews={false}
+          ListFooterComponent={
+            loading && page > 1 ? (
+              <ActivityIndicator size="small" color="#A40C2D" style={{ marginVertical: 10 }} />
+            ) : null
+          }
         />
       )}
     </View>

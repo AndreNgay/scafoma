@@ -1,8 +1,10 @@
 import React from "react";
-import { View, Text, StyleSheet, Image, ScrollView, FlatList, TouchableOpacity, TextInput } from "react-native";
+import { View, Text, StyleSheet, Image, ScrollView, FlatList, SectionList, TouchableOpacity, TextInput, ActivityIndicator, RefreshControl } from "react-native";
 import { useEffect, useMemo, useState } from "react";
 import { useNavigation, useRoute } from "@react-navigation/native";
 import api from "../../libs/apiCall";
+
+const PAGE_SIZE = 10;
 
 const ViewConcession = () => {
   const navigation = useNavigation<any>();
@@ -14,6 +16,13 @@ const ViewConcession = () => {
   const [search, setSearch] = useState("");
   const [loadingDetails, setLoadingDetails] = useState(false);
   const [loadingItems, setLoadingItems] = useState(false);
+  const [initialLoading, setInitialLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  
+  // Pagination
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     // If a new concession param arrives, sync local state
@@ -36,20 +45,75 @@ const ViewConcession = () => {
     load();
   }, [params.concession?.id]);
 
-  useEffect(() => {
-    const loadItems = async () => {
-      try {
+  // Fetch menu items with pagination
+  const loadItems = async (pageNum = 1, refresh = false) => {
+    try {
+      const id = details?.id || params.concession?.id;
+      if (!id) return;
+
+      if (!refresh && pageNum > 1) {
+        setLoading(true); // show footer loader
+      }
+      if (pageNum === 1 && !refresh) {
+        setInitialLoading(true); // full screen loader
         setLoadingItems(true);
-        const id = details?.id || params.concession?.id;
-        if (!id) return;
-        const res = await api.get(`/menu-item/all`, { params: { concessionId: id, limit: 100 } });
-        setMenuItems(res.data.data || []);
-      } catch (e) {
+      }
+
+      const res = await api.get(`/menu-item/all`, { 
+        params: { 
+          concessionId: id, 
+          page: pageNum,
+          limit: PAGE_SIZE 
+        } 
+      });
+      
+      const { data: newItems, pagination } = res.data;
+
+      if (refresh) {
+        setMenuItems(newItems || []);
+      } else if (pageNum === 1) {
+        setMenuItems(newItems || []);
+      } else {
+        setMenuItems((prev) => [...prev, ...(newItems || [])]);
+      }
+
+      setHasMore(pageNum < pagination.totalPages);
+    } catch (e) {
+      console.error("Error loading menu items:", e);
+      if (pageNum === 1) {
         setMenuItems([]);
-      } finally { setLoadingItems(false); }
-    };
-    loadItems();
+      }
+    } finally { 
+      setLoading(false);
+      setInitialLoading(false);
+      setLoadingItems(false);
+      if (refresh) setRefreshing(false);
+    }
+  };
+
+  useEffect(() => {
+    const id = details?.id || params.concession?.id;
+    if (id) {
+      setPage(1);
+      loadItems(1, true);
+    }
   }, [details?.id, params.concession?.id]);
+
+  // Pull to refresh
+  const onRefresh = () => {
+    setRefreshing(true);
+    setPage(1);
+    loadItems(1, true);
+  };
+
+  // Load more on scroll
+  const loadMore = () => {
+    if (!loading && hasMore) {
+      const nextPage = page + 1;
+      setPage(nextPage);
+      loadItems(nextPage);
+    }
+  };
 
   const filteredItems = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -60,26 +124,19 @@ const ViewConcession = () => {
     );
   }, [menuItems, search]);
 
-  const itemsByCategory = useMemo(() => {
-    const groups: Record<string, any[]> = {};
-    for (const it of filteredItems) {
-      const cat = it.category || "Others";
-      if (!groups[cat]) groups[cat] = [];
-      groups[cat].push(it);
-    }
-    return Object.entries(groups).map(([category, items]) => ({ category, items }));
-  }, [filteredItems]);
-
-  if (loadingDetails && !details) {
+  // Full-screen loader for initial load
+  if (initialLoading && !details) {
     return (
       <View style={[styles.container, { justifyContent: "center", alignItems: "center" }] }>
-        <Text style={{ color: "#666" }}>Loading concession...</Text>
+        <ActivityIndicator size="large" color="#A40C2D" />
+        <Text style={{ color: "#666", marginTop: 10 }}>Loading concession...</Text>
       </View>
     );
   }
 
-  return (
-    <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: 20 }}>
+  // Header component for FlatList
+  const ListHeaderComponent = () => (
+    <>
       {/* Header image */}
       {!!details?.image_url && <Image source={{ uri: details.image_url }} style={styles.image} />}
       {!details?.image_url && <View style={[styles.image, styles.imagePlaceholder]} />}
@@ -115,43 +172,90 @@ const ViewConcession = () => {
         placeholder="Search menu items..."
         style={styles.searchInput}
       />
+    </>
+  );
 
-      {/* Menu Items by Category */}
-      {loadingItems ? (
-        <Text style={{ color: "#666", marginTop: 10 }}>Loading items...</Text>
-      ) : itemsByCategory.map(({ category, items }) => (
-        <View key={category} style={{ marginTop: 10 }}>
-          <Text style={styles.sectionHeader}>{category}</Text>
-          {items.map((item: any) => {
-            const available = Boolean(item.availability);
-            return (
-              <TouchableOpacity
-                key={item.id}
-                style={[styles.itemCard, !available && styles.itemDisabled]}
-                onPress={() => available && navigation.navigate("Menu Item Details", { item, concession: details, cafeteria })}
-                disabled={!available}
-              >
-                {item.image_url ? (
-                  <Image source={{ uri: item.image_url }} style={styles.itemImage} />
-                ) : (
-                  <View style={[styles.itemImage, styles.itemImagePlaceholder]} />
-                )}
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.itemTitle}>{item.item_name}</Text>
-                  <Text style={styles.itemSub}>{item.category || "General"}</Text>
-                  <Text style={styles.itemPrice}>₱{Number(item.price).toFixed(2)}</Text>
-                </View>
-                {!available && (
-                  <View style={styles.unavailableBadge}>
-                    <Text style={styles.unavailableText}>Unavailable</Text>
-                  </View>
-                )}
-              </TouchableOpacity>
-            );
-          })}
+  // Render menu item
+  const renderMenuItem = ({ item }: { item: any }) => {
+    const available = Boolean(item.availability);
+    return (
+      <TouchableOpacity
+        style={[styles.itemCard, !available && styles.itemDisabled]}
+        onPress={() => available && navigation.navigate("Menu Item Details", { item, concession: details, cafeteria })}
+        disabled={!available}
+      >
+        {item.image_url ? (
+          <Image source={{ uri: item.image_url }} style={styles.itemImage} />
+        ) : (
+          <View style={[styles.itemImage, styles.itemImagePlaceholder]} />
+        )}
+        <View style={{ flex: 1 }}>
+          <Text style={styles.itemTitle}>{item.item_name}</Text>
+          <Text style={styles.itemSub}>{item.category || "General"}</Text>
+          <Text style={styles.itemPrice}>₱{Number(item.price || 0).toFixed(2)}</Text>
         </View>
-      ))}
-    </ScrollView>
+        {!available && (
+          <View style={styles.unavailableBadge}>
+            <Text style={styles.unavailableText}>Unavailable</Text>
+          </View>
+        )}
+      </TouchableOpacity>
+    );
+  };
+
+  // Group items by category for SectionList
+  const sections = useMemo(() => {
+    const groups: Record<string, any[]> = {};
+    for (const it of filteredItems) {
+      const cat = it.category || "Others";
+      if (!groups[cat]) groups[cat] = [];
+      groups[cat].push(it);
+    }
+    return Object.entries(groups).map(([category, items]) => ({ 
+      title: category, 
+      data: items 
+    }));
+  }, [filteredItems]);
+
+  return (
+    <View style={styles.container}>
+      {initialLoading ? (
+        <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
+          <ActivityIndicator size="large" color="#A40C2D" />
+          <Text style={{ color: "#666", marginTop: 10 }}>Loading menu items...</Text>
+        </View>
+      ) : filteredItems.length === 0 ? (
+        <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: 20 }}>
+          <ListHeaderComponent />
+          <Text style={{ color: "#666", marginTop: 20, textAlign: "center" }}>No menu items found</Text>
+        </ScrollView>
+      ) : (
+        <SectionList
+          sections={sections}
+          keyExtractor={(item) => item.id.toString()}
+          renderItem={renderMenuItem}
+          renderSectionHeader={({ section }) => (
+            <Text style={styles.sectionHeader}>{section.title}</Text>
+          )}
+          contentContainerStyle={{ paddingBottom: 20 }}
+          ListHeaderComponent={ListHeaderComponent}
+          onEndReached={loadMore}
+          onEndReachedThreshold={0.5}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#A40C2D" />
+          }
+          ListFooterComponent={
+            loading && page > 1 ? (
+              <ActivityIndicator
+                size="small"
+                color="#A40C2D"
+                style={{ marginVertical: 10 }}
+              />
+            ) : null
+          }
+        />
+      )}
+    </View>
   );
 };
 

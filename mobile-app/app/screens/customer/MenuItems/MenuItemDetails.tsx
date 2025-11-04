@@ -197,8 +197,8 @@ const MenuItemDetails = () => {
       if (inCart) {
         navigation.navigate("Cart");
       } else {
-        // Ensure we land on the Orders root list, not a previously open details screen
-        (navigation as any).navigate("Orders", { screen: "Customer Orders" });
+        // Redirect directly to the newly created order details
+        (navigation as any).navigate("Orders", { screen: "View Order", params: { orderId } });
       }
     } catch (err: any) {
       console.error(err.response?.data || err);

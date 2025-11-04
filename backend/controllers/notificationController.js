@@ -4,6 +4,7 @@ import { markNotificationAsRead as markRead, markAllAsRead, getUnreadCount } fro
 // GET notifications for a specific user by user_id
 export const getNotificationsByUserId = async (req, res) => {
   const { id } = req.params; // user_id
+  const { page = 1, limit = 10 } = req.query;
 
   try {
     // Validate user_id
@@ -11,20 +12,39 @@ export const getNotificationsByUserId = async (req, res) => {
       return res.status(400).json({ error: "User ID is required" });
     }
 
-    // Fetch notifications for the user, newest first
+    const pageNum = Number(page) || 1;
+    const pageLimit = Math.min(Math.max(Number(limit) || 10, 1), 100);
+    const offset = (pageNum - 1) * pageLimit;
+
+    // Fetch notifications page for the user, newest first
     const result = await pool.query(
       `SELECT id, user_id, notification_type, message, is_read, order_id, created_at, updated_at
        FROM tblnotification
        WHERE user_id = $1
-       ORDER BY created_at DESC`,
+       ORDER BY created_at DESC
+       LIMIT $2 OFFSET $3`,
+      [id, pageLimit, offset]
+    );
+
+    // Count total notifications for pagination
+    const countResult = await pool.query(
+      `SELECT COUNT(*) AS total
+       FROM tblnotification
+       WHERE user_id = $1`,
       [id]
     );
 
-    // Return notifications
+    const total = parseInt(countResult.rows?.[0]?.total || 0, 10);
+    const totalPages = Math.max(Math.ceil(total / pageLimit), 1);
+
+    // Return notifications with pagination metadata
     res.json({
       user_id: id,
-      notifications: result.rows,
-      count: result.rowCount,
+      page: pageNum,
+      limit: pageLimit,
+      total,
+      totalPages,
+      data: result.rows,
     });
   } catch (err) {
     console.error("Error fetching notifications:", err);

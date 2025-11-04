@@ -9,10 +9,13 @@ import {
   Modal,
   TouchableOpacity,
   Alert,
+  RefreshControl,
 } from "react-native";
 import { useFocusEffect, useNavigation } from "@react-navigation/native";
 import useStore from "../../../store";
 import api from "../../../libs/apiCall";
+
+const PAGE_SIZE = 10;
 
 const CustomerOrders = () => {
   const navigation = useNavigation<any>();
@@ -20,6 +23,12 @@ const CustomerOrders = () => {
   const [orders, setOrders] = useState<any[]>([]);
   const [filteredOrders, setFilteredOrders] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
+  const [initialLoading, setInitialLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  
+  // Pagination
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
 
   // Search & filter state
   const [searchQuery, setSearchQuery] = useState("");
@@ -74,29 +83,71 @@ const CustomerOrders = () => {
   const formatSchedule = (value: any) => formatManila(value);
   const formatDateTime = (value: any) => formatManila(value);
 
-  // Fetch customer orders
-  const fetchOrders = async () => {
+  // Fetch customer orders with pagination
+  const fetchOrders = useCallback(async (pageNum = 1, refresh = false) => {
     if (!user) return;
     try {
-      setLoading(true);
-      const res = await api.get(`/order/customer/${user.id}`);
-      setOrders(res.data || []);
-      setFilteredOrders(res.data || []);
+      if (!refresh && pageNum > 1) {
+        setLoading(true); // show footer loader
+      }
+      if (pageNum === 1 && !refresh) {
+        setInitialLoading(true); // full screen loader
+      }
+
+      const res = await api.get(`/order/customer/${user.id}?page=${pageNum}&limit=${PAGE_SIZE}`);
+      
+      // Backend returns { page, limit, total, totalPages, data }
+      const responseData = res.data.data || [];
+      const totalPages = Number(res.data.totalPages) || 1;
+
+      if (refresh || pageNum === 1) {
+        setOrders(responseData);
+      } else {
+        // Use functional update to avoid stale closure
+        setOrders((prevOrders) => [...prevOrders, ...responseData]);
+      }
+
+      setHasMore(pageNum < totalPages);
     } catch (err) {
       console.error("Error fetching customer orders:", err);
+      if (pageNum === 1) {
+        setOrders([]);
+        setFilteredOrders([]);
+      }
     } finally {
       setLoading(false);
+      setInitialLoading(false);
+      if (refresh) setRefreshing(false);
     }
-  };
+  }, [user]);
 
   // Refresh when screen is focused
   useFocusEffect(
     useCallback(() => {
+      setPage(1);
       setStatusFilter([]); // No default filter - show all orders
       setSortBy("date_desc"); // Default sort by newest to oldest
-      fetchOrders();
-    }, [user?.id])
+      fetchOrders(1, true);
+    }, [fetchOrders])
   );
+
+  // Pull to refresh
+  const onRefresh = () => {
+    setRefreshing(true);
+    setPage(1);
+    fetchOrders(1, true);
+  };
+
+  // Load more on scroll
+  const loadMore = useCallback(() => {
+    if (!loading && hasMore) {
+      setPage((prevPage) => {
+        const nextPage = prevPage + 1;
+        fetchOrders(nextPage);
+        return nextPage;
+      });
+    }
+  }, [loading, hasMore, fetchOrders]);
 
   // Apply search & filter
   useEffect(() => {
@@ -165,7 +216,8 @@ const renderItem = ({ item }: any) => {
               await api.put(`/order/cancel/${item.id}`);
               Alert.alert("Success", "Order cancelled successfully");
               // Refresh the orders list
-              fetchOrders();
+              setPage(1);
+              fetchOrders(1, true);
             } catch (error: any) {
               console.error("Error cancelling order:", error);
               Alert.alert(
@@ -222,6 +274,16 @@ const renderItem = ({ item }: any) => {
 };
 
 
+  // Full-screen loader for initial load
+  if (initialLoading) {
+    return (
+      <View style={styles.fullLoader}>
+        <ActivityIndicator size="large" color="#A40C2D" />
+        <Text style={{ marginTop: 10, color: "#A40C2D" }}>Loading orders...</Text>
+      </View>
+    );
+  }
+
   return (
     <View style={styles.container}>
       <Text style={styles.header}>My Orders</Text>
@@ -243,9 +305,7 @@ const renderItem = ({ item }: any) => {
       </TouchableOpacity>
 
       {/* Orders list */}
-      {loading ? (
-        <ActivityIndicator size="large" color="#A40C2D" />
-      ) : filteredOrders.length === 0 ? (
+      {filteredOrders.length === 0 ? (
         <Text style={styles.emptyText}>No orders found</Text>
       ) : (
         <FlatList
@@ -253,6 +313,21 @@ const renderItem = ({ item }: any) => {
           keyExtractor={(item) => item.id.toString()}
           renderItem={renderItem}
           contentContainerStyle={{ paddingBottom: 20 }}
+          onEndReached={loadMore}
+          onEndReachedThreshold={0.5}
+          removeClippedSubviews={false}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#A40C2D" />
+          }
+          ListFooterComponent={
+            loading && page > 1 ? (
+              <ActivityIndicator
+                size="small"
+                color="#A40C2D"
+                style={{ marginVertical: 10 }}
+              />
+            ) : null
+          }
         />
       )}
 
@@ -443,6 +518,11 @@ cancelButtonText: {
   color: "#fff",
   fontSize: 14,
   fontWeight: "600",
+},
+fullLoader: {
+  flex: 1,
+  justifyContent: "center",
+  alignItems: "center",
 },
 
 });

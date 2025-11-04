@@ -51,7 +51,7 @@ const OrderList = () => {
 
   const user = useStore((state: any) => state.user);
 
-  const fetchOrders = async (pageNum = 1, refresh = false) => {
+  const fetchOrders = useCallback(async (pageNum = 1, refresh = false) => {
     try {
       if (!refresh && pageNum > 1) {
         setLoading(true); // show footer loader
@@ -67,18 +67,14 @@ const OrderList = () => {
       );
       const { data: newOrders, totalPages } = res.data;
 
-      if (refresh) {
-        setOrders(newOrders);
-      } else if (pageNum === 1) {
+      if (refresh || pageNum === 1) {
         setOrders(newOrders);
       } else {
+        // Use functional update to avoid stale closure
         setOrders((prev) => [...prev, ...newOrders]);
       }
 
       setHasMore(pageNum < totalPages);
-      setFilteredOrders(
-        refresh || pageNum === 1 ? newOrders : [...orders, ...newOrders]
-      );
     } catch (err) {
       console.error(err);
       setError("Failed to fetch orders");
@@ -87,14 +83,14 @@ const OrderList = () => {
       setInitialLoading(false);
       if (refresh) setRefreshing(false);
     }
-  };
+  }, [user?.id]);
 
   useFocusEffect(
     useCallback(() => {
       setPage(1);
       setStatusFilter([]); // Show all by default
       fetchOrders(1, true);
-    }, [user.id])
+    }, [fetchOrders])
   );
 
   // Pull to refresh
@@ -105,13 +101,15 @@ const OrderList = () => {
   };
 
   // Load more on scroll
-  const loadMore = () => {
+  const loadMore = useCallback(() => {
     if (!loading && hasMore) {
-      const nextPage = page + 1;
-      setPage(nextPage);
-      fetchOrders(nextPage);
+      setPage((prevPage) => {
+        const nextPage = prevPage + 1;
+        fetchOrders(nextPage);
+        return nextPage;
+      });
     }
-  };
+  }, [loading, hasMore, fetchOrders]);
 
   // Apply search, filter, and sort
   useEffect(() => {
@@ -277,6 +275,7 @@ const OrderList = () => {
             contentContainerStyle={{ paddingBottom: 20 }}
             onEndReached={loadMore}
             onEndReachedThreshold={0.5}
+            removeClippedSubviews={false}
             refreshControl={
               <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
             }
@@ -298,6 +297,7 @@ const OrderList = () => {
             contentContainerStyle={{ paddingBottom: 20 }}
             onEndReached={loadMore}
             onEndReachedThreshold={0.5}
+            removeClippedSubviews={false}
             refreshControl={
               <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
             }

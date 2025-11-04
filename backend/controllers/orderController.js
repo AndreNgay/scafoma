@@ -68,7 +68,11 @@ export const getOrdersByConcessionaireId = async (req, res) => {
 // ==========================
 export const getOrdersByCustomerId = async (req, res) => {
   const { id } = req.params;
+  const { page = 1, limit = 10 } = req.query;
+
   try {
+    const offset = (page - 1) * limit;
+
     const result = await pool.query(
       `SELECT o.*, 
               o.payment_method,
@@ -81,17 +85,34 @@ export const getOrdersByCustomerId = async (req, res) => {
        JOIN tblcafeteria caf ON c.cafeteria_id = caf.id
        WHERE o.customer_id = $1
          AND o.in_cart = FALSE   -- ✅ only checked-out orders
-       ORDER BY o.created_at DESC`,
+       ORDER BY o.created_at DESC
+       LIMIT $2 OFFSET $3`,
+      [id, limit, offset]
+    );
+
+    const orders = result.rows.map(order => {
+      order.payment_proof = makeImageDataUrl(order.gcash_screenshot);
+      return order;
+    });
+
+    // Get total count for frontend pagination
+    const countResult = await pool.query(
+      `SELECT COUNT(*) AS total
+       FROM tblorder o
+       WHERE o.customer_id = $1
+         AND o.in_cart = FALSE`,
       [id]
     );
 
-  const orders = result.rows.map(order => {
-    order.payment_proof = makeImageDataUrl(order.gcash_screenshot);
-    return order;
-  });
+    const totalOrders = parseInt(countResult.rows[0].total, 10);
 
-
-    res.json(orders);
+    return res.status(200).json({
+      page: Number(page),
+      limit: Number(limit),
+      total: totalOrders,
+      totalPages: Math.ceil(totalOrders / limit),
+      data: orders,
+    });
   } catch (err) {
     console.error("Error fetching customer orders:", err);
     res.status(500).json({ error: "Failed to fetch customer orders" });
