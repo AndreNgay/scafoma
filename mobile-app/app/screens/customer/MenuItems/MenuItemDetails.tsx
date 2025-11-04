@@ -28,6 +28,11 @@ const MenuItemDetails = () => {
   const [selectedVariations, setSelectedVariations] = useState<any[]>([]);
   const [placingOrder, setPlacingOrder] = useState(false);
   const [feedbacks, setFeedbacks] = useState<any[]>([]);
+  const [canLeaveFeedback, setCanLeaveFeedback] = useState<boolean>(false);
+  const [eligibilityChecked, setEligibilityChecked] = useState<boolean>(false);
+  const [feedbackRating, setFeedbackRating] = useState<number>(5);
+  const [feedbackComment, setFeedbackComment] = useState<string>("");
+  const [submittingFeedback, setSubmittingFeedback] = useState<boolean>(false);
   const user = useStore.getState().user;
 
   // Determine available payment methods
@@ -45,7 +50,7 @@ const MenuItemDetails = () => {
     }
   }, [availablePaymentMethods]);
 
-  // Fetch variations + feedbacks
+  // Fetch variations + feedbacks + feedback eligibility
   useEffect(() => {
     const fetchVariations = async () => {
       try {
@@ -76,9 +81,52 @@ const MenuItemDetails = () => {
       }
     };
 
+    const checkEligibility = async () => {
+      try {
+        if (!user?.id) return;
+        const res = await api.get(`/feedback/can-leave/${item.id}/${user.id}`);
+        setCanLeaveFeedback(!!res.data?.canLeave);
+      } catch (err) {
+        console.error("Error checking feedback eligibility:", err);
+        setCanLeaveFeedback(false);
+      } finally {
+        setEligibilityChecked(true);
+      }
+    };
+
     fetchVariations();
     fetchFeedbacks();
-  }, [item.id]);
+    checkEligibility();
+  }, [item.id, user?.id]);
+
+  const submitFeedback = async () => {
+    try {
+      if (!user?.id) return Alert.alert("Error", "You must be logged in to leave feedback.");
+      if (!canLeaveFeedback) return Alert.alert("Not eligible", "You can only leave feedback after completing an order for this item.");
+      if (feedbackRating < 1 || feedbackRating > 5) return Alert.alert("Invalid Rating", "Please select a rating between 1 and 5.");
+      setSubmittingFeedback(true);
+      await api.post(`/feedback`, {
+        customer_id: user.id,
+        menu_item_id: item.id,
+        rating: feedbackRating,
+        comment: feedbackComment || null,
+      });
+      setFeedbackModalVisible(false);
+      setFeedbackComment("");
+      setFeedbackRating(5);
+      // refresh feedback list
+      try {
+        const res = await api.get(`/feedback/${item.id}`);
+        setFeedbacks(res.data);
+      } catch {}
+      Alert.alert("Thank you!", "Your feedback has been submitted.");
+    } catch (err: any) {
+      const msg = err.response?.data?.message || "Failed to submit feedback.";
+      Alert.alert("Error", msg);
+    } finally {
+      setSubmittingFeedback(false);
+    }
+  };
 
   // Price calculation
   const basePrice = Number(item.price) || 0;
@@ -416,6 +464,40 @@ const MenuItemDetails = () => {
         {/* Feedback Section */}
         <View style={styles.feedbackContainer}>
           <Text style={styles.feedbackTitle}>Customer Feedback</Text>
+          {eligibilityChecked && !canLeaveFeedback ? (
+            <Text style={styles.feedbackInfo}>Only customers who have completed an order for this item can leave feedback.</Text>
+          ) : null}
+          {eligibilityChecked && canLeaveFeedback ? (
+            <View style={{ gap: 8, marginBottom: 10 }}>
+              <Text style={{ fontWeight: '600' }}>Add Feedback</Text>
+              <View style={styles.ratingRow}>
+                {[1,2,3,4,5].map((n) => (
+                  <TouchableOpacity key={n} onPress={() => setFeedbackRating(n)}>
+                    <Text style={[styles.star, feedbackRating >= n && styles.starActive]}>★</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+              <TextInput
+                style={styles.feedbackInput}
+                placeholder="Share your experience (optional)"
+                value={feedbackComment}
+                onChangeText={setFeedbackComment}
+                multiline
+              />
+              <View style={{ flexDirection: 'row', gap: 10 }}>
+                <TouchableOpacity style={[styles.btn, styles.btnAlt, { flex: 1 }]} disabled={submittingFeedback} onPress={submitFeedback}>
+                  <Text style={styles.btnText}>{submittingFeedback ? 'Submitting...' : 'Submit'}</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.btn, { flex: 1 }]}
+                  disabled={submittingFeedback}
+                  onPress={() => { setFeedbackComment(''); setFeedbackRating(5); }}
+                >
+                  <Text style={styles.btnText}>Clear</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          ) : null}
           {feedbacks.length === 0 ? (
             <Text style={styles.noFeedback}>No feedback yet.</Text>
           ) : (
@@ -559,6 +641,7 @@ const styles = StyleSheet.create({
 
   feedbackContainer: { marginTop: 20 },
   feedbackTitle: { fontSize: 18, fontWeight: "bold", marginBottom: 10 },
+  feedbackInfo: { color: "#666", fontSize: 12, marginBottom: 8 },
   noFeedback: { color: "#888", fontStyle: "italic" },
   feedbackCard: { backgroundColor: "#f9f9f9", padding: 10, borderRadius: 6, marginBottom: 10 },
   feedbackHeader: { flexDirection: "row", alignItems: "center", marginBottom: 6 },
@@ -572,6 +655,28 @@ const styles = StyleSheet.create({
   feedbackRating: { color: "#A40C2D" },
   feedbackComment: { color: "#333", marginVertical: 3 },
   feedbackDate: { fontSize: 12, color: "#888" },
+  feedbackModal: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    top: 0,
+    bottom: 0,
+    backgroundColor: '#0006',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  feedbackModalCard: {
+    width: '90%',
+    backgroundColor: '#fff',
+    borderRadius: 10,
+    padding: 16,
+    gap: 10,
+  },
+  feedbackModalTitle: { fontSize: 16, fontWeight: 'bold', color: '#A40C2D' },
+  ratingRow: { flexDirection: 'row', gap: 6, marginVertical: 6 },
+  star: { fontSize: 24, color: '#ccc' },
+  starActive: { color: '#FFD700' },
+  feedbackInput: { borderWidth: 1, borderColor: '#ddd', borderRadius: 8, padding: 10, minHeight: 60 },
 });
 
 export default MenuItemDetails;

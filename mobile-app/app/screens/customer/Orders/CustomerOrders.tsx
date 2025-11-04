@@ -83,6 +83,13 @@ const CustomerOrders = () => {
   const formatSchedule = (value: any) => formatManila(value);
   const formatDateTime = (value: any) => formatManila(value);
 
+  // Normalize status strings for consistent filtering (e.g., "ready-for-pickup" vs "ready for pickup")
+  const normalizeStatus = (value: any) =>
+    String(value || "")
+      .trim()
+      .toLowerCase()
+      .replace(/[_\s]+/g, "-");
+
   // Fetch customer orders with pagination
   const fetchOrders = useCallback(async (pageNum = 1, refresh = false) => {
     if (!user) return;
@@ -161,9 +168,10 @@ const CustomerOrders = () => {
       );
     }
 
-    // Filter by status
+    // Filter by status (normalized)
     if (statusFilter.length > 0) {
-      filtered = filtered.filter((o) => statusFilter.includes(o.order_status));
+      const normalizedSelected = new Set(statusFilter.map((s) => normalizeStatus(s)));
+      filtered = filtered.filter((o) => normalizedSelected.has(normalizeStatus(o.order_status)));
     }
 
     // Sort orders
@@ -197,6 +205,15 @@ const CustomerOrders = () => {
 
     setFilteredOrders(filtered);
   }, [searchQuery, statusFilter, sortBy, orders]);
+
+  // If a status filter is applied and no results are visible yet, auto-load more pages
+  useEffect(() => {
+    if (statusFilter.length > 0 && filteredOrders.length === 0 && hasMore && !loading) {
+      const nextPage = page + 1;
+      setPage(nextPage);
+      fetchOrders(nextPage);
+    }
+  }, [statusFilter, filteredOrders.length, hasMore, loading, page, fetchOrders]);
 
 const renderItem = ({ item }: any) => {
   const cancelOrder = async () => {
@@ -413,13 +430,6 @@ const renderItem = ({ item }: any) => {
           </View>
         </View>
       </Modal>
-      {loading && !initialLoading && (
-        <ActivityIndicator
-          size="large"
-          color="#A40C2D"
-          style={styles.overlayLoader}
-        />
-      )}
     </View>
   );
 };
@@ -541,11 +551,6 @@ fullLoader: {
   justifyContent: "center",
   alignItems: "center",
 },
-  overlayLoader: {
-    position: "absolute",
-    bottom: 16,
-    alignSelf: "center",
-  },
 
 });
 
