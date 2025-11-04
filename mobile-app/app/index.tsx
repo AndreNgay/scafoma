@@ -5,7 +5,7 @@ import {
   Text,
   StyleSheet,
 } from "react-native";
-import { NavigationContainer } from "@react-navigation/native";
+import { NavigationContainer, CommonActions } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { Ionicons } from "@expo/vector-icons";
@@ -200,8 +200,27 @@ function CustomerTabs() {
         }}
         listeners={({ navigation }) => ({
           tabPress: (e) => {
-            // Ensure the nested stack shows the root list screen
-            navigation.navigate("Menu Items", { screen: "View Menu Items" });
+            const state = navigation.getState();
+            const menuItemsTab = state.routes.find(r => r.name === "Menu Items");
+            
+            // If we're already on this tab and the stack has multiple screens, reset to root
+            if (menuItemsTab && menuItemsTab.state && menuItemsTab.state.index > 0) {
+              e.preventDefault();
+              navigation.dispatch(
+                CommonActions.reset({
+                  index: 0,
+                  routes: [
+                    {
+                      name: "Menu Items",
+                      state: {
+                        routes: [{ name: "View Menu Items" }],
+                        index: 0,
+                      },
+                    },
+                  ],
+                })
+              );
+            }
           },
         })}
       />
@@ -227,9 +246,28 @@ function CustomerTabs() {
           ),
         }}
         listeners={({ navigation }) => ({
-          tabPress: () => {
-            // Force Orders tab to show the root list screen
-            navigation.navigate('Orders', { screen: 'Customer Orders' });
+          tabPress: (e) => {
+            const state = navigation.getState();
+            const ordersTab = state.routes.find(r => r.name === "Orders");
+            
+            // If we're already on this tab and the stack has multiple screens, reset to root
+            if (ordersTab && ordersTab.state && ordersTab.state.index > 0) {
+              e.preventDefault();
+              navigation.dispatch(
+                CommonActions.reset({
+                  index: 0,
+                  routes: [
+                    {
+                      name: "Orders",
+                      state: {
+                        routes: [{ name: "Customer Orders" }],
+                        index: 0,
+                      },
+                    },
+                  ],
+                })
+              );
+            }
           },
         })}
       />
@@ -319,6 +357,31 @@ function ConcessionaireTabs() {
             <Ionicons name="list" size={size} color={color} />
           ),
         }}
+        listeners={({ navigation }) => ({
+          tabPress: (e) => {
+            const state = navigation.getState();
+            const orderListTab = state.routes.find(r => r.name === "Order List");
+            
+            // If we're already on this tab and the stack has multiple screens, reset to root
+            if (orderListTab && orderListTab.state && orderListTab.state.index > 0) {
+              e.preventDefault();
+              navigation.dispatch(
+                CommonActions.reset({
+                  index: 0,
+                  routes: [
+                    {
+                      name: "Order List",
+                      state: {
+                        routes: [{ name: "View Orders" }],
+                        index: 0,
+                      },
+                    },
+                  ],
+                })
+              );
+            }
+          },
+        })}
       />
       <Tab.Screen 
         name="Menu" 
@@ -330,6 +393,31 @@ function ConcessionaireTabs() {
             <Ionicons name="restaurant" size={size} color={color} />
           ),
         }}
+        listeners={({ navigation }) => ({
+          tabPress: (e) => {
+            const state = navigation.getState();
+            const menuTab = state.routes.find(r => r.name === "Menu");
+            
+            // If we're already on this tab and the stack has multiple screens, reset to root
+            if (menuTab && menuTab.state && menuTab.state.index > 0) {
+              e.preventDefault();
+              navigation.dispatch(
+                CommonActions.reset({
+                  index: 0,
+                  routes: [
+                    {
+                      name: "Menu",
+                      state: {
+                        routes: [{ name: "Menu Management" }],
+                        index: 0,
+                      },
+                    },
+                  ],
+                })
+              );
+            }
+          },
+        })}
       />
       <Tab.Screen 
         name="Concession" 
@@ -341,6 +429,31 @@ function ConcessionaireTabs() {
             <Ionicons name="storefront" size={size} color={color} />
           ),
         }}
+        listeners={({ navigation }) => ({
+          tabPress: (e) => {
+            const state = navigation.getState();
+            const concessionTab = state.routes.find(r => r.name === "Concession");
+            
+            // If we're already on this tab and the stack has multiple screens, reset to root
+            if (concessionTab && concessionTab.state && concessionTab.state.index > 0) {
+              e.preventDefault();
+              navigation.dispatch(
+                CommonActions.reset({
+                  index: 0,
+                  routes: [
+                    {
+                      name: "Concession",
+                      state: {
+                        routes: [{ name: "Concession Management" }],
+                        index: 0,
+                      },
+                    },
+                  ],
+                })
+              );
+            }
+          },
+        })}
       />
       <Tab.Screen 
         name="Notifications" 
