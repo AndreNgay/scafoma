@@ -231,6 +231,10 @@ const renderItem = ({ item }: any) => {
     );
   };
 
+  const itemNames: string[] = Array.isArray(item.item_names_preview) ? item.item_names_preview : [];
+  const itemCount: number = typeof item.item_count === 'number' ? item.item_count : (item.items_count || 0);
+  const extraCount = Math.max(0, itemCount - itemNames.length);
+
   return (
     <View style={styles.card}>
       <TouchableOpacity
@@ -243,6 +247,11 @@ const renderItem = ({ item }: any) => {
         <Text style={styles.title}>
           {item.cafeteria_name} • {item.concession_name}
         </Text>
+        {itemNames.length > 0 && (
+          <Text style={styles.itemsPreview}>
+            Items: {itemNames.join(', ')}{extraCount > 0 ? ` +${extraCount} more` : ''}
+          </Text>
+        )}
         <Text>
           Status: <Text style={styles.status}>{item.order_status}</Text>
         </Text>
@@ -443,6 +452,7 @@ const styles = StyleSheet.create({
   },
   title: { fontSize: 16, fontWeight: "600", marginBottom: 5 },
   status: { color: "#A40C2D", fontWeight: "600" },
+  itemsPreview: { fontSize: 12, color: "#333", marginBottom: 4 },
   declineReason: { color: "#dc3545", fontSize: 12, fontStyle: "italic", marginTop: 2 },
   date: { fontSize: 12, color: "#666", marginTop: 5 },
   emptyText: { textAlign: "center", marginTop: 20, color: "#888" },

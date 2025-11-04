@@ -126,7 +126,19 @@ const removeItem = async (orderDetailId: number) => {
       
       alert(message);
       setScheduleTime(null); // Clear schedule time after checkout
-      fetchCart();
+      const createdOrders = response.data?.orders || [];
+      if (Array.isArray(createdOrders) && createdOrders.length === 1) {
+        const orderId = createdOrders[0]?.id;
+        if (orderId) {
+          // Redirect directly to the single order's details
+          navigation.navigate("Orders", { screen: "View Order", params: { orderId } });
+        } else {
+          navigation.navigate("Orders", { screen: "Customer Orders" });
+        }
+      } else {
+        // Multiple concessions/orders → go to Orders list
+        navigation.navigate("Orders", { screen: "Customer Orders" });
+      }
     } catch (err: any) {
       console.error("Checkout failed:", err);
       const errorMessage = err.response?.data?.error || "Checkout failed";

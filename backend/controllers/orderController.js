@@ -79,7 +79,20 @@ export const getOrdersByCustomerId = async (req, res) => {
               c.concession_name, 
               caf.cafeteria_name,
               COALESCE(c.gcash_payment_available, FALSE) AS gcash_payment_available,
-              COALESCE(c.oncounter_payment_available, FALSE) AS oncounter_payment_available
+              COALESCE(c.oncounter_payment_available, FALSE) AS oncounter_payment_available,
+              (
+                SELECT ARRAY(
+                  SELECT m.item_name
+                  FROM tblorderdetail d
+                  JOIN tblmenuitem m ON d.item_id = m.id
+                  WHERE d.order_id = o.id
+                  ORDER BY d.id
+                  LIMIT 3
+                )
+              ) AS item_names_preview,
+              (
+                SELECT COUNT(*)::int FROM tblorderdetail d2 WHERE d2.order_id = o.id
+              ) AS item_count
        FROM tblorder o
        JOIN tblconcession c ON o.concession_id = c.id
        JOIN tblcafeteria caf ON c.cafeteria_id = caf.id
