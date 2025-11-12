@@ -300,7 +300,10 @@ const ViewOrderConcessionaire = () => {
               <View style={{ marginTop: 5 }}>
                 {item.variations.map((v: any, vIndex: number) => (
                   <Text key={`${item.id}-${v.id}-${vIndex}`} style={styles.variation}>
-                    • {v.variation_group_name}: {v.variation_name} (+₱{Number(v.additional_price || 0).toFixed(2)})
+                    • {v.variation_group_name}: {v.variation_name} 
+                    {v.quantity > 1 ? ` x${v.quantity}` : ''}
+                    {' '}(+₱{Number(v.additional_price || 0).toFixed(2)})
+                    {v.quantity > 1 ? ` = ₱${(Number(v.additional_price || 0) * (v.quantity || 1)).toFixed(2)}` : ''}
                   </Text>
                 ))}
               </View>

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from "react";
+import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import {
   View,
   Text,
@@ -11,7 +11,7 @@ import {
   TextInput,
   RefreshControl,
 } from "react-native";
-import { useNavigation, useFocusEffect } from "@react-navigation/native";
+import { useNavigation } from "@react-navigation/native";
 import useStore from "../../../store";
 import api from "../../../libs/apiCall";
 
@@ -43,6 +43,7 @@ const Menu = () => {
   // Align with customer menu UI: simple list (no grouping toggle)
 
   const navigation = useNavigation<any>();
+  const hasInitialized = useRef(false);
 
   const fetchMenuItems = async (pageNum = 1, replace = false) => {
     try {
@@ -65,11 +66,13 @@ const Menu = () => {
     }
   };
 
-  useFocusEffect(
-    useCallback(() => {
+  // Only fetch on initial mount, not on every focus
+  useEffect(() => {
+    if (!hasInitialized.current) {
+      hasInitialized.current = true;
       fetchMenuItems(1, true);
-    }, [])
-  );
+    }
+  }, []); // Empty dependency array - only run once on mount
 
   const onRefresh = () => {
     setRefreshing(true);

@@ -11,7 +11,7 @@ import {
   Modal,
   RefreshControl,
 } from "react-native";
-import { useNavigation, useFocusEffect } from "@react-navigation/native";
+import { useNavigation } from "@react-navigation/native";
 import api from "../../../libs/apiCall";
 import useStore from "../../../store";
 
@@ -82,16 +82,14 @@ const OrderList = () => {
     }
   }, [user?.id]);
 
-  useFocusEffect(
-    useCallback(() => {
-      // Only fetch on initial load, not on every navigation
-      if (!hasInitialized.current) {
-        hasInitialized.current = true;
-        setStatusFilter([]); // Show all by default
-        fetchOrders(1, true);
-      }
-    }, [fetchOrders])
-  );
+  // Only fetch on initial mount, not on every focus
+  useEffect(() => {
+    if (!hasInitialized.current) {
+      hasInitialized.current = true;
+      setStatusFilter([]); // Show all by default
+      fetchOrders(1, true);
+    }
+  }, []); // Empty dependency array - only run once on mount
 
   // Pull to refresh
   const onRefresh = () => {
