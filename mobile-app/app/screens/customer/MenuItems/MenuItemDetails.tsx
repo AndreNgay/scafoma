@@ -26,6 +26,8 @@ const MenuItemDetails = () => {
   const [paymentMethod, setPaymentMethod] = useState<'gcash' | 'on-counter'>('on-counter');
   const [groupedVariations, setGroupedVariations] = useState<any>({});
   const [selectedVariations, setSelectedVariations] = useState<any[]>([]);
+  // Track quantities for variations with max_amount > 1
+  const [variationQuantities, setVariationQuantities] = useState<Record<number, number>>({});
   const [placingOrder, setPlacingOrder] = useState(false);
   const [feedbacks, setFeedbacks] = useState<any[]>([]);
   const [canLeaveFeedback, setCanLeaveFeedback] = useState<boolean>(false);
@@ -130,28 +132,65 @@ const MenuItemDetails = () => {
 
   // Price calculation
   const basePrice = Number(item.price) || 0;
-  const variationTotal = selectedVariations.reduce(
-    (sum, v) => sum + Number(v.additional_price || 0),
-    0
-  );
+  const variationTotal = selectedVariations.reduce((sum, v) => {
+    const qty = variationQuantities[v.id] || 1;
+    return sum + (Number(v.additional_price || 0) * qty);
+  }, 0);
   const displayPrice = (basePrice + variationTotal) * quantity;
 
   // Handle variation selection
   const toggleVariation = (group: any, variation: any) => {
-    const alreadySelected = selectedVariations.find((v) => v.id === variation.id);
+    const maxAmount = variation.max_amount || 1;
     const maxSelection = group.max_selection || 1;
-    
-    // Get currently selected variations for this group
     const selectionsInGroup = selectedVariations.filter((v) => v.group_id === group.id);
+    const isSelected = selectedVariations.some((v) => v.id === variation.id);
+    
+    // Check if selection should be blocked
+    if (!isSelected) {
+      // If max_selection is 1, and another variation is already selected, show message
+      if (maxSelection === 1 && selectionsInGroup.length > 0) {
+        Alert.alert(
+          "Selection Limit",
+          `You can only select 1 option from "${group.variation_group_name}". Please deselect the current selection first.`
+        );
+        return;
+      }
+      // If max_selection is reached, show message
+      if (selectionsInGroup.length >= maxSelection) {
+        Alert.alert(
+          "Selection Limit",
+          `You can only select up to ${maxSelection} option(s) from "${group.variation_group_name}". Please deselect an option first.`
+        );
+        return;
+      }
+    }
+    
+    // If max_amount > 1, use quantity-based selection
+    if (maxAmount > 1) {
+      const currentQty = variationQuantities[variation.id] || 0;
+      if (currentQty > 0) {
+        // Remove variation if quantity is being set to 0
+        const newQuantities = { ...variationQuantities };
+        delete newQuantities[variation.id];
+        setVariationQuantities(newQuantities);
+        setSelectedVariations(selectedVariations.filter((v) => v.id !== variation.id));
+      } else {
+        // Add variation with quantity 1
+        setVariationQuantities({ ...variationQuantities, [variation.id]: 1 });
+        setSelectedVariations([...selectedVariations, { ...variation, group_id: group.id }]);
+      }
+      return;
+    }
+    
+    // For max_amount = 1, use the old toggle logic
+    const alreadySelected = selectedVariations.find((v) => v.id === variation.id);
     
     if (maxSelection > 1) {
       // Multiple selection allowed up to max_selection
       if (alreadySelected) {
         setSelectedVariations(selectedVariations.filter((v) => v.id !== variation.id));
-      } else if (selectionsInGroup.length < maxSelection) {
-        setSelectedVariations([...selectedVariations, { ...variation, group_id: group.id }]);
       } else {
-        Alert.alert("Selection Limit", `You can only select up to ${maxSelection} option(s) from this group.`);
+        setSelectedVariations([...selectedVariations, { ...variation, group_id: group.id }]);
       }
     } else {
       // Single selection only
@@ -162,25 +201,84 @@ const MenuItemDetails = () => {
     }
   };
 
+  // Handle variation quantity changes (for max_amount > 1)
+  const updateVariationQuantity = (variation: any, delta: number) => {
+    const currentQty = variationQuantities[variation.id] || 0;
+    const maxAmount = variation.max_amount || 1;
+    
+    // Find the group this variation belongs to
+    const group = Object.values(groupedVariations).find((g: any) => 
+      g.variations.some((v: any) => v.id === variation.id)
+    ) as any;
+    
+    if (!group) return;
+    
+    const maxSelection = group.max_selection || 1;
+    const selectionsInGroup = selectedVariations.filter((v) => v.group_id === group.id);
+    
+    // Check if trying to add when max_selection is reached
+    if (delta > 0 && currentQty === 0) {
+      // Trying to add a new variation
+      if (maxSelection === 1 && selectionsInGroup.length > 0) {
+        Alert.alert(
+          "Selection Limit",
+          `You can only select 1 option from "${group.variation_group_name}". Please deselect the current selection first.`
+        );
+        return;
+      }
+      if (selectionsInGroup.length >= maxSelection) {
+        Alert.alert(
+          "Selection Limit",
+          `You can only select up to ${maxSelection} option(s) from "${group.variation_group_name}". Please deselect an option first.`
+        );
+        return;
+      }
+    }
+    
+    const newQty = Math.max(0, Math.min(maxAmount, currentQty + delta));
+    
+    if (newQty === 0) {
+      // Remove variation
+      const newQuantities = { ...variationQuantities };
+      delete newQuantities[variation.id];
+      setVariationQuantities(newQuantities);
+      setSelectedVariations(selectedVariations.filter((v) => v.id !== variation.id));
+    } else {
+      // Update quantity
+      setVariationQuantities({ ...variationQuantities, [variation.id]: newQty });
+      // Ensure variation is in selectedVariations
+      if (!selectedVariations.find((v) => v.id === variation.id)) {
+        setSelectedVariations([...selectedVariations, { ...variation, group_id: group.id }]);
+      }
+    }
+  };
+
   // Submit order/cart
   const submitOrder = async (inCart: boolean) => {
     try {
       setPlacingOrder(true);
       if (!user) return Alert.alert("Error", "You must be logged in to place an order.");
 
-      // Validate required selections and max selections
+      // Validate required selections, min_selection, and max_selection
       for (const [groupName, group] of Object.entries<any>(groupedVariations)) {
-        if (group.required_selection) {
-          const hasSelection = selectedVariations.some((v) => v.group_id === group.id);
-          if (!hasSelection) {
-            setPlacingOrder(false);
-            return Alert.alert("Missing Selection", `Please select at least one option from "${groupName}".`);
-          }
+        const selectionsInGroup = selectedVariations.filter((v) => v.group_id === group.id);
+        const minSelection = group.min_selection || 0;
+        const maxSelection = group.max_selection || 1;
+        const requiredSelection = group.required_selection || false;
+        
+        // Check required selection
+        if (requiredSelection && selectionsInGroup.length === 0) {
+          setPlacingOrder(false);
+          return Alert.alert("Missing Selection", `Please select at least one option from "${groupName}".`);
         }
         
-        // Validate max_selection limit
-        const selectionsInGroup = selectedVariations.filter((v) => v.group_id === group.id);
-        const maxSelection = group.max_selection || 1;
+        // Check min_selection
+        if (selectionsInGroup.length < minSelection) {
+          setPlacingOrder(false);
+          return Alert.alert("Insufficient Selections", `Please select at least ${minSelection} option(s) from "${groupName}".`);
+        }
+        
+        // Check max_selection limit
         if (selectionsInGroup.length > maxSelection) {
           setPlacingOrder(false);
           return Alert.alert("Too Many Selections", `You can only select up to ${maxSelection} option(s) from "${groupName}".`);
@@ -222,12 +320,16 @@ const MenuItemDetails = () => {
 
       const orderDetailId = detailRes.data.id;
 
-      // Add variations
+      // Add variations (with quantities for max_amount > 1)
       for (const v of selectedVariations) {
-        await api.post("/order-item-variation", {
-          order_detail_id: orderDetailId,
-          variation_id: v.id,
-        });
+        const qty = variationQuantities[v.id] || 1;
+        // Add the variation qty times
+        for (let i = 0; i < qty; i++) {
+          await api.post("/order-item-variation", {
+            order_detail_id: orderDetailId,
+            variation_id: v.id,
+          });
+        }
       }
 
       await api.put(`/order/${orderId}/recalculate`);
@@ -391,6 +493,10 @@ const MenuItemDetails = () => {
         {Object.entries<any>(groupedVariations).map(([groupName, group]) => {
           const selectionsInGroup = selectedVariations.filter((v) => v.group_id === group.id);
           const maxSelection = group.max_selection || 1;
+          const minSelection = group.min_selection || 0;
+          
+          // Determine if variations should be disabled
+          const isMaxSelectionReached = selectionsInGroup.length >= maxSelection;
           
           return (
             <View key={group.id} style={styles.group}>
@@ -404,14 +510,48 @@ const MenuItemDetails = () => {
                 </Text>
               )}
             {group.variations.map((variation: any) => {
-              const isSelected = selectedVariations.some((v) => v.id === variation.id);
+              const maxAmount = variation.max_amount || 1;
+              const variationQty = variationQuantities[variation.id] || 0;
+              const showQuantityControls = maxAmount > 1;
+              const isSelected = showQuantityControls ? variationQty > 0 : selectedVariations.some((v) => v.id === variation.id);
+              
+              // Determine if this variation should be unclickable (but not visually disabled)
+              let isUnclickable = false;
+              if (!isSelected) {
+                // If max_selection is 1, make unselected variations unclickable when any is selected
+                if (maxSelection === 1 && selectionsInGroup.length > 0) {
+                  isUnclickable = true;
+                }
+                // If max_selection is reached, make all unselected variations unclickable
+                else if (isMaxSelectionReached) {
+                  isUnclickable = true;
+                }
+              }
+              
               return (
-                <TouchableOpacity
-                  key={variation.id}
-                  style={[styles.option, isSelected && styles.optionSelected]}
-                  onPress={() => toggleVariation(group, variation)}
-                >
-                  <View style={styles.variationContent}>
+                <View key={variation.id} style={[styles.option, isSelected && styles.optionSelected]}>
+                  <TouchableOpacity
+                    style={styles.variationContent}
+                    onPress={() => {
+                      if (showQuantityControls) return;
+                      if (isUnclickable) {
+                        if (maxSelection === 1) {
+                          Alert.alert(
+                            "Selection Limit",
+                            `You can only select 1 option from "${groupName}". Please deselect the current selection first.`
+                          );
+                        } else {
+                          Alert.alert(
+                            "Selection Limit",
+                            `You can only select up to ${maxSelection} option(s) from "${groupName}". Please deselect an option first.`
+                          );
+                        }
+                        return;
+                      }
+                      toggleVariation(group, variation);
+                    }}
+                    disabled={showQuantityControls}
+                  >
                     {variation.image_url && (
                       <Image 
                         source={{ uri: variation.image_url }} 
@@ -423,8 +563,43 @@ const MenuItemDetails = () => {
                       <Text style={styles.variationName}>{variation.variation_name}</Text>
                       <Text style={styles.variationPrice}>+₱{variation.additional_price}</Text>
                     </View>
-                  </View>
-                </TouchableOpacity>
+                  </TouchableOpacity>
+                  {showQuantityControls ? (
+                    <View style={styles.variationQuantityContainer}>
+                      <TouchableOpacity
+                        style={[styles.variationQtyButton, variationQty === 0 && styles.variationQtyButtonDisabled]}
+                        onPress={() => updateVariationQuantity(variation, -1)}
+                        disabled={variationQty === 0}
+                      >
+                        <Text style={[styles.variationQtyButtonText, variationQty === 0 && styles.variationQtyButtonTextDisabled]}>−</Text>
+                      </TouchableOpacity>
+                      <Text style={styles.variationQtyValue}>{variationQty}</Text>
+                      <TouchableOpacity
+                        style={[styles.variationQtyButton, variationQty >= maxAmount && styles.variationQtyButtonDisabled]}
+                        onPress={() => {
+                          if (isUnclickable && variationQty === 0) {
+                            if (maxSelection === 1) {
+                              Alert.alert(
+                                "Selection Limit",
+                                `You can only select 1 option from "${groupName}". Please deselect the current selection first.`
+                              );
+                            } else {
+                              Alert.alert(
+                                "Selection Limit",
+                                `You can only select up to ${maxSelection} option(s) from "${groupName}". Please deselect an option first.`
+                              );
+                            }
+                            return;
+                          }
+                          updateVariationQuantity(variation, 1);
+                        }}
+                        disabled={variationQty >= maxAmount}
+                      >
+                        <Text style={[styles.variationQtyButtonText, variationQty >= maxAmount && styles.variationQtyButtonTextDisabled]}>+</Text>
+                      </TouchableOpacity>
+                    </View>
+                  ) : null}
+                </View>
               );
             })}
           </View>
@@ -624,11 +799,42 @@ const styles = StyleSheet.create({
   selectionCounter: { fontSize: 12, color: "#666", marginTop: 4, fontWeight: "500" },
   option: { padding: 10, backgroundColor: "#f2f2f2", borderRadius: 8, marginBottom: 6 },
   optionSelected: { backgroundColor: "#A40C2D33", borderWidth: 1, borderColor: "#A40C2D" },
-  variationContent: { flexDirection: "row", alignItems: "center" },
+  variationContent: { flexDirection: "row", alignItems: "center", flex: 1 },
   variationImage: { width: 50, height: 50, borderRadius: 8, marginRight: 12 },
   variationTextContainer: { flex: 1 },
   variationName: { fontSize: 16, fontWeight: "500" },
   variationPrice: { fontSize: 14, color: "#A40C2D", fontWeight: "600" },
+  variationQuantityContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginLeft: 10,
+  },
+  variationQtyButton: {
+    width: 32,
+    height: 32,
+    backgroundColor: "#A40C2D",
+    borderRadius: 6,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  variationQtyButtonDisabled: {
+    backgroundColor: "#ccc",
+  },
+  variationQtyButtonText: {
+    color: "#fff",
+    fontSize: 18,
+    fontWeight: "bold",
+  },
+  variationQtyButtonTextDisabled: {
+    color: "#999",
+  },
+  variationQtyValue: {
+    fontSize: 16,
+    fontWeight: "600",
+    marginHorizontal: 12,
+    minWidth: 20,
+    textAlign: "center",
+  },
 
   noteLabel: { fontSize: 14, fontWeight: "600", marginTop: 10, marginBottom: 5 },
   noteInput: { borderWidth: 1, borderColor: "#ccc", borderRadius: 6, padding: 10, minHeight: 50, marginBottom: 15 },

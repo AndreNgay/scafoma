@@ -3,8 +3,8 @@ import axios from "axios";
 import useStore from "../store";
 
 const api = axios.create({
-  baseURL: "http://192.168.42.178:5000/api-v1",
-  timeout: 1000000,
+  baseURL: "http://192.168.42.73:5000/api-v1",
+  timeout: 10000000,
 });
 
 

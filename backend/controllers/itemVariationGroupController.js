@@ -6,7 +6,7 @@ export const getVariationGroupsById = async (req, res) => {
 
   try {
     const query = `
-      SELECT id, variation_group_name, multiple_selection, required_selection, max_selection
+      SELECT id, variation_group_name, multiple_selection, required_selection, min_selection, max_selection
       FROM tblitemvariationgroup
       WHERE menu_item_id = $1
       ORDER BY variation_group_name ASC;

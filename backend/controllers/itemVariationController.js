@@ -18,6 +18,7 @@ export const getVariationsByGroupId = async (req, res) => {
         v.item_variation_group_id,
         v.variation_name,
         v.additional_price,
+        v.max_amount,
         v.image,
         v.created_at,
         v.updated_at

@@ -88,6 +88,7 @@ CREATE TABLE IF NOT EXISTS tblitemvariationgroup (
     variation_group_name VARCHAR(100) NOT NULL,
     menu_item_id INT NOT NULL,
     required_selection BOOLEAN DEFAULT FALSE,
+    min_selection INT DEFAULT 0,
     max_selection INT DEFAULT 1,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -104,6 +105,7 @@ CREATE TABLE IF NOT EXISTS tblitemvariation (
     variation_name VARCHAR(50) NOT NULL,
     additional_price NUMERIC(10,2) NOT NULL CHECK (additional_price >= 0),
     image BYTEA,
+    max_amount INT DEFAULT 1,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 

@@ -19,6 +19,7 @@ import api from "../../../libs/apiCall";
 type Variation = { 
   name: string; 
   price: string; 
+  max_amount?: number;
   image?: any; 
   image_url?: string;
   variation_id?: number;
@@ -27,6 +28,7 @@ type VariationGroup = {
   label: string;
   variations: Variation[];
   required_selection: boolean;
+  min_selection: number;
   max_selection: number;
 };
 
@@ -52,10 +54,12 @@ const EditMenu: React.FC = () => {
     return menuItem.variations.map((group: any) => ({
       label: group.label,
       required_selection: group.required_selection || false,
+      min_selection: group.min_selection || 0,
       max_selection: group.max_selection || 1,
       variations: group.variations.map((v: any) => ({
         ...v,
         price: v.price?.toString() || "",
+        max_amount: v.max_amount || 1,
         image_url: v.image_url
       }))
     }));
@@ -100,6 +104,7 @@ const EditMenu: React.FC = () => {
         label: "",
         variations: [],
         required_selection: false,
+        min_selection: 0,
         max_selection: 1,
       },
     ]);
@@ -112,7 +117,7 @@ const EditMenu: React.FC = () => {
 
   const addVariation = (gIndex: number) => {
     const updated = [...variationGroups];
-    updated[gIndex].variations.push({ name: "", price: "" });
+    updated[gIndex].variations.push({ name: "", price: "", max_amount: 1 });
     setVariationGroups(updated);
   };
 
@@ -128,16 +133,72 @@ const EditMenu: React.FC = () => {
     setVariationGroups(updated);
   };
 
+  const updateMinSelection = (index: number, value: string) => {
+    const updated = [...variationGroups];
+    const numValue = parseInt(value) || 0;
+    const maxSelection = updated[index].max_selection || 1;
+    const requiredSelection = updated[index].required_selection || false;
+    
+    // If required_selection is true, min_selection must be at least 1
+    const minAllowed = requiredSelection ? 1 : 0;
+    
+    // Limit min_selection to be <= max_selection and >= minAllowed
+    if (numValue > maxSelection) {
+      Alert.alert("Invalid Value", `Min selection cannot exceed max selection (${maxSelection})`);
+      updated[index].min_selection = maxSelection;
+    } else if (numValue < minAllowed) {
+      Alert.alert("Invalid Value", `Min selection must be at least ${minAllowed} when required selection is enabled`);
+      updated[index].min_selection = minAllowed;
+    } else {
+      updated[index].min_selection = numValue;
+    }
+    setVariationGroups(updated);
+  };
+
+  const incrementMinSelection = (index: number) => {
+    const updated = [...variationGroups];
+    const currentValue = updated[index].min_selection || 0;
+    const maxSelection = updated[index].max_selection || 1;
+    const requiredSelection = updated[index].required_selection || false;
+    const minAllowed = requiredSelection ? 1 : 0;
+    
+    if (currentValue < maxSelection) {
+      updated[index].min_selection = Math.max(currentValue + 1, minAllowed);
+      setVariationGroups(updated);
+    } else {
+      Alert.alert("Limit Reached", `Min selection cannot exceed max selection (${maxSelection})`);
+    }
+  };
+
+  const decrementMinSelection = (index: number) => {
+    const updated = [...variationGroups];
+    const currentValue = updated[index].min_selection || 0;
+    const requiredSelection = updated[index].required_selection || false;
+    const minAllowed = requiredSelection ? 1 : 0;
+    
+    if (currentValue > minAllowed) {
+      updated[index].min_selection = currentValue - 1;
+      setVariationGroups(updated);
+    } else {
+      updated[index].min_selection = minAllowed;
+      setVariationGroups(updated);
+    }
+  };
+
   const updateMaxSelection = (index: number, value: string) => {
     const updated = [...variationGroups];
     const numValue = parseInt(value) || 1;
     const numVariations = updated[index].variations.length;
     const maxAllowed = numVariations > 0 ? numVariations : 1;
+    const minSelection = updated[index].min_selection || 0;
     
     // Limit max_selection to number of variations
     if (numValue > maxAllowed) {
       Alert.alert("Invalid Value", `Max selection cannot exceed the number of variations (${numVariations})`);
       updated[index].max_selection = maxAllowed;
+    } else if (numValue < minSelection) {
+      Alert.alert("Invalid Value", `Max selection cannot be less than min selection (${minSelection})`);
+      updated[index].max_selection = minSelection;
     } else {
       updated[index].max_selection = numValue > 0 ? numValue : 1;
     }
@@ -149,6 +210,7 @@ const EditMenu: React.FC = () => {
     const currentValue = updated[index].max_selection || 1;
     const numVariations = updated[index].variations.length;
     const maxAllowed = numVariations > 0 ? numVariations : 1;
+    
     if (currentValue < maxAllowed) {
       updated[index].max_selection = currentValue + 1;
       setVariationGroups(updated);
@@ -160,18 +222,28 @@ const EditMenu: React.FC = () => {
   const decrementMaxSelection = (index: number) => {
     const updated = [...variationGroups];
     const currentValue = updated[index].max_selection || 1;
-    updated[index].max_selection = currentValue > 1 ? currentValue - 1 : 1;
-    setVariationGroups(updated);
+    const minSelection = updated[index].min_selection || 0;
+    
+    if (currentValue > minSelection) {
+      updated[index].max_selection = currentValue - 1;
+      setVariationGroups(updated);
+    } else {
+      Alert.alert("Limit Reached", `Max selection cannot be less than min selection (${minSelection})`);
+    }
   };
 
   const updateVariation = (
     gIndex: number,
     vIndex: number,
-    key: "name" | "price",
-    value: string
+    key: "name" | "price" | "max_amount",
+    value: string | number
   ) => {
     const updated = [...variationGroups];
-    updated[gIndex].variations[vIndex][key] = value;
+    if (key === "max_amount") {
+      updated[gIndex].variations[vIndex][key] = typeof value === "number" ? value : parseInt(value as string) || 1;
+    } else {
+      updated[gIndex].variations[vIndex][key] = value;
+    }
     setVariationGroups(updated);
   };
 
@@ -180,7 +252,14 @@ const EditMenu: React.FC = () => {
     key: "required_selection"
   ) => {
     const updated = [...variationGroups];
-    updated[gIndex][key] = !updated[gIndex][key];
+    const newValue = !updated[gIndex][key];
+    updated[gIndex][key] = newValue;
+    
+    // If required_selection is enabled, ensure min_selection is at least 1
+    if (newValue && updated[gIndex].min_selection < 1) {
+      updated[gIndex].min_selection = 1;
+    }
+    
     setVariationGroups(updated);
   };
 
@@ -332,7 +411,7 @@ const EditMenu: React.FC = () => {
         break;
       case "required":
         message =
-          "Customer must select at least one option in this group.";
+          "Customer must select at least one option in this group. Min selection will be set to at least 1.";
         break;
       case "max":
         message =
@@ -444,7 +523,7 @@ const EditMenu: React.FC = () => {
           <View style={styles.toggleRow}>
             <Text>Required Selection</Text>
             <Switch
-              value={group.required_selection}
+              value={group.required_selection || false}
               onValueChange={() =>
                 toggleGroupOption(gIndex, "required_selection")
               }
@@ -461,9 +540,34 @@ const EditMenu: React.FC = () => {
           </View>
           <Tooltip id="required" />
 
+          {/* Min Selection */}
+          <View style={styles.selectionRow}>
+            <View style={styles.selectionLabelContainer}>
+              <Text style={styles.label}>Min Selection</Text>
+            </View>
+            <TouchableOpacity
+              style={styles.maxSelectionButton}
+              onPress={() => decrementMinSelection(gIndex)}
+            >
+              <Text style={styles.maxSelectionButtonText}>−</Text>
+            </TouchableOpacity>
+            <TextInput
+              style={styles.selectionInput}
+              keyboardType="numeric"
+              value={group.min_selection?.toString() || "0"}
+              onChangeText={(t) => updateMinSelection(gIndex, t)}
+            />
+            <TouchableOpacity
+              style={styles.maxSelectionButton}
+              onPress={() => incrementMinSelection(gIndex)}
+            >
+              <Text style={styles.maxSelectionButtonText}>+</Text>
+            </TouchableOpacity>
+          </View>
+
           {/* Max Selection */}
-          <View style={styles.maxSelectionRowWithLabel}>
-            <View style={styles.maxSelectionLabelContainer}>
+          <View style={styles.selectionRow}>
+            <View style={styles.selectionLabelContainer}>
               <Text style={styles.label}>Max Selection *</Text>
               <TouchableOpacity
                 onPress={() => setTooltip(tooltip === "max" ? null : "max")}
@@ -479,7 +583,7 @@ const EditMenu: React.FC = () => {
               <Text style={styles.maxSelectionButtonText}>−</Text>
             </TouchableOpacity>
             <TextInput
-              style={styles.maxSelectionInput}
+              style={styles.selectionInput}
               keyboardType="numeric"
               value={group.max_selection?.toString() || "1"}
               onChangeText={(t) => updateMaxSelection(gIndex, t)}
@@ -533,6 +637,17 @@ const EditMenu: React.FC = () => {
                 value={v.price}
                 onChangeText={(t) =>
                   updateVariation(gIndex, vIndex, "price", t)
+                }
+              />
+
+              {/* Max Amount Input */}
+              <TextInput
+                style={[styles.input, styles.variationMaxAmountInput]}
+                placeholder="Max"
+                keyboardType="numeric"
+                value={v.max_amount?.toString() || "1"}
+                onChangeText={(t) =>
+                  updateVariation(gIndex, vIndex, "max_amount", t)
                 }
               />
 
@@ -670,6 +785,10 @@ const styles = StyleSheet.create({
     flex: 1,
     marginTop: 0,
   },
+  variationMaxAmountInput: {
+    width: 60,
+    marginTop: 0,
+  },
   removeVariationButton: {
     width: 40,
     height: 40,
@@ -691,16 +810,26 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 8,
   },
-  maxSelectionRowWithLabel: {
+  selectionRow: {
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
     marginTop: 8,
   },
-  maxSelectionLabelContainer: {
+  selectionLabelContainer: {
     flexDirection: "row",
     alignItems: "center",
     minWidth: 120,
+  },
+  selectionInput: {
+    width: 80,
+    borderWidth: 1,
+    borderColor: "#ccc",
+    padding: 10,
+    borderRadius: 8,
+    textAlign: "center",
+    fontSize: 16,
+    backgroundColor: "#fff",
   },
   maxSelectionButton: {
     width: 40,
@@ -715,15 +844,13 @@ const styles = StyleSheet.create({
     fontSize: 24,
     fontWeight: "bold",
   },
-  maxSelectionInput: {
-    flex: 1,
-    borderWidth: 1,
-    borderColor: "#ccc",
-    padding: 10,
-    borderRadius: 8,
-    textAlign: "center",
-    fontSize: 16,
-    backgroundColor: "#fff",
+  toggleContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  toggleLabel: {
+    fontSize: 14,
   },
   maxSelectionHint: {
     fontSize: 12,
