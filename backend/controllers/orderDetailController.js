@@ -51,6 +51,18 @@ export const addOrderDetail = async (req, res) => {
        VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
       [order_id, item_id, quantity, item_price, total_price, note]
     );
+    // Recalculate order total after insert
+    await pool.query(
+      `UPDATE tblorder
+       SET total_price = (
+         SELECT COALESCE(SUM(od.total_price), 0)
+         FROM tblorderdetail od
+         WHERE od.order_id = $1
+       ),
+       updated_at = NOW()
+       WHERE id = $1`,
+      [order_id]
+    );
     res.status(201).json(result.rows[0]);
   } catch (err) {
     console.error("Error adding order detail:", err);
@@ -66,6 +78,9 @@ export const updateOrderDetail = async (req, res) => {
   const { id } = req.params;
   const { quantity, item_price, total_price } = req.body;
   try {
+    // Get order_id to recalc later
+    const pre = await pool.query(`SELECT order_id FROM tblorderdetail WHERE id = $1`, [id]);
+    const orderId = pre.rows[0]?.order_id;
     const result = await pool.query(
       `UPDATE tblorderdetail
        SET quantity = $1, item_price = $2, total_price = $3, updated_at = NOW()
@@ -73,6 +88,19 @@ export const updateOrderDetail = async (req, res) => {
       [quantity, item_price, total_price, id]
     );
     if (result.rowCount === 0) return res.status(404).json({ error: "Order detail not found" });
+    if (orderId) {
+      await pool.query(
+        `UPDATE tblorder
+         SET total_price = (
+           SELECT COALESCE(SUM(od.total_price), 0)
+           FROM tblorderdetail od
+           WHERE od.order_id = $1
+         ),
+         updated_at = NOW()
+         WHERE id = $1`,
+        [orderId]
+      );
+    }
     res.json(result.rows[0]);
   } catch (err) {
     console.error("Error updating order detail:", err);
@@ -86,11 +114,27 @@ export const updateOrderDetail = async (req, res) => {
 export const deleteOrderDetail = async (req, res) => {
   const { id } = req.params; // order_detail_id
   try {
+    // Get order_id before deleting
+    const pre = await pool.query(`SELECT order_id FROM tblorderdetail WHERE id = $1`, [id]);
+    const orderId = pre.rows[0]?.order_id;
     const result = await pool.query(
       `DELETE FROM tblorderdetail WHERE id = $1 RETURNING *`,
       [id]
     );
     if (result.rowCount === 0) return res.status(404).json({ error: "Order detail not found" });
+    if (orderId) {
+      await pool.query(
+        `UPDATE tblorder
+         SET total_price = (
+           SELECT COALESCE(SUM(od.total_price), 0)
+           FROM tblorderdetail od
+           WHERE od.order_id = $1
+         ),
+         updated_at = NOW()
+         WHERE id = $1`,
+        [orderId]
+      );
+    }
     res.json({ message: "Item removed from cart" });
   } catch (err) {
     console.error("Error deleting order detail:", err);
@@ -139,6 +183,19 @@ export const updateOrderDetailQuantity = async (req, res) => {
       WHERE id = $4
       `,
       [quantity, itemPrice, totalPrice, orderDetailId]
+    );
+
+    // Recalculate parent order total
+    await pool.query(
+      `UPDATE tblorder
+       SET total_price = (
+         SELECT COALESCE(SUM(od.total_price), 0)
+         FROM tblorderdetail od
+         WHERE od.order_id = (SELECT order_id FROM tblorderdetail WHERE id = $1)
+       ),
+       updated_at = NOW()
+       WHERE id = (SELECT order_id FROM tblorderdetail WHERE id = $1)`,
+      [orderDetailId]
     );
 
     res.json({ message: "Quantity updated successfully" });

@@ -322,14 +322,8 @@ export const updateOrderTotal = async (req, res) => {
     const query = `
       UPDATE tblorder
       SET total_price = (
-        SELECT COALESCE(SUM(od.total_price + COALESCE(v.total_variations, 0)), 0)
+        SELECT COALESCE(SUM(od.total_price), 0)
         FROM tblorderdetail od
-        LEFT JOIN (
-          SELECT oiv.order_detail_id, SUM(iv.additional_price) AS total_variations
-          FROM tblorderitemvariation oiv
-          JOIN tblitemvariation iv ON oiv.variation_id = iv.id
-          GROUP BY oiv.order_detail_id
-        ) v ON od.id = v.order_detail_id
         WHERE od.order_id = $1
       ),
       updated_at = NOW()

@@ -293,7 +293,7 @@ const ViewOrderConcessionaire = () => {
         keyExtractor={(item) => item.id.toString()}
         renderItem={({ item }) => (
           <View style={styles.itemCard}>
-            <Text style={styles.itemName}>{item.item_name} x{item.quantity}</Text>
+            <Text style={styles.itemName}>{Number(item.quantity ?? 1)} x {item.item_name}</Text>
             <Text>₱{Number(item.total_price).toFixed(2)}</Text>
             {item.note && <Text style={styles.note}>Note: {item.note}</Text>}
             {item.variations?.length > 0 && (
