@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState, useCallback, useRef } from "react";
 import {
   View,
   Text,
@@ -9,7 +9,6 @@ import {
   ActivityIndicator,
   TextInput,
   Modal,
-  Image,
   RefreshControl,
 } from "react-native";
 import { useNavigation, useFocusEffect } from "@react-navigation/native";
@@ -52,6 +51,7 @@ const OrderList = () => {
   const [hasMoreHistory, setHasMoreHistory] = useState(true);
 
   const user = useStore((state: any) => state.user);
+  const hasInitialized = useRef(false);
 
   const fetchOrders = useCallback(async (pageNum = 1, refresh = false) => {
     try {
@@ -84,8 +84,12 @@ const OrderList = () => {
 
   useFocusEffect(
     useCallback(() => {
-      setStatusFilter([]); // Show all by default
-      fetchOrders(1, true);
+      // Only fetch on initial load, not on every navigation
+      if (!hasInitialized.current) {
+        hasInitialized.current = true;
+        setStatusFilter([]); // Show all by default
+        fetchOrders(1, true);
+      }
     }, [fetchOrders])
   );
 
@@ -191,53 +195,34 @@ const OrderList = () => {
       style={styles.orderCard}
       onPress={() => navigation.navigate("View Order", { orderId: item.id })}
     >
-      <View style={{ flexDirection: "row", alignItems: "center" }}>
-        <TouchableOpacity
-          onPress={(e) => {
-            e.stopPropagation();
-            navigation.navigate("View Customer Profile", { customerId: item.customer_id });
-          }}
-        >
-          {item.profile_image ? (
-            <Image
-              source={{ uri: item.profile_image }}
-              style={styles.avatar}
-            />
-          ) : (
-            <View style={styles.avatarPlaceholder}>
-              <Text style={styles.avatarInitials}>
-                {item.first_name?.[0]}{item.last_name?.[0]}
-              </Text>
-            </View>
-          )}
-        </TouchableOpacity>
-        <View style={{ flex: 1, marginLeft: 10 }}>
-          <Text style={styles.orderId}>Order #{item.id}</Text>
-          <Text style={styles.customer}>
-            Customer: {item.first_name} {item.last_name}
+      <View style={{ flex: 1 }}>
+        <Text style={styles.orderId}>Order #{item.id}</Text>
+        <Text style={styles.customer}>
+          Customer: {item.first_name} {item.last_name}
+        </Text>
+        {Array.isArray((item as any).item_names_preview) && (item as any).item_names_preview.length > 0 && (
+          <Text style={styles.itemsPreview}>
+            Items: {(item as any).item_names_preview.join(', ')}
+            {typeof (item as any).item_count === 'number' && (item as any).item_count > (item as any).item_names_preview.length
+              ? ` +${(item as any).item_count - (item as any).item_names_preview.length} more`
+              : ''}
           </Text>
-          {Array.isArray((item as any).item_names_preview) && (item as any).item_names_preview.length > 0 && (
-            <Text style={styles.itemsPreview}>
-              Items: {(item as any).item_names_preview.join(', ')}
-              {typeof (item as any).item_count === 'number' && (item as any).item_count > (item as any).item_names_preview.length
-                ? ` +${(item as any).item_count - (item as any).item_names_preview.length} more`
-                : ''}
-            </Text>
-          )}
-          <Text>
-            Status: <Text style={styles.status}>{item.order_status}</Text>
-          </Text>
-          {item.order_status === 'declined' && (item as any).decline_reason ? (
-            <Text style={styles.declineReason}>Reason: {(item as any).decline_reason}</Text>
-          ) : null}
-          <Text>Total: ₱{Number(item.total_price).toFixed(2)}</Text>
-          <Text>Date: {new Date(item.created_at).toLocaleString()}</Text>
-        </View>
+        )}
+        <Text>
+          Status: <Text style={styles.status}>{item.order_status}</Text>
+        </Text>
+        {item.order_status === 'declined' && (item as any).decline_reason ? (
+          <Text style={styles.declineReason}>Reason: {(item as any).decline_reason}</Text>
+        ) : null}
+        <Text>Total: ₱{Number(item.total_price).toFixed(2)}</Text>
+        <Text>Date: {new Date(item.created_at).toLocaleString()}</Text>
       </View>
     </TouchableOpacity>
   );
 
   // Group orders by status when no explicit status filter is applied
+  // Ensure ongoing orders (pending, accepted, ready for pickup) appear first
+  // Settled orders (completed, declined) appear after
   const groupedSections = (() => {
     if (statusFilter.length > 0) return [] as { title: string; data: Order[] }[];
     const groups: Record<string, Order[]> = {};
@@ -246,24 +231,44 @@ const OrderList = () => {
       if (!groups[key]) groups[key] = [];
       groups[key].push(o);
     }
-    const orderStatusPriority = [
-      'pending',
-      'accepted',
-      'ready for pickup',
-      'completed',
-      'declined',
-      'cancelled',
-    ];
+    const ongoingStatuses = ['pending', 'accepted', 'ready for pickup'];
+    const settledStatuses = ['completed', 'declined', 'cancelled'];
     const toLabel = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
-    const keys = Object.keys(groups).sort((a, b) => {
-      const ai = orderStatusPriority.indexOf(a);
-      const bi = orderStatusPriority.indexOf(b);
-      if (ai === -1 && bi === -1) return a.localeCompare(b);
-      if (ai === -1) return 1;
-      if (bi === -1) return -1;
-      return ai - bi;
+    
+    // Separate ongoing and settled orders
+    const ongoingKeys: string[] = [];
+    const settledKeys: string[] = [];
+    const otherKeys: string[] = [];
+    
+    Object.keys(groups).forEach(key => {
+      if (ongoingStatuses.includes(key)) {
+        ongoingKeys.push(key);
+      } else if (settledStatuses.includes(key)) {
+        settledKeys.push(key);
+      } else {
+        otherKeys.push(key);
+      }
     });
-    return keys.map((k) => ({ title: toLabel(k), data: groups[k] }));
+    
+    // Sort each group by priority
+    const sortByPriority = (keys: string[], priority: string[]) => {
+      return keys.sort((a, b) => {
+        const ai = priority.indexOf(a);
+        const bi = priority.indexOf(b);
+        if (ai === -1 && bi === -1) return a.localeCompare(b);
+        if (ai === -1) return 1;
+        if (bi === -1) return -1;
+        return ai - bi;
+      });
+    };
+    
+    const sortedOngoing = sortByPriority(ongoingKeys, ongoingStatuses);
+    const sortedSettled = sortByPriority(settledKeys, settledStatuses);
+    const sortedOther = otherKeys.sort();
+    
+    // Combine: ongoing first, then settled, then others
+    const allKeys = [...sortedOngoing, ...sortedSettled, ...sortedOther];
+    return allKeys.map((k) => ({ title: toLabel(k), data: groups[k] }));
   })();
 
   // full-screen loader
@@ -534,24 +539,6 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
   applyText: { color: "#fff", textAlign: "center", fontWeight: "bold" },
-  avatar: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-  },
-  avatarPlaceholder: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    backgroundColor: "#A40C2D",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  avatarInitials: {
-    color: "#fff",
-    fontSize: 16,
-    fontWeight: "bold",
-  },
   fullLoader: {
     flex: 1,
     justifyContent: "center",

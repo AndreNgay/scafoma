@@ -528,8 +528,11 @@ const MenuItemDetails = () => {
                 }
               }
               
+              // Use composite key to ensure uniqueness across groups
+              const uniqueKey = `${group.id}-${variation.id}`;
+              
               return (
-                <View key={variation.id} style={[styles.option, isSelected && styles.optionSelected]}>
+                <View key={uniqueKey} style={[styles.option, isSelected && styles.optionSelected]}>
                   <TouchableOpacity
                     style={styles.variationContent}
                     onPress={() => {
