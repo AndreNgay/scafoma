@@ -10,13 +10,15 @@ import {
   Alert,
   TouchableOpacity,
   Platform,
+  BackHandler,
 } from "react-native";
-import { useRoute } from "@react-navigation/native";
+import { useRoute, useNavigation, useFocusEffect } from "@react-navigation/native";
 import * as ImagePicker from "expo-image-picker";
 import api from "../../../libs/apiCall";
 
 const ViewOrderCustomer = () => {
   const route = useRoute<any>();
+  const navigation = useNavigation<any>();
   const { orderId } = route.params;
 
   const [order, setOrder] = useState<any>(null);
@@ -93,6 +95,21 @@ const ViewOrderCustomer = () => {
   useEffect(() => {
     fetchOrder();
   }, [orderId]);
+
+  useFocusEffect(
+    React.useCallback(() => {
+      const onBackPress = () => {
+        if (navigation.canGoBack()) {
+          navigation.goBack();
+          return true;
+        }
+        navigation.navigate('Orders', { screen: 'Customer Orders' });
+        return true;
+      };
+      const sub = BackHandler.addEventListener('hardwareBackPress', onBackPress);
+      return () => sub.remove();
+    }, [navigation])
+  );
 
   // ===============================
   // Cancel order

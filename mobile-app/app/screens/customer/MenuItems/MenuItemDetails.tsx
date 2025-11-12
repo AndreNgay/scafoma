@@ -798,7 +798,7 @@ const styles = StyleSheet.create({
   required: { color: "red", fontSize: 14 },
   multiple: { fontSize: 12, color: "#555", marginLeft: 5 },
   selectionCounter: { fontSize: 12, color: "#666", marginTop: 4, fontWeight: "500" },
-  option: { padding: 10, backgroundColor: "#f2f2f2", borderRadius: 8, marginBottom: 6 },
+  option: { padding: 10, backgroundColor: "#f2f2f2", borderRadius: 8, marginBottom: 6, flexDirection: 'row', alignItems: 'center' },
   optionSelected: { backgroundColor: "#A40C2D33", borderWidth: 1, borderColor: "#A40C2D" },
   variationContent: { flexDirection: "row", alignItems: "center", flex: 1 },
   variationImage: { width: 50, height: 50, borderRadius: 8, marginRight: 12 },

@@ -216,7 +216,56 @@ const MenuItems = () => {
         {item.category && (
           <Text style={styles.categoryTag}>{item.category}</Text>
         )}
-        <Text style={styles.price}>₱{Number(item.price || 0).toFixed(2)}</Text>
+        {(() => {
+          const base = Number(item.price || 0);
+          if (base > 0) return <Text style={styles.price}>₱{base.toFixed(2)}</Text>;
+
+          const groups = (item as any).variations || [];
+          if (!groups.length) return <Text style={styles.price}>₱0.00</Text>;
+
+          // Helper to get sorted price list for a group's variations
+          const getSortedPrices = (g: any) =>
+            (g.variations || [])
+              .map((v: any) => Number(v.price))
+              .filter((n: number) => Number.isFinite(n))
+              .sort((a: number, b: number) => a - b);
+
+          // Minimum extra: sum the cheapest options required by group constraints
+          let minExtra = 0;
+          for (const g of groups) {
+            const prices = getSortedPrices(g);
+            if (!prices.length) continue;
+            const required = !!g.required_selection;
+            const minSel = Number(g.min_selection || 0);
+            const need = Math.max(required ? 1 : 0, minSel);
+            for (let i = 0; i < need && i < prices.length; i++) {
+              minExtra += prices[i];
+            }
+          }
+
+          // Maximum extra: sum the most expensive options allowed by group constraints
+          let maxExtra = 0;
+          for (const g of groups) {
+            const prices = getSortedPrices(g);
+            if (!prices.length) continue;
+            const multiple = !!g.multiple_selection;
+            const maxSel = Number.isFinite(Number(g.max_selection)) && Number(g.max_selection) > 0
+              ? Number(g.max_selection)
+              : (multiple ? prices.length : 1);
+            const chosen = prices.slice(-maxSel); // most expensive allowed
+            for (const p of chosen) maxExtra += p;
+          }
+
+          const low = base + minExtra;
+          const high = base + Math.max(minExtra, maxExtra);
+          if (!Number.isFinite(low) || !Number.isFinite(high)) return <Text style={styles.price}>₱0.00</Text>;
+
+          return (
+            <Text style={styles.price}>
+              {low === high ? `₱${low.toFixed(2)}` : `₱${low.toFixed(2)} - ₱${high.toFixed(2)}`}
+            </Text>
+          );
+        })()}
       </View>
     </TouchableOpacity>
   );

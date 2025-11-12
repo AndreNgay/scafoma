@@ -204,7 +204,7 @@ function CustomerTabs() {
             const menuItemsTab = state.routes.find(r => r.name === "Menu Items");
             
             // If we're already on this tab and the stack has multiple screens, reset to root
-            if (menuItemsTab && menuItemsTab.state && menuItemsTab.state.index > 0) {
+            if (menuItemsTab?.state?.index > 0) {
               e.preventDefault();
               navigation.dispatch(
                 CommonActions.reset({
@@ -247,27 +247,8 @@ function CustomerTabs() {
         }}
         listeners={({ navigation }) => ({
           tabPress: (e) => {
-            const state = navigation.getState();
-            const ordersTab = state.routes.find(r => r.name === "Orders");
-            
-            // If we're already on this tab and the stack has multiple screens, reset to root
-            if (ordersTab && ordersTab.state && ordersTab.state.index > 0) {
-              e.preventDefault();
-              navigation.dispatch(
-                CommonActions.reset({
-                  index: 0,
-                  routes: [
-                    {
-                      name: "Orders",
-                      state: {
-                        routes: [{ name: "Customer Orders" }],
-                        index: 0,
-                      },
-                    },
-                  ],
-                })
-              );
-            }
+            e.preventDefault();
+            navigation.navigate('Orders', { screen: 'Customer Orders' });
           },
         })}
       />
@@ -363,7 +344,7 @@ function ConcessionaireTabs() {
             const orderListTab = state.routes.find(r => r.name === "Order List");
             
             // If we're already on this tab and the stack has multiple screens, reset to root
-            if (orderListTab && orderListTab.state && orderListTab.state.index > 0) {
+            if (orderListTab?.state?.index > 0) {
               e.preventDefault();
               navigation.dispatch(
                 CommonActions.reset({
@@ -399,7 +380,7 @@ function ConcessionaireTabs() {
             const menuTab = state.routes.find(r => r.name === "Menu");
             
             // If we're already on this tab and the stack has multiple screens, reset to root
-            if (menuTab && menuTab.state && menuTab.state.index > 0) {
+            if (menuTab?.state?.index > 0) {
               e.preventDefault();
               navigation.dispatch(
                 CommonActions.reset({
@@ -435,7 +416,7 @@ function ConcessionaireTabs() {
             const concessionTab = state.routes.find(r => r.name === "Concession");
             
             // If we're already on this tab and the stack has multiple screens, reset to root
-            if (concessionTab && concessionTab.state && concessionTab.state.index > 0) {
+            if (concessionTab?.state?.index > 0) {
               e.preventDefault();
               navigation.dispatch(
                 CommonActions.reset({

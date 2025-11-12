@@ -82,26 +82,41 @@ export const getMenuItems = async (req, res) => {
 
     const menuItems = result.rows;
 
-    // Fetch variations
+    // Fetch variations with group constraints (to allow constrained price ranges on clients)
     const menuItemIds = menuItems.map(mi => mi.id);
     let variationsMap = {};
     if (menuItemIds.length > 0) {
       const vRes = await pool.query(
-        `SELECT ivg.menu_item_id, ivg.variation_group_name AS label,
-                iv.variation_name, iv.additional_price
-         FROM tblitemvariation iv
-         JOIN tblitemvariationgroup ivg ON iv.item_variation_group_id = ivg.id
+        `SELECT ivg.id AS group_id, ivg.menu_item_id,
+                ivg.variation_group_name AS label,
+                ivg.multiple_selection, ivg.required_selection, ivg.min_selection, ivg.max_selection,
+                iv.variation_name, iv.additional_price, iv.max_amount, iv.id AS variation_id
+         FROM tblitemvariationgroup ivg
+         LEFT JOIN tblitemvariation iv ON iv.item_variation_group_id = ivg.id
          WHERE ivg.menu_item_id = ANY($1::int[])`,
         [menuItemIds]
       );
 
       for (const v of vRes.rows) {
         if (!variationsMap[v.menu_item_id]) variationsMap[v.menu_item_id] = {};
-        if (!variationsMap[v.menu_item_id][v.label]) variationsMap[v.menu_item_id][v.label] = [];
-        variationsMap[v.menu_item_id][v.label].push({
-          name: v.variation_name,
-          price: Number(v.additional_price),
-        });
+        if (!variationsMap[v.menu_item_id][v.label]) {
+          variationsMap[v.menu_item_id][v.label] = {
+            label: v.label,
+            multiple_selection: v.multiple_selection,
+            required_selection: v.required_selection || false,
+            min_selection: v.min_selection || 0,
+            max_selection: v.max_selection,
+            variations: []
+          };
+        }
+        if (v.variation_name) {
+          variationsMap[v.menu_item_id][v.label].variations.push({
+            name: v.variation_name,
+            price: Number(v.additional_price),
+            max_amount: v.max_amount || 1,
+            variation_id: v.variation_id,
+          });
+        }
       }
     }
 
@@ -153,10 +168,7 @@ export const getMenuItems = async (req, res) => {
       feedback: feedbackMap[r.id] || { feedback_count: 0, avg_rating: null },
       order_count: orderCountMap[r.id] || 0,
       variations: variationsMap[r.id]
-        ? Object.keys(variationsMap[r.id]).map(label => ({
-            label,
-            variations: variationsMap[r.id][label]
-          }))
+        ? Object.values(variationsMap[r.id])
         : [],
       gcash_payment_available: r.gcash_payment_available,
       oncounter_payment_available: r.oncounter_payment_available,
