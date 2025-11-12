@@ -235,11 +235,11 @@ export const getOrderById = async (req, res) => {
 
     const items = itemsResult.rows;
 
-    // For each item, get variations with quantities
+    // For each item, get variations with quantities (supports new quantity column)
     for (let item of items) {
       const variationsResult = await pool.query(
         `SELECT iv.id, iv.variation_name, iv.additional_price, ivg.variation_group_name,
-                COUNT(*)::int AS quantity
+                SUM(COALESCE(oiv.quantity, 1))::int AS quantity
          FROM tblorderitemvariation oiv
          JOIN tblitemvariation iv ON oiv.variation_id = iv.id
          JOIN tblitemvariationgroup ivg ON iv.item_variation_group_id = ivg.id

@@ -24,10 +24,15 @@ export const getOrderDetailsById = async (req, res) => {
 
     for (const item of order.items) {
       const varsRes = await pool.query(
-        `SELECT v.*
+        `SELECT iv.id, iv.variation_name, iv.additional_price,
+                ivg.variation_group_name,
+                SUM(COALESCE(oiv.quantity, 1))::int AS quantity
          FROM tblorderitemvariation oiv
-         JOIN tblitemvariation v ON oiv.variation_id = v.id
-         WHERE oiv.order_detail_id = $1`, [item.id]
+         JOIN tblitemvariation iv ON oiv.variation_id = iv.id
+         JOIN tblitemvariationgroup ivg ON iv.item_variation_group_id = ivg.id
+         WHERE oiv.order_detail_id = $1
+         GROUP BY iv.id, iv.variation_name, iv.additional_price, ivg.variation_group_name`,
+        [item.id]
       );
       item.variations = varsRes.rows;
     }

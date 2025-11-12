@@ -320,16 +320,14 @@ const MenuItemDetails = () => {
 
       const orderDetailId = detailRes.data.id;
 
-      // Add variations (with quantities for max_amount > 1)
+      // Add variations (send quantity once per variation)
       for (const v of selectedVariations) {
         const qty = variationQuantities[v.id] || 1;
-        // Add the variation qty times
-        for (let i = 0; i < qty; i++) {
-          await api.post("/order-item-variation", {
-            order_detail_id: orderDetailId,
-            variation_id: v.id,
-          });
-        }
+        await api.post("/order-item-variation", {
+          order_detail_id: orderDetailId,
+          variation_id: v.id,
+          quantity: qty,
+        });
       }
 
       await api.put(`/order/${orderId}/recalculate`);
