@@ -522,7 +522,7 @@ export const updatePaymentProof = async (req, res) => {
   if (!file) return res.status(400).json({ error: "No file uploaded" });
 
   try {
-    // First check if the order exists, is accepted, and doesn't already have a screenshot
+    // First check if the order exists and whether payment proof can be uploaded/updated
     const orderCheck = await pool.query(
       `SELECT order_status, gcash_screenshot FROM tblorder WHERE id = $1`,
       [id]
@@ -533,19 +533,21 @@ export const updatePaymentProof = async (req, res) => {
     }
     
     const orderStatus = orderCheck.rows[0].order_status;
-    const existingScreenshot = orderCheck.rows[0].gcash_screenshot;
-    
+
+    // Once an order is completed, the payment proof should no longer be changed
+    if (orderStatus === "completed") {
+      return res.status(400).json({
+        error: "Payment proof can no longer be changed because the order is completed",
+        currentStatus: orderStatus,
+      });
+    }
+
+    // For other states, keep the rule that upload is only allowed
+    // after the order has been accepted or is ready for pickup
     if (orderStatus !== "accepted" && orderStatus !== "ready for pickup") {
       return res.status(400).json({ 
         error: "Payment proof can only be uploaded after the order has been accepted or is ready for pickup",
         currentStatus: orderStatus
-      });
-    }
-    
-    if (existingScreenshot) {
-      return res.status(400).json({ 
-        error: "GCash screenshot has already been uploaded and cannot be changed",
-        hasScreenshot: true
       });
     }
 

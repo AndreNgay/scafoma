@@ -245,7 +245,7 @@ export const updateUser = async (req, res) => {
 export const updateProfile = async (req, res) => {
   try {
     const { id } = req.user; // JWT
-    const { first_name, last_name } = req.body;
+    const { first_name, last_name, contact_number, messenger_link } = req.body;
     let imageBuffer = null;
 
     if (req.file) {
@@ -257,15 +257,26 @@ export const updateProfile = async (req, res) => {
       return res.status(404).json({ status: "failed", message: "User not found" });
     }
 
+    const normalizedContact =
+      contact_number && String(contact_number).trim().length > 0
+        ? String(contact_number).trim()
+        : null;
+    const normalizedMessenger =
+      messenger_link && String(messenger_link).trim().length > 0
+        ? String(messenger_link).trim()
+        : null;
+
     const updatedUser = await pool.query(
       `UPDATE tbluser
        SET first_name = $1,
            last_name = $2,
-           profile_image = COALESCE($3, profile_image),
+           contact_number = $3,
+           messenger_link = $4,
+           profile_image = COALESCE($5, profile_image),
            updated_at = CURRENT_TIMESTAMP
-       WHERE id = $4
-       RETURNING id, email, first_name, last_name, role, profile_image`,
-      [first_name, last_name, imageBuffer, id]
+       WHERE id = $6
+       RETURNING id, email, first_name, last_name, role, profile_image, contact_number, messenger_link`,
+      [first_name, last_name, normalizedContact, normalizedMessenger, imageBuffer, id]
     );
 
     const user = updatedUser.rows[0];

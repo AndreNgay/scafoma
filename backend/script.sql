@@ -11,6 +11,8 @@ CREATE TABLE IF NOT EXISTS tbluser (
     profile_image BYTEA,
     email_verified BOOLEAN DEFAULT FALSE,
     profile_created BOOLEAN DEFAULT FALSE,
+    contact_number VARCHAR(11),
+    messenger_link VARCHAR(255),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );

@@ -375,23 +375,19 @@ const ViewOrderCustomer = () => {
           )}
           
           {(order.order_status === "accepted" || order.order_status === "ready for pickup") ? (
-            order.payment_proof ? (
-              <View style={styles.uploadDisabledContainer}>
-                <Text style={styles.uploadDisabledText}>
-                  ✅ GCash screenshot uploaded successfully. Screenshot cannot be changed once uploaded.
-                </Text>
-              </View>
-            ) : (
-              <TouchableOpacity
-                style={styles.uploadBtn}
-                onPress={pickImage}
-                disabled={uploading}
-              >
-                <Text>
-                  {uploading ? "Uploading..." : "Upload Screenshot"}
-                </Text>
-              </TouchableOpacity>
-            )
+            <TouchableOpacity
+              style={styles.uploadBtn}
+              onPress={pickImage}
+              disabled={uploading}
+            >
+              <Text>
+                {uploading
+                  ? "Uploading..."
+                  : order.payment_proof
+                  ? "Replace Screenshot"
+                  : "Upload Screenshot"}
+              </Text>
+            </TouchableOpacity>
           ) : (
             <View style={styles.uploadDisabledContainer}>
               <Text style={styles.uploadDisabledText}>

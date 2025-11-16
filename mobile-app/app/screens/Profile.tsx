@@ -9,6 +9,7 @@ import {
   StyleSheet,
   Image,
   Modal,
+  Linking,
 } from "react-native";
 import api from "../libs/apiCall";
 import useStore from "../store";
@@ -17,13 +18,26 @@ import * as ImagePicker from "expo-image-picker";
 import { useToast } from "../contexts/ToastContext";
 
 
-
 // ✅ Zod schemas
 const profileSchema = z.object({
   first_name: z.string().min(1, "First name is required"),
   last_name: z.string().min(1, "Last name is required"),
   email: z.string().email("Invalid email"),
-  profile_image_url: z.string().url("Invalid image URL").optional().or(z.literal("")),
+  contact_number: z
+    .string()
+    .trim()
+    .regex(/^\d{11}$/, "Contact number must be 11 digits")
+    .or(z.literal("")),
+  messenger_link: z
+    .string()
+    .trim()
+    .max(255, "Messenger link is too long")
+    .or(z.literal("")),
+  profile_image_url: z
+    .string()
+    .url("Invalid image URL")
+    .optional()
+    .or(z.literal("")),
 });
 
 const passwordSchema = z.object({
@@ -44,6 +58,8 @@ const Profile = () => {
     first_name: "",
     last_name: "",
     email: "",
+    contact_number: "",
+    messenger_link: "",
     profile_image_url: "",
   });
 
@@ -53,6 +69,7 @@ const Profile = () => {
     confirmPassword: "",
   });
   const [logoutConfirmVisible, setLogoutConfirmVisible] = useState(false);
+  const [activeTab, setActiveTab] = useState<"profile" | "contact" | "password">("profile");
   const { showToast } = useToast();
 
   const handleLogout = () => {
@@ -94,6 +111,8 @@ const Profile = () => {
           first_name: u.first_name || "",
           last_name: u.last_name || "",
           email: u.email || "",
+          contact_number: u.contact_number || "",
+          messenger_link: u.messenger_link || "",
           profile_image_url: u.profile_image_url
             ? (u.profile_image_url.startsWith("data:") ? u.profile_image_url : String(u.profile_image_url))
             : "",
@@ -110,55 +129,74 @@ const Profile = () => {
     if (user) fetchUser();
   }, [user, token]);
 
-const handleUpdateProfile = async () => {
-  const validation = profileSchema.safeParse(profile);
-  if (!validation.success) {
-    const fieldErrors: any = {};
-    validation.error.issues.forEach((issue) => {
-      fieldErrors[issue.path[0] as string] = issue.message;
-    });
-    setErrors(fieldErrors);
-    return;
-  }
+  const openMessengerLink = async () => {
+    const raw = profile.messenger_link?.trim();
+    if (!raw) return;
+    const url = /^https?:\/\//i.test(raw) ? raw : `https://${raw}`;
+    try {
+      const canOpen = await Linking.canOpenURL(url);
+      if (!canOpen) {
+        showToast("error", "Cannot open the provided Messenger link.");
+        return;
+      }
+      await Linking.openURL(url);
+    } catch (err) {
+      console.error("Error opening messenger link:", err);
+      showToast("error", "Failed to open Messenger link.");
+    }
+  };
 
-  try {
-    setErrors({});
-    setLoading(true);
-
-    const formData = new FormData();
-    formData.append("first_name", profile.first_name);
-    formData.append("last_name", profile.last_name);
-
-    if (profile.profile_image_url && !profile.profile_image_url.startsWith("http")) {
-      // only append if it's a new picked image (local file)
-      formData.append("profile_image", {
-        uri: profile.profile_image_url,
-        name: "profile.jpg",
-        type: "image/jpeg",
-      } as any);
+  const handleUpdateProfile = async () => {
+    const validation = profileSchema.safeParse(profile);
+    if (!validation.success) {
+      const fieldErrors: any = {};
+      validation.error.issues.forEach((issue) => {
+        fieldErrors[issue.path[0] as string] = issue.message;
+      });
+      setErrors(fieldErrors);
+      return;
     }
 
-    const res = await api.put("/user/profile", formData, {
-      headers: {
-        Authorization: `Bearer ${token}`,
-        "Content-Type": "multipart/form-data",
-      },
-    });
+    try {
+      setErrors({});
+      setLoading(true);
 
-    await setCredentials({ ...res.data.user, token: user.token });
+      const formData = new FormData();
+      formData.append("first_name", profile.first_name);
+      formData.append("last_name", profile.last_name);
+      formData.append("contact_number", profile.contact_number || "");
+      formData.append("messenger_link", profile.messenger_link || "");
 
-    showToast("success", "Profile updated successfully");
-  } catch (err: any) {
-    console.error("Error updating profile:", err);
-    if (err.response?.data?.message) {
-      showToast("error", err.response.data.message);
-    } else {
-      showToast("error", "Failed to update profile");
+      if (profile.profile_image_url && !profile.profile_image_url.startsWith("http")) {
+        // only append if it's a new picked image (local file)
+        formData.append("profile_image", {
+          uri: profile.profile_image_url,
+          name: "profile.jpg",
+          type: "image/jpeg",
+        } as any);
+      }
+
+      const res = await api.put("/user/profile", formData, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "multipart/form-data",
+        },
+      });
+
+      await setCredentials({ ...res.data.user, token: user.token });
+
+      showToast("success", "Profile updated successfully");
+    } catch (err: any) {
+      console.error("Error updating profile:", err);
+      if (err.response?.data?.message) {
+        showToast("error", err.response.data.message);
+      } else {
+        showToast("error", "Failed to update profile");
+      }
+    } finally {
+      setLoading(false);
     }
-  } finally {
-    setLoading(false);
-  }
-};
+  };
 
 
   // ✅ Password update
@@ -200,6 +238,12 @@ const handleUpdateProfile = async () => {
 
   if (!user) return null;
 
+  const tabs: { key: "profile" | "contact" | "password"; label: string }[] = [
+    { key: "profile", label: "Profile" },
+    { key: "contact", label: "Contact" },
+    { key: "password", label: "Password" },
+  ];
+
   return (
     <ScrollView contentContainerStyle={styles.container}>
       {loading && (
@@ -208,85 +252,177 @@ const handleUpdateProfile = async () => {
         </View>
       )}
 
-      {/* Profile Image */}
-      <View style={styles.imageContainer}>
-<TouchableOpacity onPress={pickImage}>
-  {profile.profile_image_url ? (
-    <Image
-      source={{ uri: String(profile.profile_image_url) }}
-      style={styles.profileImage}
-    />
-  ) : (
-    <View style={[styles.profileImage, styles.imagePlaceholder]}>
-      <Text style={{ color: "#666" }}>Pick Image</Text>
-    </View>
-  )}
-</TouchableOpacity>
-
+      {/* Tabs */}
+      <View style={styles.tabRow}>
+        {tabs.map((tab) => (
+          <TouchableOpacity
+            key={tab.key}
+            style={[
+              styles.tabButton,
+              activeTab === tab.key && styles.tabButtonActive,
+            ]}
+            onPress={() => setActiveTab(tab.key)}
+          >
+            <Text
+              style={[
+                styles.tabText,
+                activeTab === tab.key && styles.tabTextActive,
+              ]}
+            >
+              {tab.label}
+            </Text>
+          </TouchableOpacity>
+        ))}
       </View>
 
+      {/* Profile Tab */}
+      {activeTab === "profile" && (
+        <>
+          <View style={styles.imageContainer}>
+            <TouchableOpacity onPress={pickImage}>
+              {profile.profile_image_url ? (
+                <Image
+                  source={{ uri: String(profile.profile_image_url) }}
+                  style={styles.profileImage}
+                />
+              ) : (
+                <View style={[styles.profileImage, styles.imagePlaceholder]}>
+                  <Text style={{ color: "#666" }}>Pick Image</Text>
+                </View>
+              )}
+            </TouchableOpacity>
+          </View>
 
-      <Text style={styles.sectionTitle}>Profile Information</Text>
+          <Text style={styles.sectionTitle}>Profile</Text>
 
-      <Text style={styles.label}>First Name</Text>
-      <TextInput
-        style={styles.input}
-        value={profile.first_name}
-        onChangeText={(t) => setProfile({ ...profile, first_name: t })}
-      />
-      {errors.first_name && <Text style={styles.error}>{errors.first_name}</Text>}
+          <Text style={styles.label}>First Name</Text>
+          <TextInput
+            style={styles.input}
+            value={profile.first_name}
+            onChangeText={(t) => setProfile({ ...profile, first_name: t })}
+          />
+          {errors.first_name && <Text style={styles.error}>{errors.first_name}</Text>}
 
-      <Text style={styles.label}>Last Name</Text>
-      <TextInput
-        style={styles.input}
-        value={profile.last_name}
-        onChangeText={(t) => setProfile({ ...profile, last_name: t })}
-      />
-      {errors.last_name && <Text style={styles.error}>{errors.last_name}</Text>}
+          <Text style={styles.label}>Last Name</Text>
+          <TextInput
+            style={styles.input}
+            value={profile.last_name}
+            onChangeText={(t) => setProfile({ ...profile, last_name: t })}
+          />
+          {errors.last_name && <Text style={styles.error}>{errors.last_name}</Text>}
 
-      <Text style={styles.label}>Email</Text>
-      <TextInput style={[styles.input, { backgroundColor: "#eee" }]} editable={false} value={profile.email} />
-      {errors.email && <Text style={styles.error}>{errors.email}</Text>}
+          <TouchableOpacity style={styles.button} onPress={handleUpdateProfile}>
+            <Text style={styles.buttonText}>Save Profile</Text>
+          </TouchableOpacity>
+        </>
+      )}
 
+      {/* Contact Tab */}
+      {activeTab === "contact" && (
+        <>
+          <Text style={styles.sectionTitle}>Contact</Text>
 
-      <TouchableOpacity style={styles.button} onPress={handleUpdateProfile}>
-        <Text style={styles.buttonText}>Save Profile</Text>
-      </TouchableOpacity>
+          <Text style={styles.label}>Contact Number</Text>
+          <TextInput
+            style={styles.input}
+            keyboardType="number-pad"
+            value={profile.contact_number}
+            onChangeText={(t) => setProfile({ ...profile, contact_number: t })}
+          />
+          {errors.contact_number && (
+            <Text style={styles.error}>{errors.contact_number}</Text>
+          )}
 
-      <Text style={styles.sectionTitle}>Change Password</Text>
+          <Text style={styles.label}>Messenger Link</Text>
+          <TextInput
+            style={styles.input}
+            keyboardType="url"
+            autoCapitalize="none"
+            value={profile.messenger_link}
+            onChangeText={(t) => setProfile({ ...profile, messenger_link: t })}
+          />
+          {errors.messenger_link && (
+            <Text style={styles.error}>{errors.messenger_link}</Text>
+          )}
 
-      <Text style={styles.label}>Current Password</Text>
-      <TextInput
-        style={styles.input}
-        secureTextEntry
-        value={passwords.currentPassword}
-        onChangeText={(t) => setPasswords({ ...passwords, currentPassword: t })}
-      />
-      {errors.currentPassword && <Text style={styles.error}>{errors.currentPassword}</Text>}
+          {profile.messenger_link?.trim() ? (
+            <TouchableOpacity
+              style={styles.linkButton}
+              onPress={openMessengerLink}
+            >
+              <Text style={styles.linkButtonText}>Open Messenger Link</Text>
+            </TouchableOpacity>
+          ) : null}
 
-      <Text style={styles.label}>New Password</Text>
-      <TextInput
-        style={styles.input}
-        secureTextEntry
-        value={passwords.newPassword}
-        onChangeText={(t) => setPasswords({ ...passwords, newPassword: t })}
-      />
-      {errors.newPassword && <Text style={styles.error}>{errors.newPassword}</Text>}
+          <Text style={styles.label}>Email</Text>
+          <TextInput
+            style={[styles.input, { backgroundColor: "#eee" }]}
+            editable={false}
+            value={profile.email}
+          />
+          {errors.email && <Text style={styles.error}>{errors.email}</Text>}
 
-      <Text style={styles.label}>Confirm New Password</Text>
-      <TextInput
-        style={styles.input}
-        secureTextEntry
-        value={passwords.confirmPassword}
-        onChangeText={(t) => setPasswords({ ...passwords, confirmPassword: t })}
-      />
-      {errors.confirmPassword && <Text style={styles.error}>{errors.confirmPassword}</Text>}
+          <TouchableOpacity style={styles.button} onPress={handleUpdateProfile}>
+            <Text style={styles.buttonText}>Save Contact</Text>
+          </TouchableOpacity>
+        </>
+      )}
 
-      <TouchableOpacity style={styles.button} onPress={handleChangePassword}>
-        <Text style={styles.buttonText}>Change Password</Text>
-      </TouchableOpacity>
+      {/* Password Tab */}
+      {activeTab === "password" && (
+        <>
+          <Text style={styles.sectionTitle}>Change Password</Text>
 
-      <TouchableOpacity style={[styles.button, { backgroundColor: "gray" }]} onPress={handleLogout}>
+          <Text style={styles.label}>Current Password</Text>
+          <TextInput
+            style={styles.input}
+            secureTextEntry
+            value={passwords.currentPassword}
+            onChangeText={(t) =>
+              setPasswords({ ...passwords, currentPassword: t })
+            }
+          />
+          {errors.currentPassword && (
+            <Text style={styles.error}>{errors.currentPassword}</Text>
+          )}
+
+          <Text style={styles.label}>New Password</Text>
+          <TextInput
+            style={styles.input}
+            secureTextEntry
+            value={passwords.newPassword}
+            onChangeText={(t) =>
+              setPasswords({ ...passwords, newPassword: t })
+            }
+          />
+          {errors.newPassword && (
+            <Text style={styles.error}>{errors.newPassword}</Text>
+          )}
+
+          <Text style={styles.label}>Confirm New Password</Text>
+          <TextInput
+            style={styles.input}
+            secureTextEntry
+            value={passwords.confirmPassword}
+            onChangeText={(t) =>
+              setPasswords({ ...passwords, confirmPassword: t })
+            }
+          />
+          {errors.confirmPassword && (
+            <Text style={styles.error}>{errors.confirmPassword}</Text>
+          )}
+
+          <TouchableOpacity style={styles.button} onPress={handleChangePassword}>
+            <Text style={styles.buttonText}>Change Password</Text>
+          </TouchableOpacity>
+        </>
+      )}
+
+      {/* Logout (global) */}
+      <TouchableOpacity
+        style={[styles.button, { backgroundColor: "gray" }]}
+        onPress={handleLogout}
+      >
         <Text style={styles.buttonText}>Logout</Text>
       </TouchableOpacity>
 
@@ -321,7 +457,7 @@ const handleUpdateProfile = async () => {
       </Modal>
     </ScrollView>
   );
-};
+}
 
 export default Profile;
 
@@ -330,6 +466,31 @@ const styles = StyleSheet.create({
     padding: 16,
     backgroundColor: "#f9f9f9",
     flexGrow: 1,
+  },
+  tabRow: {
+    flexDirection: "row",
+    backgroundColor: "#fff",
+    borderRadius: 999,
+    padding: 4,
+    marginBottom: 16,
+  },
+  tabButton: {
+    flex: 1,
+    paddingVertical: 8,
+    borderRadius: 999,
+    alignItems: "center",
+  },
+  tabButtonActive: {
+    backgroundColor: "darkred",
+  },
+  tabText: {
+    fontSize: 14,
+    fontWeight: "500",
+    color: "#555",
+  },
+  tabTextActive: {
+    color: "#fff",
+    fontWeight: "600",
   },
   loaderOverlay: {
     ...StyleSheet.absoluteFillObject,
@@ -387,6 +548,20 @@ const styles = StyleSheet.create({
     backgroundColor: "#eee",
     justifyContent: "center",
     alignItems: "center",
+  },
+  linkButton: {
+    marginTop: 8,
+    marginBottom: 4,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    borderRadius: 8,
+    backgroundColor: "#1877F2",
+    alignItems: "center",
+  },
+  linkButtonText: {
+    color: "#fff",
+    fontWeight: "600",
+    fontSize: 14,
   },
   toastContainer: {
     marginTop: 12,
