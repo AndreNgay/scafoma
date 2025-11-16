@@ -28,6 +28,10 @@ const ViewOrderConcessionaire = () => {
   const [declineModalVisible, setDeclineModalVisible] = useState(false);
   const [selectedReason, setSelectedReason] = useState<string>("");
   const [customReason, setCustomReason] = useState<string>("");
+  const [acceptModalVisible, setAcceptModalVisible] = useState(false);
+  const [adjustedTotal, setAdjustedTotal] = useState<string>("");
+  const [priceReason, setPriceReason] = useState<string>("");
+  const [customPriceReason, setCustomPriceReason] = useState<string>("");
   const { showToast } = useToast();
 
   // Format dates with Asia/Manila timezone
@@ -144,6 +148,73 @@ const ViewOrderConcessionaire = () => {
     setCustomReason("");
   };
 
+  const openAcceptModal = () => {
+    if (!order) return;
+    const baseTotal =
+      order.updated_total_price !== null && order.updated_total_price !== undefined
+        ? order.updated_total_price
+        : order.total_price;
+    const formatted =
+      baseTotal !== null && baseTotal !== undefined && !Number.isNaN(Number(baseTotal))
+        ? Number(baseTotal).toFixed(2)
+        : "";
+    setAdjustedTotal(formatted);
+    setPriceReason("");
+    setCustomPriceReason("");
+    setAcceptModalVisible(true);
+  };
+
+  const cancelAccept = () => {
+    setAcceptModalVisible(false);
+    setPriceReason("");
+    setCustomPriceReason("");
+  };
+
+  const submitAccept = async () => {
+    if (!order) return;
+    const originalTotal = Number(order.total_price ?? 0);
+    const trimmed = adjustedTotal.trim();
+
+    let newTotal: number | null = null;
+    if (trimmed) {
+      const parsed = Number(trimmed);
+      if (!Number.isFinite(parsed) || parsed < 0) {
+        showToast("error", "Please enter a valid total amount.");
+        return;
+      }
+      newTotal = parsed;
+    }
+
+    const payload: any = { order_status: "accepted" };
+
+    if (newTotal !== null && newTotal !== originalTotal) {
+      if (!priceReason && !customPriceReason.trim()) {
+        showToast(
+          "error",
+          "Please select or enter a reason for changing the total."
+        );
+        return;
+      }
+      const reason =
+        priceReason === "custom" ? customPriceReason.trim() : priceReason;
+      payload.updated_total_price = newTotal;
+      payload.price_change_reason = reason;
+    }
+
+    try {
+      setUpdatingStatus(true);
+      await api.put(`order/status/${order.id}`, payload);
+      await fetchOrderDetails();
+      showToast("success", "Order marked as accepted");
+      setAcceptModalVisible(false);
+    } catch (err) {
+      console.error(err);
+      showToast("error", "Failed to update order status");
+    } finally {
+      setUpdatingStatus(false);
+    }
+  };
+
   const onRefresh = () => {
     if (loading) return;
     fetchOrderDetails(true);
@@ -169,7 +240,7 @@ const ViewOrderConcessionaire = () => {
           <View style={styles.buttonRow}>
             <TouchableOpacity
               style={styles.acceptBtn}
-              onPress={() => updateStatus("accepted")}
+              onPress={openAcceptModal}
             >
               <Text style={styles.btnText}>Accept</Text>
             </TouchableOpacity>
@@ -249,10 +320,39 @@ const ViewOrderConcessionaire = () => {
       </View>
 
       {/* Total Price */}
-      <View style={styles.infoSection}>
-        <Text style={styles.infoLabel}>Total:</Text>
-        <Text style={styles.infoValue}>₱{Number(order.total_price).toFixed(2)}</Text>
-      </View>
+      {order.updated_total_price !== null &&
+      order.updated_total_price !== undefined &&
+      !Number.isNaN(Number(order.updated_total_price)) &&
+      !Number.isNaN(Number(order.total_price)) &&
+      Number(order.updated_total_price) !== Number(order.total_price) ? (
+        <>
+          <View style={styles.infoSection}>
+            <Text style={styles.infoLabel}>Original Total:</Text>
+            <Text style={styles.infoValue}>
+              ₱{Number(order.total_price).toFixed(2)}
+            </Text>
+          </View>
+          <View style={styles.infoSection}>
+            <Text style={styles.infoLabel}>Updated Total:</Text>
+            <Text style={styles.infoValue}>
+              ₱{Number(order.updated_total_price).toFixed(2)}
+            </Text>
+          </View>
+          {order.price_change_reason && (
+            <View style={styles.infoSection}>
+              <Text style={styles.infoLabel}>Price Change Reason:</Text>
+              <Text style={styles.infoValue}>{order.price_change_reason}</Text>
+            </View>
+          )}
+        </>
+      ) : (
+        <View style={styles.infoSection}>
+          <Text style={styles.infoLabel}>Total:</Text>
+          <Text style={styles.infoValue}>
+            ₱{Number(order.total_price).toFixed(2)}
+          </Text>
+        </View>
+      )}
 
       {/* Payment Method */}
       <View style={styles.infoSection}>
@@ -337,6 +437,104 @@ const ViewOrderConcessionaire = () => {
         )}
         scrollEnabled={false}
       />
+
+      {/* Accept Order Modal (optional price adjustment) */}
+      <Modal visible={acceptModalVisible} animationType="slide" transparent={true}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContainer}>
+            <Text style={styles.modalHeader}>Accept Order</Text>
+            <Text style={styles.modalSubtitle}>
+              You can optionally adjust the total before accepting.
+            </Text>
+
+            <View style={styles.infoSection}>
+              <Text style={styles.infoLabel}>Original Total:</Text>
+              <Text style={styles.infoValue}>
+                ₱{Number(order.total_price).toFixed(2)}
+              </Text>
+            </View>
+
+            <View style={styles.infoSection}>
+              <Text style={styles.infoLabel}>New Total (optional):</Text>
+              <TextInput
+                style={styles.customReasonInput}
+                keyboardType="numeric"
+                placeholder={Number(order.total_price).toFixed(2)}
+                value={adjustedTotal}
+                onChangeText={setAdjustedTotal}
+              />
+            </View>
+
+            <Text style={styles.reasonLabel}>Reason for change (optional):</Text>
+            {[
+              "Applied discount",
+              "Correcting system total",
+              "Removed unavailable items",
+              "Other (specify below)",
+            ].map((reason, index) => (
+              <TouchableOpacity
+                key={index}
+                style={[
+                  styles.reasonOption,
+                  (index === 3 ? priceReason === "custom" : priceReason === reason) &&
+                    styles.selectedReason,
+                ]}
+                onPress={() => {
+                  if (index === 3) {
+                    setPriceReason("custom");
+                  } else {
+                    setPriceReason(reason);
+                    setCustomPriceReason("");
+                  }
+                }}
+              >
+                <Text
+                  style={[
+                    styles.reasonText,
+                    (index === 3 ? priceReason === "custom" : priceReason === reason) &&
+                      styles.selectedReasonText,
+                  ]}
+                >
+                  {reason}
+                </Text>
+              </TouchableOpacity>
+            ))}
+
+            {priceReason === "custom" && (
+              <View style={styles.customReasonContainer}>
+                <Text style={styles.reasonLabel}>Custom reason:</Text>
+                <TextInput
+                  style={[styles.customReasonInput]}
+                  placeholder="Enter your reason for changing the total..."
+                  value={customPriceReason}
+                  onChangeText={setCustomPriceReason}
+                  multiline
+                  numberOfLines={3}
+                />
+              </View>
+            )}
+
+            <View style={styles.modalButtonRow}>
+              <TouchableOpacity
+                style={styles.cancelModalBtn}
+                onPress={cancelAccept}
+                disabled={updatingStatus}
+              >
+                <Text style={styles.cancelModalText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.submitDeclineBtn}
+                onPress={submitAccept}
+                disabled={updatingStatus}
+              >
+                <Text style={styles.submitDeclineText}>
+                  {updatingStatus ? "Saving..." : "Accept Order"}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
 
       {/* Decline Reason Modal */}
       <Modal visible={declineModalVisible} animationType="slide" transparent={true}>

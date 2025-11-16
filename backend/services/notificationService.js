@@ -48,19 +48,49 @@ export const notifyOrderCancelledForConcessionaire = async (orderId, concessiona
 /**
  * Notify customer about order status change
  */
-export const notifyOrderStatusChange = async (orderId, customerId, status, concessionName = '', declineReason = '') => {
+export const notifyOrderStatusChange = async (
+  orderId,
+  customerId,
+  status,
+  concessionName = '',
+  declineReason = '',
+  oldTotal = null,
+  newTotal = null,
+  priceChangeReason = ''
+) => {
   const statusMessages = {
     'accepted': 'Your order has been accepted!',
     'declined': 'Your order has been declined.',
     'ready for pickup': 'Your order is ready for pickup!',
     'completed': 'Your order has been completed.',
   };
-  
-  let message = `${concessionName ? `${concessionName}: ` : ''}${statusMessages[status] || `Order status updated to ${status}`} (Order #${orderId})`;
+
+  let message = `${concessionName ? `${concessionName}: ` : ''}${
+    statusMessages[status] || `Order status updated to ${status}`
+  } (Order #${orderId})`;
+
   if (status === 'declined' && declineReason) {
     message += `\nReason: ${declineReason}`;
   }
-  return await createNotification(customerId, 'Order Update', message, { order_id: orderId, order_status: status });
+
+  if (
+    oldTotal !== null &&
+    newTotal !== null &&
+    Number.isFinite(Number(oldTotal)) &&
+    Number.isFinite(Number(newTotal)) &&
+    Number(newTotal) !== Number(oldTotal)
+  ) {
+    const formatPeso = (v) => Number(v).toFixed(2);
+    message += `\nTotal updated from ₱${formatPeso(oldTotal)} to ₱${formatPeso(newTotal)}.`;
+    if (priceChangeReason) {
+      message += `\nReason for change: ${priceChangeReason}`;
+    }
+  }
+
+  return await createNotification(customerId, 'Order Update', message, {
+    order_id: orderId,
+    order_status: status,
+  });
 };
 
 /**

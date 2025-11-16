@@ -126,6 +126,8 @@ CREATE TABLE IF NOT EXISTS tblorder (
     dining_option VARCHAR(10) CHECK (dining_option IN ('dine-in', 'take-out')) DEFAULT 'dine-in',
     schedule_time TIMESTAMP,
     total_price NUMERIC(10,2) CHECK (total_price >= 0),
+    updated_total_price NUMERIC(10, 2),
+    price_change_reason TEXT,
     order_status VARCHAR(30) DEFAULT 'pending' CHECK (order_status IN (
         'pending', 'accepted', 'declined', 'cancelled', 'ready for pickup', 'completed'
     )),
@@ -194,69 +196,6 @@ CREATE TABLE IF NOT EXISTS tblorderitemvariation (
         ON UPDATE CASCADE,
 
     CONSTRAINT fk_order_variation
-        FOREIGN KEY (variation_id)
-        REFERENCES tblitemvariation (id)
-        ON DELETE CASCADE
-        ON UPDATE CASCADE
-);
-
--- =========================
--- Cart Table
--- =========================
-CREATE TABLE IF NOT EXISTS tblcart (
-    id SERIAL PRIMARY KEY,
-    user_id INT NOT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-
-    CONSTRAINT fk_user
-        FOREIGN KEY (user_id)
-        REFERENCES tbluser (id)
-        ON DELETE CASCADE
-        ON UPDATE CASCADE
-);
-
--- =========================
--- Cart Details Table
--- =========================
-CREATE TABLE IF NOT EXISTS tblcartdetail (
-    id SERIAL PRIMARY KEY,
-    cart_id INT NOT NULL,
-    item_id INT NOT NULL,
-    quantity INT NOT NULL CHECK (quantity > 0),
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-
-    CONSTRAINT fk_cart
-        FOREIGN KEY (cart_id)
-        REFERENCES tblcart (id)
-        ON DELETE CASCADE
-        ON UPDATE CASCADE,
-
-    CONSTRAINT fk_cart_item
-        FOREIGN KEY (item_id)
-        REFERENCES tblmenuitem (id)
-        ON DELETE CASCADE
-        ON UPDATE CASCADE
-);
-
--- =========================
--- Cart Item Variations Table
--- =========================
-CREATE TABLE IF NOT EXISTS tblcartitemvariation (
-    id SERIAL PRIMARY KEY,
-    cart_detail_id INT NOT NULL,
-    variation_id INT NOT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-
-    CONSTRAINT fk_cartdetail_variation
-        FOREIGN KEY (cart_detail_id)
-        REFERENCES tblcartdetail (id)
-        ON DELETE CASCADE
-        ON UPDATE CASCADE,
-
-    CONSTRAINT fk_cart_variation
         FOREIGN KEY (variation_id)
         REFERENCES tblitemvariation (id)
         ON DELETE CASCADE

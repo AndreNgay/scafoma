@@ -383,10 +383,16 @@ export const getOrderById = async (req, res) => {
 // ==========================
 export const updateOrderStatus = async (req, res) => {
   const { id } = req.params;
-  const { order_status, decline_reason } = req.body;
+  const {
+    order_status,
+    decline_reason,
+    updated_total_price,
+    price_change_reason,
+  } = req.body;
+
   try {
     let query, params;
-    
+
     if (order_status === 'declined' && decline_reason) {
       // Update with decline reason
       query = `UPDATE tblorder 
@@ -394,38 +400,88 @@ export const updateOrderStatus = async (req, res) => {
                WHERE id = $3 RETURNING *`;
       params = [order_status, decline_reason, id];
     } else {
-      // Update without decline reason
-      query = `UPDATE tblorder 
-               SET order_status = $1, updated_at = NOW()
-               WHERE id = $2 RETURNING *`;
-      params = [order_status, id];
+      // Optional price adjustment when accepting an order
+      const hasUpdatedTotalRaw =
+        updated_total_price !== undefined &&
+        updated_total_price !== null &&
+        updated_total_price !== '';
+      const updatedTotal = hasUpdatedTotalRaw
+        ? Number(updated_total_price)
+        : null;
+
+      if (
+        order_status === 'accepted' &&
+        updatedTotal !== null &&
+        !Number.isNaN(updatedTotal)
+      ) {
+        query = `UPDATE tblorder 
+                 SET order_status = $1,
+                     updated_total_price = $2,
+                     price_change_reason = $3,
+                     updated_at = NOW()
+                 WHERE id = $4 RETURNING *`;
+        params = [
+          order_status,
+          updatedTotal,
+          price_change_reason || null,
+          id,
+        ];
+      } else {
+        // Update without decline reason or price change
+        query = `UPDATE tblorder 
+                 SET order_status = $1, updated_at = NOW()
+                 WHERE id = $2 RETURNING *`;
+        params = [order_status, id];
+      }
     }
-    
+
     const result = await pool.query(query, params);
-    if (result.rowCount === 0) return res.status(404).json({ error: "Order not found" });
-    
+    if (result.rowCount === 0)
+      return res.status(404).json({ error: "Order not found" });
+
     const order = result.rows[0];
-    
+
     // Send notification to customer about order status change
     try {
       const concessionResult = await pool.query(
         `SELECT c.concession_name FROM tblconcession c WHERE c.id = $1`,
         [order.concession_id]
       );
-      const concessionName = concessionResult.rows[0]?.concession_name || '';
-      
+      const concessionName =
+        concessionResult.rows[0]?.concession_name || '';
+
+      let oldTotal = null;
+      let newTotal = null;
+      let priceReason = '';
+
+      if (
+        order_status === 'accepted' &&
+        order.updated_total_price !== null &&
+        order.updated_total_price !== undefined &&
+        !Number.isNaN(Number(order.updated_total_price)) &&
+        !Number.isNaN(Number(order.total_price)) &&
+        Number(order.updated_total_price) !== Number(order.total_price)
+      ) {
+        oldTotal = order.total_price;
+        newTotal = order.updated_total_price;
+        priceReason = order.price_change_reason || '';
+      }
+
       await notifyOrderStatusChange(
         order.id,
         order.customer_id,
         order_status,
         concessionName,
-        decline_reason
+        decline_reason,
+        oldTotal,
+        newTotal,
+        priceReason
       );
     } catch (notifErr) {
       console.error("Error creating order status notification:", notifErr);
       // Don't fail the status update if notification fails
     }
-    
+
     res.json(order);
   } catch (err) {
     console.error("Error updating order status:", err);

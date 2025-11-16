@@ -245,10 +245,26 @@ const CustomerOrders = () => {
           );
           break;
         case "price_asc":
-          filtered.sort((a, b) => a.total_price - b.total_price);
+          filtered.sort((a, b) => {
+            const totalA = Number(
+              (a as any).updated_total_price ?? a.total_price ?? 0
+            );
+            const totalB = Number(
+              (b as any).updated_total_price ?? b.total_price ?? 0
+            );
+            return totalA - totalB;
+          });
           break;
         case "price_desc":
-          filtered.sort((a, b) => b.total_price - a.total_price);
+          filtered.sort((a, b) => {
+            const totalA = Number(
+              (a as any).updated_total_price ?? a.total_price ?? 0
+            );
+            const totalB = Number(
+              (b as any).updated_total_price ?? b.total_price ?? 0
+            );
+            return totalB - totalA;
+          });
           break;
         case "status":
           filtered.sort((a, b) => a.order_status.localeCompare(b.order_status));
@@ -310,7 +326,18 @@ const CustomerOrders = () => {
           {item.order_status === 'declined' && !!item.decline_reason && (
             <Text style={styles.declineReason}>Reason: {item.decline_reason}</Text>
           )}
-          <Text>Total: ₱{Number(item.total_price).toFixed(2)}</Text>
+          {item.updated_total_price !== null &&
+          item.updated_total_price !== undefined &&
+          !Number.isNaN(Number(item.updated_total_price)) &&
+          !Number.isNaN(Number(item.total_price)) &&
+          Number(item.updated_total_price) !== Number(item.total_price) ? (
+            <Text>
+              Total: ₱{Number(item.updated_total_price).toFixed(2)} (was ₱
+              {Number(item.total_price).toFixed(2)})
+            </Text>
+          ) : (
+            <Text>Total: ₱{Number(item.total_price).toFixed(2)}</Text>
+          )}
           {item.schedule_time && (
             <Text style={styles.scheduleTime}>
               📅 Scheduled: {formatSchedule(item.schedule_time)}

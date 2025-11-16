@@ -26,6 +26,8 @@ interface Order {
   concession_name: string;
   profile_image?: string | null;
   customer_id: number;
+  updated_total_price?: number | null;
+  price_change_reason?: string | null;
 }
 
 const PAGE_SIZE = 10;
@@ -217,10 +219,26 @@ const OrderList = () => {
           );
           break;
         case "price_asc":
-          filtered.sort((a, b) => a.total_price - b.total_price);
+          filtered.sort((a, b) => {
+            const totalA = Number(
+              (a.updated_total_price ?? a.total_price) ?? 0
+            );
+            const totalB = Number(
+              (b.updated_total_price ?? b.total_price) ?? 0
+            );
+            return totalA - totalB;
+          });
           break;
         case "price_desc":
-          filtered.sort((a, b) => b.total_price - a.total_price);
+          filtered.sort((a, b) => {
+            const totalA = Number(
+              (a.updated_total_price ?? a.total_price) ?? 0
+            );
+            const totalB = Number(
+              (b.updated_total_price ?? b.total_price) ?? 0
+            );
+            return totalB - totalA;
+          });
           break;
       }
     }
@@ -252,7 +270,18 @@ const OrderList = () => {
         {item.order_status === 'declined' && (item as any).decline_reason ? (
           <Text style={styles.declineReason}>Reason: {(item as any).decline_reason}</Text>
         ) : null}
-        <Text>Total: ₱{Number(item.total_price).toFixed(2)}</Text>
+        {item.updated_total_price !== null &&
+        item.updated_total_price !== undefined &&
+        !Number.isNaN(Number(item.updated_total_price)) &&
+        !Number.isNaN(Number(item.total_price)) &&
+        Number(item.updated_total_price) !== Number(item.total_price) ? (
+          <Text>
+            Total: ₱{Number(item.updated_total_price).toFixed(2)} (was ₱
+            {Number(item.total_price).toFixed(2)})
+          </Text>
+        ) : (
+          <Text>Total: ₱{Number(item.total_price).toFixed(2)}</Text>
+        )}
         <Text>Date: {new Date(item.created_at).toLocaleString()}</Text>
       </View>
     </TouchableOpacity>

@@ -271,7 +271,27 @@ const ViewOrderCustomer = () => {
       <Text>
         Status: <Text style={styles.status}>{order.order_status}</Text>
       </Text>
-      <Text>Total: ₱{Number(order.total_price).toFixed(2)}</Text>
+      {order.updated_total_price !== null &&
+      order.updated_total_price !== undefined &&
+      !Number.isNaN(Number(order.updated_total_price)) &&
+      !Number.isNaN(Number(order.total_price)) &&
+      Number(order.updated_total_price) !== Number(order.total_price) ? (
+        <>
+          <Text>
+            Original Total: ₱{Number(order.total_price).toFixed(2)}
+          </Text>
+          <Text>
+            Updated Total: ₱{Number(order.updated_total_price).toFixed(2)}
+          </Text>
+          {order.price_change_reason && (
+            <Text>
+              Reason for change: {order.price_change_reason}
+            </Text>
+          )}
+        </>
+      ) : (
+        <Text>Total: ₱{Number(order.total_price).toFixed(2)}</Text>
+      )}
       {order.note && <Text>Note: {order.note}</Text>}
       {order.schedule_time && (
         <Text style={styles.scheduleTime}>
