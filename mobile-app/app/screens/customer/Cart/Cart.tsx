@@ -1,18 +1,21 @@
 import React, { useEffect, useState } from "react";
-import { View, Text, FlatList, StyleSheet, ActivityIndicator, Button, TouchableOpacity, Platform, ScrollView } from "react-native";
+import { View, Text, FlatList, StyleSheet, ActivityIndicator, Button, TouchableOpacity, Platform, ScrollView, Modal } from "react-native";
 import DateTimePicker from '@react-native-community/datetimepicker';
 import useStore from "../../../store";
 import api from "../../../libs/apiCall";
+import { useToast } from "../../../contexts/ToastContext";
 
 const Cart = ({ navigation }: any) => {
-  const user = useStore((state: any) => state.user);
+  const { user } = useStore();
   const [cartItems, setCartItems] = useState<any[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [previousCartCount, setPreviousCartCount] = useState(0);
+  const [loading, setLoading] = useState(true);
   const [scheduleTime, setScheduleTime] = useState<Date | null>(null);
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [showTimePicker, setShowTimePicker] = useState(false);
   const [updatingItemId, setUpdatingItemId] = useState<number | null>(null);
+  const [removeModalVisible, setRemoveModalVisible] = useState(false);
+  const [itemToRemove, setItemToRemove] = useState<{ id: number; name: string } | null>(null);
+  const { showToast } = useToast();
 
   const fetchCart = async () => {
     if (!user) return;
@@ -22,7 +25,6 @@ const Cart = ({ navigation }: any) => {
       const newCartItems = res.data || [];
       
       setCartItems(newCartItems);
-      setPreviousCartCount(newCartItems.length);
     } catch (err) {
       console.error("Error fetching cart:", err);
     } finally {
@@ -38,7 +40,7 @@ const Cart = ({ navigation }: any) => {
     await fetchCart();
   } catch (err) {
     console.error("Error updating quantity:", err);
-    alert("Failed to update quantity. Please try again.");
+    showToast("error", "Failed to update quantity. Please try again.");
   } finally {
     setUpdatingItemId(null);
   }
@@ -51,10 +53,27 @@ const removeItem = async (orderDetailId: number) => {
     await fetchCart();
   } catch (err) {
     console.error("Error removing item:", err);
-    alert("Failed to remove item. Please try again.");
+    showToast("error", "Failed to remove item. Please try again.");
   } finally {
     setUpdatingItemId(null);
   }
+};
+
+const confirmRemoveItem = (itemName: string, orderDetailId: number) => {
+  setItemToRemove({ id: orderDetailId, name: itemName });
+  setRemoveModalVisible(true);
+};
+
+const cancelRemoveItem = () => {
+  setRemoveModalVisible(false);
+  setItemToRemove(null);
+};
+
+const confirmRemoveItemProceed = async () => {
+  if (!itemToRemove) return;
+  setRemoveModalVisible(false);
+  await removeItem(itemToRemove.id);
+  setItemToRemove(null);
 };
 
   useEffect(() => {
@@ -111,7 +130,7 @@ const removeItem = async (orderDetailId: number) => {
     try {
       // Validate schedule time if set
       if (scheduleTime && scheduleTime <= new Date()) {
-        alert("Please select a future date and time for scheduling.");
+        showToast("error", "Please select a future date and time for scheduling.");
         return;
       }
       
@@ -134,25 +153,27 @@ const removeItem = async (orderDetailId: number) => {
         message += `\n\nNote: ${response.data.cleanedItems}`;
       }
       
-      alert(message);
+      showToast("success", message);
       setScheduleTime(null); // Clear schedule time after checkout
-      const createdOrders = response.data?.orders || [];
-      if (Array.isArray(createdOrders) && createdOrders.length === 1) {
-        const orderId = createdOrders[0]?.id;
-        if (orderId) {
-          // Redirect directly to the single order's details
-          navigation.navigate("Orders", { screen: "View Order", params: { orderId } });
+      
+      // Navigate after a short delay to allow toast to show
+      setTimeout(() => {
+        const orders = response.data?.orders || [];
+        if (Array.isArray(orders) && orders.length === 1) {
+          const orderId = orders[0]?.id;
+          if (orderId) {
+            navigation.navigate("Orders", { screen: "View Order", params: { orderId } });
+          } else {
+            navigation.navigate("Orders", { screen: "Customer Orders" });
+          }
         } else {
           navigation.navigate("Orders", { screen: "Customer Orders" });
         }
-      } else {
-        // Multiple concessions/orders → go to Orders list
-        navigation.navigate("Orders", { screen: "Customer Orders" });
-      }
+      }, 1500);
     } catch (err: any) {
       console.error("Checkout failed:", err);
       const errorMessage = err.response?.data?.error || "Checkout failed";
-      alert(errorMessage);
+      showToast("error", errorMessage);
     }
   };
 const renderItem = ({ item }: any) => {
@@ -210,7 +231,7 @@ const renderItem = ({ item }: any) => {
       </View>
 
       <TouchableOpacity 
-        onPress={() => removeItem(item.order_detail_id)} 
+        onPress={() => confirmRemoveItem(item.item_name, item.order_detail_id)} 
         style={styles.removeBtn}
         disabled={isUpdating}
       >
@@ -259,14 +280,6 @@ const renderItem = ({ item }: any) => {
               {renderItem({ item })}
             </View>
           ))}
-          
-          {/* Total Summary */}
-          <View style={styles.summaryContainer}>
-            <View style={styles.summaryRow}>
-              <Text style={styles.summaryLabel}>Total ({itemCount} {itemCount === 1 ? 'item' : 'items'})</Text>
-              <Text style={styles.summaryTotal}>₱{totalAmount.toFixed(2)}</Text>
-            </View>
-          </View>
           
           {/* Schedule Time Section */}
           <View style={styles.scheduleContainer}>
@@ -339,6 +352,38 @@ const renderItem = ({ item }: any) => {
           onChange={handleTimeChange}
         />
       )}
+
+      <Modal visible={removeModalVisible} animationType="slide" transparent={true}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContainer}>
+            <Text style={styles.modalHeader}>Remove Item</Text>
+            <Text style={styles.modalSubtitle}>
+              {itemToRemove
+                ? `Are you sure you want to remove "${itemToRemove.name}" from your cart?`
+                : "Are you sure you want to remove this item from your cart?"}
+            </Text>
+
+            <View style={styles.modalButtonRow}>
+              <TouchableOpacity
+                style={styles.cancelModalBtn}
+                onPress={cancelRemoveItem}
+                disabled={updatingItemId !== null}
+              >
+                <Text style={styles.cancelModalText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.submitRemoveBtn}
+                onPress={confirmRemoveItemProceed}
+                disabled={updatingItemId !== null}
+              >
+                <Text style={styles.submitRemoveText}>
+                  {updatingItemId !== null ? "Removing..." : "Remove"}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 };
@@ -648,6 +693,60 @@ const styles = StyleSheet.create({
     color: "#fff",
     fontSize: 16,
     fontWeight: "700",
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  modalContainer: {
+    backgroundColor: "#fff",
+    borderRadius: 10,
+    padding: 20,
+    margin: 20,
+    maxHeight: "80%",
+    width: "90%",
+  },
+  modalHeader: {
+    fontSize: 18,
+    fontWeight: "bold",
+    color: "#A40C2D",
+    marginBottom: 10,
+    textAlign: "center",
+  },
+  modalSubtitle: {
+    fontSize: 14,
+    color: "#666",
+    marginBottom: 20,
+    textAlign: "center",
+  },
+  modalButtonRow: {
+    flexDirection: "row",
+    marginTop: 20,
+    gap: 10,
+  },
+  cancelModalBtn: {
+    flex: 1,
+    backgroundColor: "#ccc",
+    padding: 12,
+    borderRadius: 8,
+    alignItems: "center",
+  },
+  cancelModalText: {
+    color: "#fff",
+    fontWeight: "600",
+  },
+  submitRemoveBtn: {
+    flex: 1,
+    backgroundColor: "#dc3545",
+    padding: 12,
+    borderRadius: 8,
+    alignItems: "center",
+  },
+  submitRemoveText: {
+    color: "#fff",
+    fontWeight: "600",
   },
 });
 

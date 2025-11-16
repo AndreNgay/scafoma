@@ -46,7 +46,7 @@ function MenuManagementStack() {
       <MenuStackNav.Screen
         name="Menu Management"
         component={Menu}
-        options={{ headerShown: false }}
+        options={{ title: "Menu" }}
       />
       <MenuStackNav.Screen
         name="Add Menu"
@@ -73,7 +73,7 @@ function ConcessionaireConcessionStack() {
       <MenuStackNav.Screen
         name="Concession Management"
         component={Concession}
-        options={{ headerShown: false }}
+        options={{ title: "Concession" }}
       />
     </MenuStackNav.Navigator>
   );
@@ -85,17 +85,17 @@ function MenuItemsStack() {
       <MenuStackNav.Screen
         name="View Menu Items"
         component={MenuItems}
-        options={{ headerShown: false }}
+        options={{ title: "Menu" }}
       />
       <MenuStackNav.Screen
         name="Menu Item Details"
         component={MenuItemDetails}
-        options={{ headerShown: false }}
+        options={{ title: "Menu Item Details" }}
       />
       <MenuStackNav.Screen
         name="View Concession"
         component={ViewConcession}
-        options={{ headerShown: false }}
+        options={{ title: "Concession" }}
       />
     </MenuStackNav.Navigator>
   );
@@ -107,17 +107,17 @@ function OrdersStack() {
       <MenuStackNav.Screen
         name="Customer Orders"
         component={CustomerOrders}
-        options={{ headerShown: false }}
+        options={{ title: "Orders" }}
       />
       <MenuStackNav.Screen
         name="View Order"
         component={ViewOrderCustomer}
-        options={{ headerShown: false }}
+        options={{ title: "Order Details" }}
       />
       <MenuStackNav.Screen
         name="View Concessionaire Profile"
         component={ViewConcessionaireProfile}
-        options={{ headerShown: false }}
+        options={{ title: "Concessionaire Profile" }}
       />
     </MenuStackNav.Navigator>
   );
@@ -129,17 +129,17 @@ function OrderListStack() {
       <MenuStackNav.Screen
         name="View Orders"
         component={OrderList}
-        options={{ headerShown: false }}
+        options={{ title: "Orders" }}
       />
       <MenuStackNav.Screen
         name="View Order"
         component={ViewOrderConcessionaire}
-        options={{ headerShown: false }}
+        options={{ title: "Order Details" }}
       />
       <MenuStackNav.Screen
         name="View Customer Profile"
         component={ViewCustomerProfile}
-        options={{ headerShown: false }}
+        options={{ title: "Customer Profile" }}
       />
     </MenuStackNav.Navigator>
   );
@@ -187,6 +187,7 @@ function CustomerTabs() {
         name="Home" 
         component={Home}
         options={{
+          headerShown: true,
           title: "Home",
           tabBarLabel: 'Home',
           tabBarIcon: ({ color, size }) => (
@@ -234,6 +235,7 @@ function CustomerTabs() {
         name="Cart" 
         component={Cart}
         options={{
+          headerShown: true,
           title: "Cart",
           tabBarLabel: 'Cart',
           tabBarIcon: ({ color, size }) => (
@@ -262,6 +264,7 @@ function CustomerTabs() {
         name="Notifications" 
         component={Notifications}
         options={{
+          headerShown: true,
           title: "Notifications",
           tabBarLabel: 'Notifications',
           tabBarIcon: ({ color, size }) => (
@@ -285,6 +288,7 @@ function CustomerTabs() {
         name="Profile" 
         component={Profile}
         options={{
+          headerShown: true,
           title: "Profile",
           tabBarLabel: 'Profile',
           tabBarIcon: ({ color, size }) => (
@@ -446,6 +450,7 @@ function ConcessionaireTabs() {
         name="Notifications" 
         component={Notifications}
         options={{
+          headerShown: true,
           title: "Notifications",
           tabBarLabel: 'Notifications',
           tabBarIcon: ({ color, size }) => (
@@ -469,6 +474,7 @@ function ConcessionaireTabs() {
         name="Profile" 
         component={Profile}
         options={{
+          headerShown: true,
           title: "Profile",
           tabBarLabel: 'Profile',
           tabBarIcon: ({ color, size }) => (

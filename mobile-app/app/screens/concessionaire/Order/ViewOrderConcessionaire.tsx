@@ -16,9 +16,6 @@ import { useRoute, useNavigation } from "@react-navigation/native";
 import api from "../../../libs/apiCall";
 import { useToast } from "../../../contexts/ToastContext";
 
-// Import GCash icon
-const GCashIcon = require("../../../../assets/images/gcash-icon.png");
-
 const ViewOrderConcessionaire = () => {
   const route = useRoute<any>();
   const navigation = useNavigation<any>();
@@ -284,6 +281,7 @@ const ViewOrderConcessionaire = () => {
   return (
     <ScrollView
       style={styles.container}
+      contentContainerStyle={styles.contentContainer}
       refreshControl={
         <RefreshControl
           refreshing={refreshing}
@@ -297,20 +295,20 @@ const ViewOrderConcessionaire = () => {
         style={styles.customerSection}
         onPress={() => navigation.navigate("View Customer Profile", { customerId: order.customer_id })}
       >
-        {order.profile_image ? (
-          <Image source={{ uri: order.profile_image }} style={styles.customerAvatar} />
+        {order.customer_profile_image ? (
+          <Image source={{ uri: order.customer_profile_image }} style={styles.customerAvatar} />
         ) : (
           <View style={styles.customerAvatarPlaceholder}>
             <Text style={styles.customerInitials}>
-              {order.first_name?.[0]}{order.last_name?.[0]}
+              {order.customer_first_name?.[0]}{order.customer_last_name?.[0]}
             </Text>
           </View>
         )}
         <View style={styles.customerInfo}>
           <Text style={styles.customerName}>
-            {order.first_name} {order.last_name}
+            {order.customer_first_name} {order.customer_last_name}
           </Text>
-          <Text style={styles.customerEmail}>{order.email}</Text>
+          <Text style={styles.customerEmail}>{order.customer_email}</Text>
         </View>
       </TouchableOpacity>
 
@@ -394,10 +392,7 @@ const ViewOrderConcessionaire = () => {
           <Text style={styles.infoLabel}>Payment Method:</Text>
           <View style={styles.paymentMethodDisplay}>
             {order.payment_method === "gcash" ? (
-              <>
-                <Image source={GCashIcon} style={styles.gcashIconSmall} />
-                <Text style={styles.infoValue}>GCash</Text>
-              </>
+              <Text style={styles.infoValue}>GCash</Text>
             ) : (
               <Text style={styles.infoValue}>💰 On-Counter</Text>
             )}
@@ -405,12 +400,6 @@ const ViewOrderConcessionaire = () => {
         </View>
         {order.payment_method === "gcash" && (
           <View style={styles.gcashSection}>
-            {order.gcash_number && (
-              <View style={styles.infoSection}>
-                <Text style={styles.infoLabel}>GCash Number:</Text>
-                <Text style={styles.infoValue}>{order.gcash_number}</Text>
-              </View>
-            )}
             {order.gcash_screenshot && (
               <View style={styles.paymentProofSection}>
                 <Text style={styles.infoLabel}>GCash Screenshot:</Text>
@@ -431,8 +420,6 @@ const ViewOrderConcessionaire = () => {
           </View>
         </View>
       )}
-
-      {renderStatusButtons()}
 
       {/* Order Items */}
       <View style={styles.sectionCard}>
@@ -462,6 +449,8 @@ const ViewOrderConcessionaire = () => {
         scrollEnabled={false}
       />
       </View>
+
+      {renderStatusButtons()}
 
       {/* Accept Order Modal (optional price adjustment) */}
       <Modal visible={acceptModalVisible} animationType="slide" transparent={true}>
@@ -638,7 +627,8 @@ const ViewOrderConcessionaire = () => {
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, padding: 15, backgroundColor: "#fff" },
+  container: { flex: 1, backgroundColor: "#fff" },
+  contentContainer: { padding: 15, paddingBottom: 160 },
   customerSection: {
     flexDirection: "row",
     alignItems: "center",
@@ -847,11 +837,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     flex: 1,
     justifyContent: "flex-end",
-  },
-  gcashIconSmall: {
-    width: 16,
-    height: 16,
-    marginRight: 4,
   },
 });
 

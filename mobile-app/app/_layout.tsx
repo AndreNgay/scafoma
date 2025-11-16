@@ -7,8 +7,8 @@ export default function RootLayout() {
 
   return (
     <ToastProvider>
-      <Stack screenOptions={{ headerShown: true }}>
-        <Stack.Screen name="index" options={{ title: "SCaFOMA-UB" }} />
+      <Stack screenOptions={{ headerShown: false }}>
+        <Stack.Screen name="index" />
       </Stack>
     </ToastProvider>
   );
