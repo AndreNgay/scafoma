@@ -115,7 +115,7 @@ function OrdersStack() {
         options={{ headerShown: false }}
       />
       <MenuStackNav.Screen
-        name="ViewConcessionaireProfile"
+        name="View Concessionaire Profile"
         component={ViewConcessionaireProfile}
         options={{ headerShown: false }}
       />

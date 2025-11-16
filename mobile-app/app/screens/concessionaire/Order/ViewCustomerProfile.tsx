@@ -37,20 +37,6 @@ const ViewCustomerProfile = () => {
     fetchCustomerProfile();
   }, [customerId]);
 
-  const openMessengerLink = async (link: string) => {
-    const raw = String(link).trim();
-    if (!raw) return;
-    const url = /^https?:\/\//i.test(raw) ? raw : `https://${raw}`;
-    try {
-      const canOpen = await Linking.canOpenURL(url);
-      if (canOpen) {
-        await Linking.openURL(url);
-      }
-    } catch (err) {
-      console.error("Error opening messenger/facebook link:", err);
-    }
-  };
-
   if (loading) {
     return (
       <View style={styles.container}>
@@ -107,7 +93,19 @@ const ViewCustomerProfile = () => {
           <Text style={styles.infoLabel}>Messenger/Facebook:</Text>
           <TouchableOpacity
             style={{ flex: 1 }}
-            onPress={() => openMessengerLink(customer.messenger_link)}
+            onPress={async () => {
+              const raw = String(customer.messenger_link).trim();
+              if (!raw) return;
+              const url = /^https?:\/\//i.test(raw) ? raw : `https://${raw}`;
+              try {
+                const canOpen = await Linking.canOpenURL(url);
+                if (canOpen) {
+                  await Linking.openURL(url);
+                }
+              } catch (err) {
+                console.error("Error opening messenger/facebook link:", err);
+              }
+            }}
           >
             <Text
               style={[

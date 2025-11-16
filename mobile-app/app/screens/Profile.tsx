@@ -9,7 +9,6 @@ import {
   StyleSheet,
   Image,
   Modal,
-  Linking,
 } from "react-native";
 import api from "../libs/apiCall";
 import useStore from "../store";
@@ -129,22 +128,6 @@ const Profile = () => {
     if (user) fetchUser();
   }, [user, token]);
 
-  const openMessengerLink = async () => {
-    const raw = profile.messenger_link?.trim();
-    if (!raw) return;
-    const url = /^https?:\/\//i.test(raw) ? raw : `https://${raw}`;
-    try {
-      const canOpen = await Linking.canOpenURL(url);
-      if (!canOpen) {
-        showToast("error", "Cannot open the provided Messenger link.");
-        return;
-      }
-      await Linking.openURL(url);
-    } catch (err) {
-      console.error("Error opening messenger link:", err);
-      showToast("error", "Failed to open Messenger link.");
-    }
-  };
 
   const handleUpdateProfile = async () => {
     const validation = profileSchema.safeParse(profile);
@@ -360,6 +343,7 @@ const Profile = () => {
             {errors.messenger_link && (
               <Text style={styles.error}>{errors.messenger_link}</Text>
             )}
+
 
             <Text style={styles.label}>Email</Text>
             <TextInput

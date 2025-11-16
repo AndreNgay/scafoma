@@ -14,46 +14,27 @@ import api from "../../../libs/apiCall";
 
 const ViewConcessionaireProfile = () => {
   const route = useRoute<any>();
-  const { concessionaireId } = route.params;
+  const { concessionId } = route.params;
 
-  const [concessionaire, setConcessionaire] = useState<any>(null);
+  const [concession, setConcession] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
-  // Fetch concessionaire profile (concession details + user info)
-  const fetchConcessionaireProfile = async () => {
+  // Fetch concession profile
+  const fetchConcessionProfile = async () => {
     try {
       setLoading(true);
-      // Concession details
-      const concessionRes = await api.get(`/concession/${concessionaireId}`);
-      const concession = concessionRes.data.data || concessionRes.data;
-      // Concessionaire user info
-      const userRes = await api.get(`/user/${concession.concessionaire_id}`);
-      const user = userRes.data.user || userRes.data;
-      setConcessionaire({ ...concession, ...user });
+      const res = await api.get(`/concession/${concessionId}`);
+      setConcession(res.data.data || res.data);
     } catch (err) {
-      console.error("Error fetching concessionaire profile:", err);
+      console.error("Error fetching concession profile:", err);
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchConcessionaireProfile();
-  }, [concessionaireId]);
-
-  const openMessengerLink = async (link: string) => {
-    const raw = String(link).trim();
-    if (!raw) return;
-    const url = /^https?:\/\//i.test(raw) ? raw : `https://${raw}`;
-    try {
-      const canOpen = await Linking.canOpenURL(url);
-      if (canOpen) {
-        await Linking.openURL(url);
-      }
-    } catch (err) {
-      console.error("Error opening messenger/facebook link:", err);
-    }
-  };
+    fetchConcessionProfile();
+  }, [concessionId]);
 
   if (loading) {
     return (
@@ -63,7 +44,7 @@ const ViewConcessionaireProfile = () => {
     );
   }
 
-  if (!concessionaire) {
+  if (!concession) {
     return (
       <View style={styles.container}>
         <Text style={styles.emptyText}>Concessionaire not found</Text>
@@ -75,85 +56,74 @@ const ViewConcessionaireProfile = () => {
     <ScrollView style={styles.container}>
       {/* Profile Image */}
       <View style={styles.imageContainer}>
-        {concessionaire.image_url ? (
-          <Image source={{ uri: concessionaire.image_url }} style={styles.profileImage} />
+        {concession.image_url ? (
+          <Image source={{ uri: concession.image_url }} style={styles.profileImage} />
         ) : (
           <View style={styles.profilePlaceholder}>
             <Text style={styles.profileInitials}>
-              {concessionaire.first_name?.[0]}{concessionaire.last_name?.[0]}
+              {concession.concession_name?.[0] || "C"}
             </Text>
           </View>
         )}
       </View>
 
-      {/* Concessionaire Name */}
-      <Text style={styles.concessionaireName}>
-        {concessionaire.first_name} {concessionaire.last_name}
+      {/* Concession Name */}
+      <Text style={styles.concessionName}>
+        {concession.concession_name}
       </Text>
-      <Text style={styles.concessionName}>{concessionaire.concession_name}</Text>
-      {concessionaire.cafeteria_name && (
-        <Text style={styles.subText}>{concessionaire.cafeteria_name} {concessionaire.location ? `• ${concessionaire.location}` : ""}</Text>
-      )}
 
-      {/* Email */}
+      {/* Cafeteria */}
       <View style={styles.infoSection}>
-        <Text style={styles.infoLabel}>Email:</Text>
-        <Text style={styles.infoValue}>{concessionaire.email}</Text>
+        <Text style={styles.infoLabel}>Cafeteria:</Text>
+        <Text style={styles.infoValue}>{concession.cafeteria_name}</Text>
       </View>
 
-      {/* Contact Number */}
-      <View style={styles.infoSection}>
-        <Text style={styles.infoLabel}>Contact Number:</Text>
-        <Text style={styles.infoValue}>
-          {concessionaire.contact_number || "Not provided"}
-        </Text>
-      </View>
-
-      {/* Messenger/Facebook Link */}
-      {concessionaire.messenger_link ? (
+      {/* Location */}
+      {concession.location && (
         <View style={styles.infoSection}>
-          <Text style={styles.infoLabel}>Messenger/Facebook:</Text>
-          <TouchableOpacity
-            style={{ flex: 1 }}
-            onPress={() => openMessengerLink(concessionaire.messenger_link)}
-          >
-            <Text
-              style={[
-                styles.infoValue,
-                { textAlign: "right", color: "#1d4ed8" },
-              ]}
-              numberOfLines={1}
-            >
-              {concessionaire.messenger_link}
-            </Text>
-          </TouchableOpacity>
-        </View>
-      ) : null}
-
-      {/* GCash */}
-      {concessionaire.gcash_payment_available && (
-        <View style={styles.infoSection}>
-          <Text style={styles.infoLabel}>GCash Number:</Text>
-          <Text style={styles.infoValue}>
-            {concessionaire.gcash_number || "Not provided"}
-          </Text>
+          <Text style={styles.infoLabel}>Location:</Text>
+          <Text style={styles.infoValue}>{concession.location}</Text>
         </View>
       )}
 
       {/* Status */}
       <View style={styles.infoSection}>
         <Text style={styles.infoLabel}>Status:</Text>
-        <Text style={styles.infoValue}>
-          {concessionaire.status ? concessionaire.status.toUpperCase() : "UNKNOWN"}
+        <Text style={[
+          styles.infoValue,
+          concession.status === 'open' ? styles.statusOpen : styles.statusClosed
+        ]}>
+          {concession.status?.toUpperCase() || 'UNKNOWN'}
         </Text>
       </View>
 
-      {/* Member Since */}
-      {concessionaire.created_at && (
+      {/* Payment Methods */}
+      <Text style={styles.sectionHeader}>Payment Methods</Text>
+      
+      {concession.gcash_payment_available && (
+        <View style={styles.paymentMethod}>
+          <Text style={styles.paymentText}>
+            💳 GCash {concession.gcash_number ? `(${concession.gcash_number})` : ''}
+          </Text>
+        </View>
+      )}
+      
+      {concession.oncounter_payment_available && (
+        <View style={styles.paymentMethod}>
+          <Text style={styles.paymentText}>💰 On-Counter Payment</Text>
+        </View>
+      )}
+
+      {!concession.gcash_payment_available && !concession.oncounter_payment_available && (
+        <Text style={styles.noPaymentText}>No payment methods available</Text>
+      )}
+
+      {/* Created Date */}
+      {concession.created_at && (
         <View style={styles.infoSection}>
           <Text style={styles.infoLabel}>Member Since:</Text>
           <Text style={styles.infoValue}>
-            {new Date(concessionaire.created_at).toLocaleDateString()}
+            {new Date(concession.created_at).toLocaleDateString()}
           </Text>
         </View>
       )}
@@ -189,25 +159,19 @@ const styles = StyleSheet.create({
     fontSize: 48,
     fontWeight: "bold",
   },
-  concessionaireName: {
+  concessionName: {
     fontSize: 24,
     fontWeight: "bold",
     color: "#A40C2D",
     textAlign: "center",
-    marginBottom: 5,
+    marginBottom: 30,
   },
-  concessionName: {
+  sectionHeader: {
     fontSize: 18,
     fontWeight: "600",
-    color: "#333",
-    textAlign: "center",
-    marginBottom: 5,
-  },
-  subText: {
-    fontSize: 14,
-    color: "#666",
-    textAlign: "center",
-    marginBottom: 20,
+    color: "#A40C2D",
+    marginTop: 20,
+    marginBottom: 10,
   },
   infoSection: {
     flexDirection: "row",
@@ -228,6 +192,32 @@ const styles = StyleSheet.create({
     color: "#666",
     flex: 1,
     textAlign: "right",
+  },
+  statusOpen: {
+    color: "#28a745",
+    fontWeight: "600",
+  },
+  statusClosed: {
+    color: "#dc3545",
+    fontWeight: "600",
+  },
+  paymentMethod: {
+    backgroundColor: "#f8f9fa",
+    padding: 12,
+    borderRadius: 8,
+    marginBottom: 8,
+  },
+  paymentText: {
+    fontSize: 16,
+    color: "#333",
+    fontWeight: "500",
+  },
+  noPaymentText: {
+    fontSize: 14,
+    color: "#888",
+    fontStyle: "italic",
+    textAlign: "center",
+    marginTop: 10,
   },
   emptyText: {
     textAlign: "center",

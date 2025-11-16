@@ -344,7 +344,7 @@ export const getOrderById = async (req, res) => {
     order.gcash_screenshot = makeImageDataUrl(order.gcash_screenshot);
     order.payment_proof = order.gcash_screenshot || null;
 
-    delete order.concession_image;
+    delete order.concession_image; // raw buffer not needed on frontend
 
     // Get order items
     const itemsResult = await pool.query(

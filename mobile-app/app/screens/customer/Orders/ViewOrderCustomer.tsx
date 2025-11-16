@@ -12,10 +12,10 @@ import {
   BackHandler,
   Modal,
   RefreshControl,
-  Clipboard,
 } from "react-native";
 import { useRoute, useNavigation, useFocusEffect } from "@react-navigation/native";
 import * as ImagePicker from "expo-image-picker";
+import { Clipboard } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import api from "../../../libs/apiCall";
 import { useToast } from "../../../contexts/ToastContext";
@@ -37,7 +37,7 @@ const ViewOrderCustomer = () => {
   const copyGcashNumber = async () => {
     if (!order?.gcash_number) return;
     try {
-      await Clipboard.setString(String(order.gcash_number));
+      Clipboard.setString(String(order.gcash_number));
       showToast("success", "GCash number copied");
     } catch (err) {
       console.error("Error copying GCash number:", err);
@@ -289,8 +289,8 @@ const ViewOrderCustomer = () => {
       <TouchableOpacity
         style={styles.concessionCard}
         onPress={() =>
-          navigation.navigate("ViewConcessionaireProfile", {
-            concessionaireId: order.concession_id,
+          navigation.navigate("View Concessionaire Profile", {
+            concessionId: order.concession_id,
           })
         }
       >
