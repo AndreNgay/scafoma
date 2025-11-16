@@ -7,12 +7,12 @@ import {
   Image,
   StyleSheet,
   TouchableOpacity,
-  Alert,
   KeyboardAvoidingView,
   Platform,
 } from "react-native";
 import { useRoute } from "@react-navigation/native";
 import api from "../../../libs/apiCall";
+import { useToast } from "../../../contexts/ToastContext";
 
 type Variation = { name: string; price: string | number; image_url?: string; max_amount?: number; id?: number | string };
 type VariationGroup = {
@@ -34,6 +34,7 @@ const ViewMenu: React.FC = () => {
   const [quantity, setQuantity] = useState<number>(1);
   const [selectedVariations, setSelectedVariations] = useState<SelectedVariation[]>([]);
   const [variationQuantities, setVariationQuantities] = useState<Record<string, number>>({});
+  const { showToast } = useToast();
 
   // Fetch feedbacks
   useEffect(() => {
@@ -82,11 +83,17 @@ const ViewMenu: React.FC = () => {
 
     if (!isSelected) {
       if (maxSelection === 1 && selectionsInGroup.length > 0) {
-        Alert.alert("Selection Limit", `You can only select 1 option from "${group.label}". Please deselect the current selection first.`);
+        showToast(
+          "error",
+          `You can only select 1 option from "${group.label}". Please deselect the current selection first.`,
+        );
         return;
       }
       if (selectionsInGroup.length >= maxSelection) {
-        Alert.alert("Selection Limit", `You can only select up to ${maxSelection} option(s) from "${group.label}". Please deselect an option first.`);
+        showToast(
+          "error",
+          `You can only select up to ${maxSelection} option(s) from "${group.label}". Please deselect an option first.`,
+        );
         return;
       }
     }
@@ -130,11 +137,17 @@ const ViewMenu: React.FC = () => {
 
     if (delta > 0 && currentQty === 0) {
       if (maxSelection === 1 && selectionsInGroup.length > 0) {
-        Alert.alert("Selection Limit", `You can only select 1 option from "${group.label}". Please deselect the current selection first.`);
+        showToast(
+          "error",
+          `You can only select 1 option from "${group.label}". Please deselect the current selection first.`,
+        );
         return;
       }
       if (selectionsInGroup.length >= maxSelection) {
-        Alert.alert("Selection Limit", `You can only select up to ${maxSelection} option(s) from "${group.label}". Please deselect an option first.`);
+        showToast(
+          "error",
+          `You can only select up to ${maxSelection} option(s) from "${group.label}". Please deselect an option first.`,
+        );
         return;
       }
     }
@@ -168,16 +181,19 @@ const ViewMenu: React.FC = () => {
       const requiredSelection = group.required_selection || false;
 
       if (requiredSelection && selectionsInGroup.length === 0) {
-        return Alert.alert("Missing Selection", `Please select at least one option from "${groupName}".`);
+        showToast("error", `Please select at least one option from "${groupName}".`);
+        return;
       }
       if (selectionsInGroup.length < minSelection) {
-        return Alert.alert("Insufficient Selections", `Please select at least ${minSelection} option(s) from "${groupName}".`);
+        showToast("error", `Please select at least ${minSelection} option(s) from "${groupName}".`);
+        return;
       }
       if (selectionsInGroup.length > maxSelection) {
-        return Alert.alert("Too Many Selections", `You can only select up to ${maxSelection} option(s) from "${groupName}".`);
+        showToast("error", `You can only select up to ${maxSelection} option(s) from "${groupName}".`);
+        return;
       }
     }
-    Alert.alert("Success", inCart ? "Item added to cart!" : "Order placed successfully!");
+    showToast("success", inCart ? "Item added to cart!" : "Order placed successfully!");
   };
 
   return (
@@ -254,9 +270,15 @@ const ViewMenu: React.FC = () => {
                           if (showQty) return;
                           if (isUnclickable) {
                             if (maxSelection === 1) {
-                              Alert.alert("Selection Limit", `You can only select 1 option from "${group.label}". Please deselect the current selection first.`);
+                              showToast(
+                                "error",
+                                `You can only select 1 option from "${group.label}". Please deselect the current selection first.`,
+                              );
                             } else {
-                              Alert.alert("Selection Limit", `You can only select up to ${maxSelection} option(s) from "${group.label}". Please deselect an option first.`);
+                              showToast(
+                                "error",
+                                `You can only select up to ${maxSelection} option(s) from "${group.label}". Please deselect an option first.`,
+                              );
                             }
                             return;
                           }

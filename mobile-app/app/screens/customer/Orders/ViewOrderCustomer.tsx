@@ -7,14 +7,15 @@ import {
   FlatList,
   Image,
   ScrollView,
-  Alert,
   TouchableOpacity,
   Platform,
   BackHandler,
+  Modal,
 } from "react-native";
 import { useRoute, useNavigation, useFocusEffect } from "@react-navigation/native";
 import * as ImagePicker from "expo-image-picker";
 import api from "../../../libs/apiCall";
+import { useToast } from "../../../contexts/ToastContext";
 
 const ViewOrderCustomer = () => {
   const route = useRoute<any>();
@@ -26,6 +27,8 @@ const ViewOrderCustomer = () => {
   const [uploading, setUploading] = useState(false);
   const [cancelling, setCancelling] = useState(false);
   const [updatingPayment, setUpdatingPayment] = useState(false);
+  const [cancelConfirmVisible, setCancelConfirmVisible] = useState(false);
+  const { showToast } = useToast();
 
   const formatManila = (value: any) => {
     if (!value) return "";
@@ -86,7 +89,7 @@ const ViewOrderCustomer = () => {
       setOrder(data);
     } catch (err) {
       console.error(err);
-      Alert.alert("Error", "Failed to fetch order");
+      showToast("error", "Failed to fetch order");
     } finally {
       setLoading(false);
     }
@@ -114,38 +117,25 @@ const ViewOrderCustomer = () => {
   // ===============================
   // Cancel order
   // ===============================
-  const cancelOrder = async () => {
-    Alert.alert(
-      "Cancel Order",
-      "Are you sure you want to cancel this order? This action cannot be undone.",
-      [
-        {
-          text: "No",
-          style: "cancel",
-        },
-        {
-          text: "Yes, Cancel",
-          style: "destructive",
-          onPress: async () => {
-            try {
-              setCancelling(true);
-              const res = await api.put(`/order/cancel/${orderId}`);
-              Alert.alert("Success", "Order cancelled successfully");
-              // Refresh the order data
-              await fetchOrder();
-            } catch (error: any) {
-              console.error("Error cancelling order:", error);
-              Alert.alert(
-                "Error",
-                error.response?.data?.error || "Failed to cancel order. Please try again."
-              );
-            } finally {
-              setCancelling(false);
-            }
-          },
-        },
-      ]
-    );
+  const cancelOrder = () => {
+    setCancelConfirmVisible(true);
+  };
+
+  const confirmCancelOrder = async () => {
+    try {
+      setCancelling(true);
+      await api.put(`/order/cancel/${orderId}`);
+      showToast("success", "Order cancelled successfully");
+      await fetchOrder();
+    } catch (error: any) {
+      console.error("Error cancelling order:", error);
+      const message =
+        error.response?.data?.error || "Failed to cancel order. Please try again.";
+      showToast("error", message);
+    } finally {
+      setCancelling(false);
+      setCancelConfirmVisible(false);
+    }
   };
 
 
@@ -158,7 +148,7 @@ const ViewOrderCustomer = () => {
     try {
       const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (!permissionResult.granted) {
-        Alert.alert("Permission required", "Please allow access to your photos.");
+        showToast("error", "Please allow access to your photos.");
         return;
       }
 
@@ -174,7 +164,7 @@ const ViewOrderCustomer = () => {
       await uploadPaymentProof(asset.uri);
     } catch (err) {
       console.error(err);
-      Alert.alert("Error", "Failed to pick image");
+      showToast("error", "Failed to pick image");
     }
   };
 
@@ -198,11 +188,11 @@ const ViewOrderCustomer = () => {
         ...prev,
         payment_proof: res.data.payment_proof || res.data.gcash_screenshot,
       }));
-      Alert.alert("Success", "GCash screenshot uploaded!");
+      showToast("success", "GCash screenshot uploaded!");
     } catch (err: any) {
       console.error(err);
       const errorMessage = err.response?.data?.error || "Failed to upload screenshot";
-      Alert.alert("Error", errorMessage);
+      showToast("error", errorMessage);
     } finally {
       setUploading(false);
     }
@@ -216,7 +206,11 @@ const ViewOrderCustomer = () => {
     if (order.payment_method === method) return;
     // Only allow change when order is pending
     if (order.order_status !== 'pending') {
-      return Alert.alert('Not Allowed', 'Payment method can only be changed while the order is pending.');
+      showToast(
+        "error",
+        "Payment method can only be changed while the order is pending."
+      );
+      return;
     }
     // Guard against unavailable methods
     if (method === 'gcash' && !order.gcash_payment_available) return;
@@ -228,7 +222,7 @@ const ViewOrderCustomer = () => {
       await fetchOrder();
     } catch (err: any) {
       console.error('Error updating payment method:', err);
-      Alert.alert('Error', err.response?.data?.error || 'Failed to update payment method');
+      showToast('error', err.response?.data?.error || 'Failed to update payment method');
     } finally {
       setUpdatingPayment(false);
     }
@@ -422,6 +416,40 @@ const ViewOrderCustomer = () => {
           </TouchableOpacity>
         </View>
       )}
+
+      <Modal
+        transparent
+        visible={cancelConfirmVisible}
+        animationType="fade"
+        onRequestClose={() => setCancelConfirmVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalBox}>
+            <Text style={styles.modalTitle}>Cancel Order</Text>
+            <Text style={styles.modalMessage}>
+              Are you sure you want to cancel this order? This action cannot be undone.
+            </Text>
+            <View style={styles.modalButtonsRow}>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.modalCancelButton]}
+                onPress={() => setCancelConfirmVisible(false)}
+                disabled={cancelling}
+              >
+                <Text style={styles.modalCancelText}>No</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.modalConfirmButton]}
+                onPress={confirmCancelOrder}
+                disabled={cancelling}
+              >
+                <Text style={styles.modalConfirmText}>
+                  {cancelling ? "Cancelling..." : "Yes, Cancel"}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </ScrollView>
   );
 };
@@ -542,6 +570,71 @@ const styles = StyleSheet.create({
   cancelButtonText: {
     color: "#fff",
     fontSize: 16,
+    fontWeight: "600",
+  },
+  toastContainer: {
+    marginTop: 12,
+    padding: 10,
+    borderRadius: 8,
+    alignItems: "center",
+  },
+  toastSuccess: {
+    backgroundColor: "#4caf50",
+  },
+  toastError: {
+    backgroundColor: "#f44336",
+  },
+  toastInfo: {
+    backgroundColor: "#333",
+  },
+  toastText: {
+    color: "#fff",
+    fontSize: 13,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.4)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  modalBox: {
+    width: "85%",
+    backgroundColor: "#fff",
+    borderRadius: 10,
+    padding: 20,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: "600",
+    marginBottom: 8,
+  },
+  modalMessage: {
+    fontSize: 14,
+    color: "#555",
+    marginBottom: 16,
+  },
+  modalButtonsRow: {
+    flexDirection: "row",
+    justifyContent: "flex-end",
+    gap: 10,
+  },
+  modalButton: {
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    borderRadius: 6,
+  },
+  modalCancelButton: {
+    backgroundColor: "#eee",
+  },
+  modalConfirmButton: {
+    backgroundColor: "#d32f2f",
+  },
+  modalCancelText: {
+    color: "#333",
+    fontWeight: "500",
+  },
+  modalConfirmText: {
+    color: "#fff",
     fontWeight: "600",
   },
 });

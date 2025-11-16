@@ -6,7 +6,6 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   StyleSheet,
-  Alert,
 } from "react-native";
 import { useForm, Controller } from "react-hook-form";
 import { z } from "zod";
@@ -14,6 +13,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
 import useStore from "../../store";
 import api from "../../libs/apiCall"; // axios instance
+import { useToast } from "../../contexts/ToastContext";
 
 const LoginSchema = z.object({
   email: z.string().email({ message: "Invalid email address" }),
@@ -26,6 +26,7 @@ type Props = NativeStackScreenProps<any, "SignIn">;
 const SignIn: React.FC<Props> = ({ navigation }) => {
   const { setCredentials } = useStore((state) => state);
   const [loading, setLoading] = useState(false);
+  const { showToast } = useToast();
 
 
   const {
@@ -46,11 +47,11 @@ const SignIn: React.FC<Props> = ({ navigation }) => {
         const userInfo = { ...res.data.user, token: res.data.token };
         await setCredentials(userInfo); 
       } else {
-        Alert.alert("Error", res.data.message || "Something went wrong");
+        showToast("error", res.data.message || "Something went wrong");
       }
     } catch (error: any) {
       console.error("Sign-In Error:", error);
-      Alert.alert("Error", error.response?.data?.message || "Sign-in failed. Please try again.");
+      showToast("error", error.response?.data?.message || "Sign-in failed. Please try again.");
     } finally {
       setLoading(false);
     }

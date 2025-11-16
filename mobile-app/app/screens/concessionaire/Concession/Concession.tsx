@@ -9,12 +9,12 @@ import {
   ScrollView,
   TextInput,
   Button,
-  Alert,
   TouchableOpacity,
 } from "react-native";
 import * as ImagePicker from "expo-image-picker";
 import api from "../../../libs/apiCall";
 import { z } from "zod";
+import { useToast } from "../../../contexts/ToastContext";
 
 type Concession = {
   id: number;
@@ -52,6 +52,7 @@ const Concession = () => {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [imageAsset, setImageAsset] = useState<any>(null);
   const [imageIsNew, setImageIsNew] = useState(false);
+  const { showToast } = useToast();
 
   const fetchConcession = async () => {
     try {
@@ -120,11 +121,10 @@ const Concession = () => {
       setConcession(res.data.data);
       setOriginal(res.data.data);
       setImageIsNew(false);
-
-      Alert.alert("Success", "Concession updated successfully");
+      showToast("success", "Concession updated successfully");
     } catch (err) {
       console.error("Error updating concession:", err);
-      Alert.alert("Error", "Failed to update concession");
+      showToast("error", "Failed to update concession");
     } finally {
       setSaving(false);
     }

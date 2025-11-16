@@ -7,13 +7,14 @@ import {
   ActivityIndicator,
   ScrollView,
   StyleSheet,
-  Alert,
   Image,
+  Modal,
 } from "react-native";
 import api from "../libs/apiCall";
 import useStore from "../store";
 import { z } from "zod";
 import * as ImagePicker from "expo-image-picker";
+import { useToast } from "../contexts/ToastContext";
 
 
 
@@ -51,19 +52,16 @@ const Profile = () => {
     newPassword: "",
     confirmPassword: "",
   });
-
+  const [logoutConfirmVisible, setLogoutConfirmVisible] = useState(false);
+  const { showToast } = useToast();
 
   const handleLogout = () => {
-    Alert.alert("Logout", "Are you sure you want to log out?", [
-      { text: "Cancel", style: "cancel" },
-      {
-        text: "Logout",
-        style: "destructive",
-        onPress: async () => {
-          await logout(); // clears AsyncStorage + Zustand user
-        },
-      },
-    ]);
+    setLogoutConfirmVisible(true);
+  };
+
+  const confirmLogout = async () => {
+    setLogoutConfirmVisible(false);
+    await logout();
   };
     const pickImage = async () => {
     let result = await ImagePicker.launchImageLibraryAsync({
@@ -103,7 +101,7 @@ const Profile = () => {
 
       } catch (error) {
         console.error("Error fetching user:", error);
-        Alert.alert("Error", "Failed to fetch profile");
+        showToast("error", "Failed to fetch profile");
       } finally {
         setLoading(false);
       }
@@ -149,13 +147,13 @@ const handleUpdateProfile = async () => {
 
     await setCredentials({ ...res.data.user, token: user.token });
 
-    Alert.alert("Success", "Profile updated successfully");
+    showToast("success", "Profile updated successfully");
   } catch (err: any) {
     console.error("Error updating profile:", err);
     if (err.response?.data?.message) {
-      Alert.alert("Error", err.response.data.message);
+      showToast("error", err.response.data.message);
     } else {
-      Alert.alert("Error", "Failed to update profile");
+      showToast("error", "Failed to update profile");
     }
   } finally {
     setLoading(false);
@@ -182,16 +180,16 @@ const handleUpdateProfile = async () => {
         headers: { Authorization: `Bearer ${token}` },
       });
 
-      Alert.alert("Success", "Password updated successfully");
+      showToast("success", "Password updated successfully");
       setPasswords({ currentPassword: "", newPassword: "", confirmPassword: "" });
     } catch (err: any) {
       console.error("Error changing password:", err);
 
       // 🔥 Show backend error messages
       if (err.response?.data?.message) {
-        Alert.alert("Error", err.response.data.message);
+        showToast("error", err.response.data.message);
       } else {
-        Alert.alert("Error", "Failed to change password");
+        showToast("error", "Failed to change password");
       }
     } finally {
       setLoading(false);
@@ -292,6 +290,35 @@ const handleUpdateProfile = async () => {
         <Text style={styles.buttonText}>Logout</Text>
       </TouchableOpacity>
 
+      <Modal
+        transparent
+        visible={logoutConfirmVisible}
+        animationType="fade"
+        onRequestClose={() => setLogoutConfirmVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalBox}>
+            <Text style={styles.modalTitle}>Logout</Text>
+            <Text style={styles.modalMessage}>
+              Are you sure you want to log out?
+            </Text>
+            <View style={styles.modalButtonsRow}>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.modalCancelButton]}
+                onPress={() => setLogoutConfirmVisible(false)}
+              >
+                <Text style={styles.modalCancelText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.modalConfirmButton]}
+                onPress={confirmLogout}
+              >
+                <Text style={styles.modalConfirmText}>Logout</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </ScrollView>
   );
 };
@@ -360,5 +387,70 @@ const styles = StyleSheet.create({
     backgroundColor: "#eee",
     justifyContent: "center",
     alignItems: "center",
+  },
+  toastContainer: {
+    marginTop: 12,
+    padding: 10,
+    borderRadius: 8,
+    alignItems: "center",
+  },
+  toastSuccess: {
+    backgroundColor: "#4caf50",
+  },
+  toastError: {
+    backgroundColor: "#f44336",
+  },
+  toastInfo: {
+    backgroundColor: "#333",
+  },
+  toastText: {
+    color: "#fff",
+    fontSize: 13,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.4)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  modalBox: {
+    width: "80%",
+    backgroundColor: "#fff",
+    borderRadius: 10,
+    padding: 20,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: "600",
+    marginBottom: 10,
+  },
+  modalMessage: {
+    fontSize: 14,
+    color: "#555",
+    marginBottom: 20,
+  },
+  modalButtonsRow: {
+    flexDirection: "row",
+    justifyContent: "flex-end",
+    gap: 10,
+  },
+  modalButton: {
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    borderRadius: 6,
+  },
+  modalCancelButton: {
+    backgroundColor: "#eee",
+  },
+  modalConfirmButton: {
+    backgroundColor: "darkred",
+  },
+  modalCancelText: {
+    color: "#333",
+    fontWeight: "500",
+  },
+  modalConfirmText: {
+    color: "#fff",
+    fontWeight: "600",
   },
 });

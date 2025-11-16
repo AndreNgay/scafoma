@@ -8,12 +8,12 @@ import {
   TextInput,
   Modal,
   TouchableOpacity,
-  Alert,
   RefreshControl,
 } from "react-native";
 import { useFocusEffect, useNavigation } from "@react-navigation/native";
 import useStore from "../../../store";
 import api from "../../../libs/apiCall";
+import { useToast } from "../../../contexts/ToastContext";
 
 const PAGE_SIZE = 10;
 
@@ -35,6 +35,9 @@ const CustomerOrders = () => {
   const [filtersVisible, setFiltersVisible] = useState(false);
   const [statusFilter, setStatusFilter] = useState<string[]>([]);
   const [sortBy, setSortBy] = useState<string>("date_desc");
+  const [cancelOrderId, setCancelOrderId] = useState<number | null>(null);
+  const [cancelLoading, setCancelLoading] = useState(false);
+  const { showToast } = useToast();
 
   const formatManila = (value: any) => {
     if (!value) return "";
@@ -215,90 +218,81 @@ const CustomerOrders = () => {
     }
   }, [statusFilter, filteredOrders.length, hasMore, loading, page, fetchOrders]);
 
-const renderItem = ({ item }: any) => {
-  const cancelOrder = async () => {
-    Alert.alert(
-      "Cancel Order",
-      "Are you sure you want to cancel this order? This action cannot be undone.",
-      [
-        {
-          text: "No",
-          style: "cancel",
-        },
-        {
-          text: "Yes, Cancel",
-          style: "destructive",
-          onPress: async () => {
-            try {
-              await api.put(`/order/cancel/${item.id}`);
-              Alert.alert("Success", "Order cancelled successfully");
-              // Refresh the orders list
-              setPage(1);
-              fetchOrders(1, true);
-            } catch (error: any) {
-              console.error("Error cancelling order:", error);
-              Alert.alert(
-                "Error",
-                error.response?.data?.error || "Failed to cancel order. Please try again."
-              );
-            }
-          },
-        },
-      ]
-    );
+  const handleConfirmCancelOrder = async () => {
+    if (!cancelOrderId) return;
+
+    try {
+      setCancelLoading(true);
+      await api.put(`/order/cancel/${cancelOrderId}`);
+      showToast("success", "Order cancelled successfully");
+      setPage(1);
+      await fetchOrders(1, true);
+    } catch (error: any) {
+      console.error("Error cancelling order:", error);
+      const message =
+        error.response?.data?.error || "Failed to cancel order. Please try again.";
+      showToast("error", message);
+    } finally {
+      setCancelLoading(false);
+      setCancelOrderId(null);
+    }
   };
 
-  const itemNames: string[] = Array.isArray(item.item_names_preview) ? item.item_names_preview : [];
-  const itemCount: number = typeof item.item_count === 'number' ? item.item_count : (item.items_count || 0);
-  const extraCount = Math.max(0, itemCount - itemNames.length);
+  const renderItem = ({ item }: any) => {
+    const cancelOrder = () => {
+      setCancelOrderId(item.id);
+    };
 
-  return (
-    <View style={styles.card}>
-      <TouchableOpacity
-        onPress={() => navigation.navigate("View Order", { orderId: item.id })}
-        style={styles.cardContent}
-      >
-        {/* ✅ Order ID */}
-        <Text style={styles.orderId}>Order #{item.id}</Text>
+    const itemNames: string[] = Array.isArray(item.item_names_preview) ? item.item_names_preview : [];
+    const itemCount: number = typeof item.item_count === 'number' ? item.item_count : (item.items_count || 0);
+    const extraCount = Math.max(0, itemCount - itemNames.length);
 
-        <Text style={styles.title}>
-          {item.cafeteria_name} • {item.concession_name}
-        </Text>
-        {itemNames.length > 0 && (
-          <Text style={styles.itemsPreview}>
-            Items: {itemNames.join(', ')}{extraCount > 0 ? ` +${extraCount} more` : ''}
-          </Text>
-        )}
-        <Text>
-          Status: <Text style={styles.status}>{item.order_status}</Text>
-        </Text>
-        {item.order_status === 'declined' && !!item.decline_reason && (
-          <Text style={styles.declineReason}>Reason: {item.decline_reason}</Text>
-        )}
-        <Text>Total: ₱{Number(item.total_price).toFixed(2)}</Text>
-        {item.schedule_time && (
-          <Text style={styles.scheduleTime}>
-            📅 Scheduled: {formatSchedule(item.schedule_time)}
-          </Text>
-        )}
-        <Text style={styles.date}>
-          {formatDateTime(item.created_at)}
-        </Text>
-      </TouchableOpacity>
-
-      {/* Cancel Button - Only show for pending orders */}
-      {item.order_status === 'pending' && (
+    return (
+      <View style={styles.card}>
         <TouchableOpacity
-          style={styles.cancelButton}
-          onPress={cancelOrder}
+          onPress={() => navigation.navigate("View Order", { orderId: item.id })}
+          style={styles.cardContent}
         >
-          <Text style={styles.cancelButtonText}>Cancel</Text>
-        </TouchableOpacity>
-      )}
-    </View>
-  );
-};
+          {/* ✅ Order ID */}
+          <Text style={styles.orderId}>Order #{item.id}</Text>
 
+          <Text style={styles.title}>
+            {item.cafeteria_name} • {item.concession_name}
+          </Text>
+          {itemNames.length > 0 && (
+            <Text style={styles.itemsPreview}>
+              Items: {itemNames.join(', ')}{extraCount > 0 ? ` +${extraCount} more` : ''}
+            </Text>
+          )}
+          <Text>
+            Status: <Text style={styles.status}>{item.order_status}</Text>
+          </Text>
+          {item.order_status === 'declined' && !!item.decline_reason && (
+            <Text style={styles.declineReason}>Reason: {item.decline_reason}</Text>
+          )}
+          <Text>Total: ₱{Number(item.total_price).toFixed(2)}</Text>
+          {item.schedule_time && (
+            <Text style={styles.scheduleTime}>
+              📅 Scheduled: {formatSchedule(item.schedule_time)}
+            </Text>
+          )}
+          <Text style={styles.date}>
+            {formatDateTime(item.created_at)}
+          </Text>
+        </TouchableOpacity>
+
+        {/* Cancel Button - Only show for pending orders */}
+        {item.order_status === 'pending' && (
+          <TouchableOpacity
+            style={styles.cancelButton}
+            onPress={cancelOrder}
+          >
+            <Text style={styles.cancelButtonText}>Cancel</Text>
+          </TouchableOpacity>
+        )}
+      </View>
+    );
+  };
 
   // Full-screen loader for initial load
   if (initialLoading) {
@@ -430,6 +424,39 @@ const renderItem = ({ item }: any) => {
           </View>
         </View>
       </Modal>
+      <Modal
+        transparent
+        visible={cancelOrderId !== null}
+        animationType="fade"
+        onRequestClose={() => setCancelOrderId(null)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalBox}>
+            <Text style={styles.modalTitle}>Cancel Order</Text>
+            <Text style={styles.modalMessage}>
+              Are you sure you want to cancel this order? This action cannot be undone.
+            </Text>
+            <View style={styles.modalButtonsRow}>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.modalCancelButton]}
+                onPress={() => setCancelOrderId(null)}
+                disabled={cancelLoading}
+              >
+                <Text style={styles.modalCancelText}>No</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.modalConfirmButton]}
+                onPress={handleConfirmCancelOrder}
+                disabled={cancelLoading}
+              >
+                <Text style={styles.modalConfirmText}>
+                  {cancelLoading ? "Cancelling..." : "Yes, Cancel"}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 };
@@ -551,7 +578,71 @@ fullLoader: {
   justifyContent: "center",
   alignItems: "center",
 },
-
+toastContainer: {
+  marginTop: 12,
+  padding: 10,
+  borderRadius: 8,
+  alignItems: "center",
+},
+toastSuccess: {
+  backgroundColor: "#4caf50",
+},
+toastError: {
+  backgroundColor: "#f44336",
+},
+toastInfo: {
+  backgroundColor: "#333",
+},
+toastText: {
+  color: "#fff",
+  fontSize: 13,
+},
+modalOverlay: {
+  flex: 1,
+  backgroundColor: "rgba(0,0,0,0.4)",
+  justifyContent: "center",
+  alignItems: "center",
+},
+modalBox: {
+  width: "85%",
+  backgroundColor: "#fff",
+  borderRadius: 10,
+  padding: 20,
+},
+modalTitle: {
+  fontSize: 18,
+  fontWeight: "600",
+  marginBottom: 8,
+},
+modalMessage: {
+  fontSize: 14,
+  color: "#555",
+  marginBottom: 16,
+},
+modalButtonsRow: {
+  flexDirection: "row",
+  justifyContent: "flex-end",
+  gap: 10,
+},
+modalButton: {
+  paddingVertical: 8,
+  paddingHorizontal: 14,
+  borderRadius: 6,
+},
+modalCancelButton: {
+  backgroundColor: "#eee",
+},
+modalConfirmButton: {
+  backgroundColor: "#d32f2f",
+},
+modalCancelText: {
+  color: "#333",
+  fontWeight: "500",
+},
+modalConfirmText: {
+  color: "#fff",
+  fontWeight: "600",
+},
 });
 
 export default CustomerOrders;

@@ -6,9 +6,9 @@ import {
   TouchableOpacity,
   StyleSheet,
   ActivityIndicator,
-  Alert,
 } from "react-native";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
+import { useToast } from "../../contexts/ToastContext";
 
 type Props = NativeStackScreenProps<any, "ForgotPassword">;
 
@@ -19,39 +19,52 @@ const ForgotPassword: React.FC<Props> = ({ navigation }) => {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [step, setStep] = useState<"email" | "otp" | "reset">("email");
   const [loading, setLoading] = useState(false);
+  const { showToast } = useToast();
 
   const handleSendOtp = () => {
-    setLoading(true);
-    setTimeout(() => {
-      setLoading(false);
-      Alert.alert("Success", "OTP sent.");
-      setStep("otp");
-    }, 800);
-  };
-
-  const handleVerifyOtp = () => {
-    setLoading(true);
-    setTimeout(() => {
-      setLoading(false);
-      Alert.alert("Success", "OTP verified!");
-      setStep("reset");
-    }, 800);
-  };
-
-  const handleChangePassword = () => {
-    if (newPassword !== confirmPassword) {
-      Alert.alert("Error", "Passwords do not match");
+    if (!email.trim()) {
+      showToast("error", "Please enter your email.");
       return;
     }
     setLoading(true);
     setTimeout(() => {
       setLoading(false);
-      Alert.alert("Success", "Password changed!", [
-        {
-          text: "OK",
-          onPress: () => navigation.navigate("SignIn"),
-        },
-      ]);
+      showToast("success", "OTP sent.");
+      setStep("otp");
+    }, 800);
+  };
+
+  const handleVerifyOtp = () => {
+    if (!otp.trim()) {
+      showToast("error", "Please enter the OTP.");
+      return;
+    }
+    setLoading(true);
+    setTimeout(() => {
+      setLoading(false);
+      showToast("success", "OTP verified!");
+      setStep("reset");
+    }, 800);
+  };
+
+  const handleChangePassword = () => {
+    if (!newPassword || !confirmPassword) {
+      showToast("error", "Please fill in both password fields.");
+      return;
+    }
+    if (newPassword.length < 6) {
+      showToast("error", "Password must be at least 6 characters.");
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      showToast("error", "Passwords do not match");
+      return;
+    }
+    setLoading(true);
+    setTimeout(() => {
+      setLoading(false);
+      showToast("success", "Password changed!");
+      navigation.navigate("SignIn");
     }, 800);
   };
 

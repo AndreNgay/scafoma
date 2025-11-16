@@ -6,7 +6,6 @@ import {
   TextInput,
   TouchableOpacity,
   StyleSheet,
-  Alert,
   ScrollView,
   Image,
   Switch,
@@ -15,6 +14,7 @@ import { useNavigation } from "@react-navigation/native";
 import * as ImagePicker from "expo-image-picker";
 import { z } from "zod";
 import api from "../../../libs/apiCall";
+import { useToast } from "../../../contexts/ToastContext";
 
 type Variation = { name: string; price: string; max_amount?: number; image?: any; available?: boolean };
 type VariationGroup = {
@@ -36,6 +36,7 @@ const AddMenu: React.FC = () => {
   const [existingCategories, setExistingCategories] = useState<string[]>([]);
 
   const navigation = useNavigation<any>();
+  const { showToast } = useToast();
 
   // Load existing categories for this concessionaire to show as quick-select chips
   useEffect(() => {
@@ -98,7 +99,19 @@ const AddMenu: React.FC = () => {
 
   const addVariation = (gIndex: number) => {
     const updated = [...variationGroups];
-    updated[gIndex].variations.push({ name: "", price: "", available: true });
+    const group = updated[gIndex];
+    const prevAvailable = group.variations.filter((v) => v.available !== false).length;
+
+    group.variations.push({ name: "", price: "", available: true });
+
+    const nextAvailable = prevAvailable + 1;
+    if (group.max_selection === prevAvailable) {
+      group.max_selection = nextAvailable;
+      if (group.min_selection > group.max_selection) {
+        group.min_selection = group.max_selection;
+      }
+    }
+
     setVariationGroups(updated);
   };
 
@@ -135,10 +148,10 @@ const AddMenu: React.FC = () => {
     
     // Limit min_selection to be <= max_selection and >= minAllowed
     if (numValue > maxSelection) {
-      Alert.alert("Invalid Value", `Min selection cannot exceed max selection (${maxSelection})`);
+      showToast("error", `Min selection cannot exceed max selection (${maxSelection})`);
       updated[index].min_selection = maxSelection;
     } else if (numValue < minAllowed) {
-      Alert.alert("Invalid Value", `Min selection must be at least ${minAllowed} when required selection is enabled`);
+      showToast("error", `Min selection must be at least ${minAllowed} when required selection is enabled`);
       updated[index].min_selection = minAllowed;
     } else {
       updated[index].min_selection = numValue;
@@ -156,7 +169,7 @@ const AddMenu: React.FC = () => {
       updated[index].min_selection = Math.max(currentValue + 1, minAllowed);
       setVariationGroups(updated);
     } else {
-      Alert.alert("Limit Reached", `Min selection cannot exceed max selection (${maxSelection})`);
+      showToast("error", `Min selection cannot exceed max selection (${maxSelection})`);
     }
   };
 
@@ -183,10 +196,10 @@ const AddMenu: React.FC = () => {
     
     // Limit max_selection to number of available variations
     if (numValue > maxAllowed) {
-      Alert.alert("Invalid Value", `Max selection cannot exceed the number of available variations (${numVariations})`);
+      showToast("error", `Max selection cannot exceed the number of available variations (${numVariations})`);
       updated[index].max_selection = maxAllowed;
     } else if (numValue < minSelection) {
-      Alert.alert("Invalid Value", `Max selection cannot be less than min selection (${minSelection})`);
+      showToast("error", `Max selection cannot be less than min selection (${minSelection})`);
       updated[index].max_selection = minSelection;
     } else {
       updated[index].max_selection = numValue > 0 ? numValue : 1;
@@ -204,7 +217,7 @@ const AddMenu: React.FC = () => {
       updated[index].max_selection = currentValue + 1;
       setVariationGroups(updated);
     } else {
-      Alert.alert("Limit Reached", `Max selection cannot exceed the number of available variations (${numVariations})`);
+      showToast("error", `Max selection cannot exceed the number of available variations (${numVariations})`);
     }
   };
 
@@ -217,7 +230,7 @@ const AddMenu: React.FC = () => {
       updated[index].max_selection = currentValue - 1;
       setVariationGroups(updated);
     } else {
-      Alert.alert("Limit Reached", `Max selection cannot be less than min selection (${minSelection})`);
+      showToast("error", `Max selection cannot be less than min selection (${minSelection})`);
     }
   };
 
@@ -270,7 +283,12 @@ const AddMenu: React.FC = () => {
 
   const handleAddMenu = async () => {
     if (!itemName.trim()) {
-      Alert.alert("Error", "Please fill in item name.");
+      showToast("error", "Please fill in item name.");
+      return;
+    }
+
+    if (!price.trim()) {
+      showToast("error", "Please enter a base price.");
       return;
     }
 
@@ -279,7 +297,7 @@ const AddMenu: React.FC = () => {
       try {
         // Check if variation group has no variations
         if (group.variations.length === 0) {
-          Alert.alert("Validation Error", `Variation group "${group.label}" has no variations. Please add at least one variation or remove the group.`);
+          showToast("error", `Variation group "${group.label}" has no variations. Please add at least one variation or remove the group.`);
           return;
         }
         
@@ -288,7 +306,7 @@ const AddMenu: React.FC = () => {
         
         // Check if max_selection exceeds number of available variations
         if (group.max_selection > maxAllowed) {
-          Alert.alert("Validation Error", `${group.label}: Max selection (${group.max_selection}) cannot exceed the number of available variations (${numVariations})`);
+          showToast("error", `${group.label}: Max selection (${group.max_selection}) cannot exceed the number of available variations (${numVariations})`);
           return;
         }
         
@@ -297,7 +315,8 @@ const AddMenu: React.FC = () => {
           max_selection: group.max_selection,
         });
       } catch (err: any) {
-        Alert.alert("Validation Error", err.errors[0].message);
+        const message = err?.errors?.[0]?.message || "Validation error";
+        showToast("error", message);
         return;
       }
     }
@@ -340,15 +359,14 @@ const AddMenu: React.FC = () => {
         // Upload variation images separately
         await uploadVariationImages(menuItemId);
         
-        Alert.alert("Success", "Menu item added successfully", [
-          { text: "OK", onPress: () => navigation.goBack() },
-        ]);
+        showToast("success", "Menu item added successfully");
+        navigation.goBack();
       } else {
-        Alert.alert("Error", res.data.message || "Failed to add menu item");
+        showToast("error", res.data.message || "Failed to add menu item");
       }
     } catch (err: unknown) {
       console.error(err);
-      Alert.alert("Error", "Failed to add menu item.");
+      showToast("error", "Failed to add menu item.");
     } finally {
       setLoading(false);
     }
@@ -975,6 +993,25 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   removeGroupButtonText: { color: "red", fontWeight: "600" },
+  toastContainer: {
+    marginTop: 12,
+    padding: 10,
+    borderRadius: 8,
+    alignItems: "center",
+  },
+  toastSuccess: {
+    backgroundColor: "#4caf50",
+  },
+  toastError: {
+    backgroundColor: "#f44336",
+  },
+  toastInfo: {
+    backgroundColor: "#333",
+  },
+  toastText: {
+    color: "#fff",
+    fontSize: 13,
+  },
   buttonOutline: {
     borderWidth: 1,
     borderColor: "darkred",

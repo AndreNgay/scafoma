@@ -5,7 +5,6 @@ import {
   Image,
   ScrollView,
   TouchableOpacity,
-  Alert,
   StyleSheet,
   TextInput,
   KeyboardAvoidingView,
@@ -14,6 +13,7 @@ import {
 import { useNavigation, useRoute } from "@react-navigation/native";
 import useStore from "../../../store";
 import api from "../../../libs/apiCall";
+import { useToast } from "../../../contexts/ToastContext";
 
 const MenuItemDetails = () => {
   const navigation = useNavigation<any>();
@@ -36,6 +36,7 @@ const MenuItemDetails = () => {
   const [feedbackComment, setFeedbackComment] = useState<string>("");
   const [submittingFeedback, setSubmittingFeedback] = useState<boolean>(false);
   const user = useStore.getState().user;
+  const { showToast } = useToast();
 
   // Determine available payment methods
   const availablePaymentMethods = {
@@ -103,9 +104,18 @@ const MenuItemDetails = () => {
 
   const submitFeedback = async () => {
     try {
-      if (!user?.id) return Alert.alert("Error", "You must be logged in to leave feedback.");
-      if (!canLeaveFeedback) return Alert.alert("Not eligible", "You can only leave feedback after completing an order for this item.");
-      if (feedbackRating < 1 || feedbackRating > 5) return Alert.alert("Invalid Rating", "Please select a rating between 1 and 5.");
+      if (!user?.id) {
+        showToast("error", "You must be logged in to leave feedback.");
+        return;
+      }
+      if (!canLeaveFeedback) {
+        showToast("error", "You can only leave feedback after completing an order for this item.");
+        return;
+      }
+      if (feedbackRating < 1 || feedbackRating > 5) {
+        showToast("error", "Please select a rating between 1 and 5.");
+        return;
+      }
       setSubmittingFeedback(true);
       await api.post(`/feedback`, {
         customer_id: user.id,
@@ -113,7 +123,6 @@ const MenuItemDetails = () => {
         rating: feedbackRating,
         comment: feedbackComment || null,
       });
-      setFeedbackModalVisible(false);
       setFeedbackComment("");
       setFeedbackRating(5);
       // refresh feedback list
@@ -121,10 +130,10 @@ const MenuItemDetails = () => {
         const res = await api.get(`/feedback/${item.id}`);
         setFeedbacks(res.data);
       } catch {}
-      Alert.alert("Thank you!", "Your feedback has been submitted.");
+      showToast("success", "Your feedback has been submitted.");
     } catch (err: any) {
       const msg = err.response?.data?.message || "Failed to submit feedback.";
-      Alert.alert("Error", msg);
+      showToast("error", msg);
     } finally {
       setSubmittingFeedback(false);
     }
@@ -149,16 +158,16 @@ const MenuItemDetails = () => {
     if (!isSelected) {
       // If max_selection is 1, and another variation is already selected, show message
       if (maxSelection === 1 && selectionsInGroup.length > 0) {
-        Alert.alert(
-          "Selection Limit",
+        showToast(
+          "error",
           `You can only select 1 option from "${group.variation_group_name}". Please deselect the current selection first.`
         );
         return;
       }
       // If max_selection is reached, show message
       if (selectionsInGroup.length >= maxSelection) {
-        Alert.alert(
-          "Selection Limit",
+        showToast(
+          "error",
           `You can only select up to ${maxSelection} option(s) from "${group.variation_group_name}". Please deselect an option first.`
         );
         return;
@@ -220,15 +229,15 @@ const MenuItemDetails = () => {
     if (delta > 0 && currentQty === 0) {
       // Trying to add a new variation
       if (maxSelection === 1 && selectionsInGroup.length > 0) {
-        Alert.alert(
-          "Selection Limit",
+        showToast(
+          "error",
           `You can only select 1 option from "${group.variation_group_name}". Please deselect the current selection first.`
         );
         return;
       }
       if (selectionsInGroup.length >= maxSelection) {
-        Alert.alert(
-          "Selection Limit",
+        showToast(
+          "error",
           `You can only select up to ${maxSelection} option(s) from "${group.variation_group_name}". Please deselect an option first.`
         );
         return;
@@ -257,7 +266,11 @@ const MenuItemDetails = () => {
   const submitOrder = async (inCart: boolean) => {
     try {
       setPlacingOrder(true);
-      if (!user) return Alert.alert("Error", "You must be logged in to place an order.");
+      if (!user) {
+        showToast("error", "You must be logged in to place an order.");
+        setPlacingOrder(false);
+        return;
+      }
 
       // Validate required selections, min_selection, and max_selection
       for (const [groupName, group] of Object.entries<any>(groupedVariations)) {
@@ -269,30 +282,47 @@ const MenuItemDetails = () => {
         // Check required selection
         if (requiredSelection && selectionsInGroup.length === 0) {
           setPlacingOrder(false);
-          return Alert.alert("Missing Selection", `Please select at least one option from "${groupName}".`);
+          showToast("error", `Please select at least one option from "${groupName}".`);
+          return;
         }
         
         // Check min_selection
         if (selectionsInGroup.length < minSelection) {
           setPlacingOrder(false);
-          return Alert.alert("Insufficient Selections", `Please select at least ${minSelection} option(s) from "${groupName}".`);
+          showToast(
+            "error",
+            `Please select at least ${minSelection} option(s) from "${groupName}".`
+          );
+          return;
         }
         
         // Check max_selection limit
         if (selectionsInGroup.length > maxSelection) {
           setPlacingOrder(false);
-          return Alert.alert("Too Many Selections", `You can only select up to ${maxSelection} option(s) from "${groupName}".`);
+          showToast(
+            "error",
+            `You can only select up to ${maxSelection} option(s) from "${groupName}".`
+          );
+          return;
         }
       }
 
       // Validate payment method availability
       if (paymentMethod === 'gcash' && !availablePaymentMethods.gcash) {
         setPlacingOrder(false);
-        return Alert.alert("Payment Method Unavailable", "GCash payment is not available for this concession.");
+        showToast(
+          "error",
+          "GCash payment is not available for this concession."
+        );
+        return;
       }
       if (paymentMethod === 'on-counter' && !availablePaymentMethods.onCounter) {
         setPlacingOrder(false);
-        return Alert.alert("Payment Method Unavailable", "On-counter payment is not available for this concession.");
+        showToast(
+          "error",
+          "On-counter payment is not available for this concession."
+        );
+        return;
       }
 
       // Create order
@@ -341,7 +371,7 @@ const MenuItemDetails = () => {
         }
       }
 
-      Alert.alert("Success", inCart ? "Item added to cart!" : "Order placed successfully!");
+      showToast("success", inCart ? "Item added to cart!" : "Order placed successfully!");
       if (inCart) {
         navigation.navigate("Cart");
       } else {
@@ -350,7 +380,7 @@ const MenuItemDetails = () => {
       }
     } catch (err: any) {
       console.error(err.response?.data || err);
-      Alert.alert("Error", err.response?.data?.message ?? "Failed to submit order.");
+      showToast("error", err.response?.data?.message ?? "Failed to submit order.");
     } finally {
       setPlacingOrder(false);
     }
@@ -537,15 +567,9 @@ const MenuItemDetails = () => {
                       if (showQuantityControls) return;
                       if (isUnclickable) {
                         if (maxSelection === 1) {
-                          Alert.alert(
-                            "Selection Limit",
-                            `You can only select 1 option from "${groupName}". Please deselect the current selection first.`
-                          );
+                          showToast("error", `You can only select 1 option from "${groupName}". Please deselect the current selection first.`);
                         } else {
-                          Alert.alert(
-                            "Selection Limit",
-                            `You can only select up to ${maxSelection} option(s) from "${groupName}". Please deselect an option first.`
-                          );
+                          showToast("error", `You can only select up to ${maxSelection} option(s) from "${groupName}". Please deselect an option first.`);
                         }
                         return;
                       }
@@ -580,15 +604,9 @@ const MenuItemDetails = () => {
                         onPress={() => {
                           if (isUnclickable && variationQty === 0) {
                             if (maxSelection === 1) {
-                              Alert.alert(
-                                "Selection Limit",
-                                `You can only select 1 option from "${groupName}". Please deselect the current selection first.`
-                              );
+                              showToast("error", `You can only select 1 option from "${groupName}". Please deselect the current selection first.`);
                             } else {
-                              Alert.alert(
-                                "Selection Limit",
-                                `You can only select up to ${maxSelection} option(s) from "${groupName}". Please deselect an option first.`
-                              );
+                              showToast("error", `You can only select up to ${maxSelection} option(s) from "${groupName}". Please deselect an option first.`);
                             }
                             return;
                           }

@@ -8,12 +8,12 @@ import {
   Image,
   ScrollView,
   TouchableOpacity,
-  Alert,
   Modal,
   TextInput,
 } from "react-native";
 import { useRoute, useNavigation } from "@react-navigation/native";
 import api from "../../../libs/apiCall";
+import { useToast } from "../../../contexts/ToastContext";
 
 const ViewOrderConcessionaire = () => {
   const route = useRoute<any>();
@@ -26,6 +26,7 @@ const ViewOrderConcessionaire = () => {
   const [declineModalVisible, setDeclineModalVisible] = useState(false);
   const [selectedReason, setSelectedReason] = useState<string>("");
   const [customReason, setCustomReason] = useState<string>("");
+  const { showToast } = useToast();
 
   // Format dates with Asia/Manila timezone
   const formatManila = (value: any) => {
@@ -77,7 +78,7 @@ const ViewOrderConcessionaire = () => {
       setOrder(res.data);
     } catch (err) {
       console.error("Error fetching order details:", err);
-      Alert.alert("Error", "Failed to fetch order details");
+      showToast("error", "Failed to fetch order details");
     } finally {
       setLoading(false);
     }
@@ -98,10 +99,10 @@ const ViewOrderConcessionaire = () => {
       }
       await api.put(`order/status/${order.id}`, requestData);
       await fetchOrderDetails();
-      Alert.alert("Success", `Order marked as ${newStatus}`);
+      showToast("success", `Order marked as ${newStatus}`);
     } catch (err) {
       console.error(err);
-      Alert.alert("Error", "Failed to update order status");
+      showToast("error", "Failed to update order status");
     } finally {
       setUpdatingStatus(false);
     }
@@ -115,7 +116,7 @@ const ViewOrderConcessionaire = () => {
   // Submit decline with reason
   const submitDecline = async () => {
     if (!selectedReason && !customReason.trim()) {
-      Alert.alert("Error", "Please select a reason or provide a custom reason for declining this order.");
+      showToast("error", "Please select a reason or provide a custom reason for declining this order.");
       return;
     }
 
