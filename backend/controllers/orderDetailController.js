@@ -174,7 +174,21 @@ export const updateOrderDetailQuantity = async (req, res) => {
 
     const { base_price } = result.rows[0];
 
-    const itemPrice = Number(base_price);
+    // Calculate total variation price for this order detail
+    const variationResult = await pool.query(
+      `
+      SELECT COALESCE(SUM(iv.additional_price * COALESCE(oiv.quantity, 1)), 0) AS total_variation_price
+      FROM tblorderitemvariation oiv
+      JOIN tblitemvariation iv ON oiv.variation_id = iv.id
+      WHERE oiv.order_detail_id = $1
+      `,
+      [orderDetailId]
+    );
+
+    const totalVariationPrice = Number(variationResult.rows[0]?.total_variation_price || 0);
+    
+    // Item price = base price + all variation prices
+    const itemPrice = Number(base_price) + totalVariationPrice;
     const totalPrice = itemPrice * quantity;
 
     // Update order detail with new qty + recomputed totals
