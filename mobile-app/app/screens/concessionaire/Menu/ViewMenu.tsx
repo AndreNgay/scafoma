@@ -8,7 +8,6 @@ import {
   StyleSheet,
   TouchableOpacity,
   Alert,
-  TextInput,
   KeyboardAvoidingView,
   Platform,
 } from "react-native";
@@ -35,32 +34,6 @@ const ViewMenu: React.FC = () => {
   const [quantity, setQuantity] = useState<number>(1);
   const [selectedVariations, setSelectedVariations] = useState<SelectedVariation[]>([]);
   const [variationQuantities, setVariationQuantities] = useState<Record<string, number>>({});
-  const [note, setNote] = useState<string>("");
-  const [diningOption, setDiningOption] = useState<'dine-in' | 'take-out'>("dine-in");
-  const [paymentMethod, setPaymentMethod] = useState<'gcash' | 'on-counter'>("on-counter");
-  const [concessionDetails, setConcessionDetails] = useState<any | null>(null);
-
-  // Helpers to normalize flags coming as boolean/number/string
-  const toBool = (v: any): boolean => {
-    if (v === true) return true;
-    if (v === false) return false;
-    if (v === 1 || v === '1') return true;
-    if (v === 0 || v === '0') return false;
-    if (typeof v === 'string') {
-      const s = v.trim().toLowerCase();
-      if (s === 'true' || s === 'yes' || s === 'y') return true;
-      if (s === 'false' || s === 'no' || s === 'n') return false;
-    }
-    return !!v;
-  };
-  const readFlag = (obj: any, keys: string[]): boolean => {
-    for (const k of keys) {
-      if (obj && Object.prototype.hasOwnProperty.call(obj, k)) {
-        return toBool((obj as any)[k]);
-      }
-    }
-    return false;
-  };
 
   // Fetch feedbacks
   useEffect(() => {
@@ -76,22 +49,6 @@ const ViewMenu: React.FC = () => {
 
     fetchFeedbacks();
   }, [menuItem.id]);
-
-  // Fetch concession details to mirror customer-side availability
-  useEffect(() => {
-    const fetchConcession = async () => {
-      try {
-        const cid = (menuItem as any)?.concession_id || (menuItem as any)?.concessionId;
-        if (!cid) return;
-        const res = await api.get(`/concession/${cid}`);
-        setConcessionDetails(res.data?.data || res.data);
-      } catch (err) {
-        // fail silently; fallback to menuItem flags
-        setConcessionDetails(null);
-      }
-    };
-    fetchConcession();
-  }, [menuItem?.concession_id]);
 
   // Helpers for preview selection logic
   const basePrice = Number(menuItem.price) || 0;
@@ -113,71 +70,6 @@ const ViewMenu: React.FC = () => {
   }, [variationQuantities, selectedVariations, variationGroups]);
 
   const displayPrice = (basePrice + variationTotal) * quantity;
-
-  // Payment availability (mirror customer behavior) with normalization and alias support
-  const availablePaymentMethods = {
-    gcash:
-      readFlag(concessionDetails || {}, [
-        'gcash_payment_available',
-        'gcashPaymentAvailable',
-        'gcash_available',
-        'gcash',
-        'enable_gcash',
-        'accepts_gcash',
-      ])
-      || readFlag(menuItem, [
-        'gcash_payment_available',
-        'gcashPaymentAvailable',
-        'gcash_available',
-        'gcash',
-        'enable_gcash',
-        'accepts_gcash',
-      ])
-      || !!(concessionDetails as any)?.gcash_number
-      || !!(menuItem as any)?.gcash_number, // fallback: gcash number present
-    onCounter:
-      readFlag(concessionDetails || {}, [
-        'oncounter_payment_available',
-        'onCounter_payment_available',
-        'onCounterPaymentAvailable',
-        'on_counter_payment_available',
-        'on_counter',
-        'onCounter',
-        'oncounter',
-        'enable_oncounter',
-        'accepts_oncounter',
-      ])
-      || readFlag(menuItem, [
-        'oncounter_payment_available',
-        'onCounter_payment_available',
-        'onCounterPaymentAvailable',
-        'on_counter_payment_available',
-        'on_counter',
-        'onCounter',
-        'oncounter',
-        'enable_oncounter',
-        'accepts_oncounter',
-      ]),
-  };
-
-  // Set default payment method based on availability
-  useEffect(() => {
-    if (availablePaymentMethods.gcash && !availablePaymentMethods.onCounter) {
-      setPaymentMethod('gcash');
-    } else if (!availablePaymentMethods.gcash && availablePaymentMethods.onCounter) {
-      setPaymentMethod('on-counter');
-    }
-  }, [availablePaymentMethods.gcash, availablePaymentMethods.onCounter]);
-
-  // Determine if payment availability data is known to avoid false 'No methods' message before fetch completes
-  const paymentKnown = (
-    concessionDetails !== null ||
-    Object.prototype.hasOwnProperty.call(menuItem, 'gcash_payment_available') ||
-    Object.prototype.hasOwnProperty.call(menuItem, 'oncounter_payment_available') ||
-    Object.prototype.hasOwnProperty.call(menuItem, 'gcashPaymentAvailable') ||
-    Object.prototype.hasOwnProperty.call(menuItem, 'onCounter_payment_available') ||
-    Object.prototype.hasOwnProperty.call(menuItem, 'onCounterPaymentAvailable')
-  );
 
   const toggleVariation = (gIndex: number, group: VariationGroup, vIndex: number, variation: Variation) => {
     const maxAmount = variation.max_amount || 1;
@@ -265,7 +157,6 @@ const ViewMenu: React.FC = () => {
     setQuantity((q: number) => Math.max(1, q + delta));
   };
 
-  // Preview: mimic customer validations and alerts without API calls
   const submitOrderPreview = (inCart: boolean) => {
     // Validate required selections, min_selection, and max_selection
     for (let gIndex = 0; gIndex < variationGroups.length; gIndex++) {
@@ -286,16 +177,6 @@ const ViewMenu: React.FC = () => {
         return Alert.alert("Too Many Selections", `You can only select up to ${maxSelection} option(s) from "${groupName}".`);
       }
     }
-
-    // Validate payment method availability
-    if (paymentMethod === 'gcash' && !availablePaymentMethods.gcash) {
-      return Alert.alert("Payment Method Unavailable", "GCash payment is not available for this concession.");
-    }
-    if (paymentMethod === 'on-counter' && !availablePaymentMethods.onCounter) {
-      return Alert.alert("Payment Method Unavailable", "On-counter payment is not available for this concession.");
-    }
-
-    // Success (no navigation in preview)
     Alert.alert("Success", inCart ? "Item added to cart!" : "Order placed successfully!");
   };
 
@@ -332,59 +213,6 @@ const ViewMenu: React.FC = () => {
       {(menuItem as any).description ? (
         <Text style={styles.desc}>{(menuItem as any).description}</Text>
       ) : null}
-
-      {/* Dining Option */}
-      <View style={styles.diningOptionContainer}>
-        <Text style={styles.diningOptionTitle}>Dining Option</Text>
-        <View style={styles.diningOptionButtons}>
-          <TouchableOpacity
-            style={[styles.diningOptionButton, diningOption === 'dine-in' && styles.diningOptionSelected]}
-            onPress={() => setDiningOption('dine-in')}
-          >
-            <Text style={[styles.diningOptionText, diningOption === 'dine-in' && styles.diningOptionTextSelected]}>🍽️ Dine In</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.diningOptionButton, diningOption === 'take-out' && styles.diningOptionSelected]}
-            onPress={() => setDiningOption('take-out')}
-          >
-            <Text style={[styles.diningOptionText, diningOption === 'take-out' && styles.diningOptionTextSelected]}>📦 Take Out</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-
-      {/* Payment Method */}
-      <View style={styles.paymentMethodContainer}>
-        <Text style={styles.paymentMethodTitle}>Payment Method</Text>
-        {(!availablePaymentMethods.gcash && !availablePaymentMethods.onCounter) ? (
-          paymentKnown ? (
-            <Text style={styles.noPaymentMethodsText}>⚠️ No payment methods are currently available for this concession.</Text>
-          ) : null
-        ) : (
-          <>
-            <View style={styles.paymentMethodButtons}>
-              {availablePaymentMethods.gcash && (
-                <TouchableOpacity
-                  style={[styles.paymentMethodButton, paymentMethod === 'gcash' && styles.paymentMethodSelected]}
-                  onPress={() => setPaymentMethod('gcash')}
-                >
-                  <Text style={[styles.paymentMethodText, paymentMethod === 'gcash' && styles.paymentMethodTextSelected]}>💳 GCash</Text>
-                </TouchableOpacity>
-              )}
-              {availablePaymentMethods.onCounter && (
-                <TouchableOpacity
-                  style={[styles.paymentMethodButton, paymentMethod === 'on-counter' && styles.paymentMethodSelected]}
-                  onPress={() => setPaymentMethod('on-counter')}
-                >
-                  <Text style={[styles.paymentMethodText, paymentMethod === 'on-counter' && styles.paymentMethodTextSelected]}>💰 On-Counter</Text>
-                </TouchableOpacity>
-              )}
-            </View>
-            {paymentMethod === 'gcash' && ((concessionDetails as any)?.gcash_number || (menuItem as any).gcash_number) && (
-              <Text style={styles.gcashNumberText}>GCash Number: {(concessionDetails as any)?.gcash_number || (menuItem as any).gcash_number}</Text>
-            )}
-          </>
-        )}
-      </View>
 
       <Text style={styles.label}>Availability</Text>
       <Text style={[styles.value, { color: menuItem.availability ? "green" : "red" }]}>
@@ -466,32 +294,19 @@ const ViewMenu: React.FC = () => {
 
       {/* Preview Footer - Quantity and Buttons */}
       <View style={styles.previewFooter}>
-        {/* Note */}
-        <Text style={styles.noteLabel}>Add Note:</Text>
-        <TextInput
-          style={styles.noteInput}
-          placeholder="e.g. No onions, extra spicy..."
-          value={note}
-          onChangeText={setNote}
-          multiline
-        />
-
-        {/* Buttons (preview) */}
         <TouchableOpacity 
-          style={[styles.btn, (!availablePaymentMethods.gcash && !availablePaymentMethods.onCounter) && styles.btnDisabled]} 
+          style={styles.btn}
           onPress={() => submitOrderPreview(true)} 
-          disabled={!availablePaymentMethods.gcash && !availablePaymentMethods.onCounter}
         >
-          <Text style={[styles.btnText, (!availablePaymentMethods.gcash && !availablePaymentMethods.onCounter) && styles.btnTextDisabled]}>
+          <Text style={styles.btnText}>
             Add to Cart
           </Text>
         </TouchableOpacity>
         <TouchableOpacity 
-          style={[styles.btn, styles.btnAlt, (!availablePaymentMethods.gcash && !availablePaymentMethods.onCounter) && styles.btnDisabled]} 
+          style={[styles.btn, styles.btnAlt]}
           onPress={() => submitOrderPreview(false)} 
-          disabled={!availablePaymentMethods.gcash && !availablePaymentMethods.onCounter}
         >
-          <Text style={[styles.btnText, (!availablePaymentMethods.gcash && !availablePaymentMethods.onCounter) && styles.btnTextDisabled]}>
+          <Text style={styles.btnText}>
             Place Order
           </Text>
         </TouchableOpacity>
@@ -597,65 +412,6 @@ const styles = StyleSheet.create({
   secondaryBtnText: { color: "#333", fontWeight: "600" },
   primaryBtn: { paddingVertical: 10, paddingHorizontal: 14, borderRadius: 8, backgroundColor: "#A40C2D" },
   primaryBtnText: { color: "#fff", fontWeight: "700" },
-
-  // Dining option (customer parity)
-  diningOptionContainer: { marginBottom: 20 },
-  diningOptionTitle: { fontSize: 16, fontWeight: "600", marginBottom: 10 },
-  diningOptionButtons: { flexDirection: "row", gap: 10 },
-  diningOptionButton: {
-    flex: 1,
-    padding: 12,
-    borderRadius: 8,
-    borderWidth: 2,
-    borderColor: "#ddd",
-    backgroundColor: "#f9f9f9",
-    alignItems: "center",
-  },
-  diningOptionSelected: { borderColor: "#A40C2D", backgroundColor: "#A40C2D22" },
-  diningOptionText: { fontSize: 14, fontWeight: "500", color: "#666" },
-  diningOptionTextSelected: { color: "#A40C2D", fontWeight: "600" },
-
-  // Payment method (customer parity)
-  paymentMethodContainer: { marginBottom: 20 },
-  paymentMethodTitle: { fontSize: 16, fontWeight: "600", marginBottom: 10 },
-  paymentMethodButtons: { flexDirection: "row", gap: 10 },
-  paymentMethodButton: {
-    flex: 1,
-    padding: 12,
-    borderRadius: 8,
-    borderWidth: 2,
-    borderColor: "#ddd",
-    backgroundColor: "#f9f9f9",
-    alignItems: "center",
-  },
-  paymentMethodSelected: { borderColor: "#A40C2D", backgroundColor: "#A40C2D22" },
-  paymentMethodText: { fontSize: 14, fontWeight: "500", color: "#666" },
-  paymentMethodTextSelected: { color: "#A40C2D", fontWeight: "600" },
-  gcashNumberText: { fontSize: 12, color: "#666", marginTop: 8, textAlign: "center", fontStyle: "italic" },
-  noPaymentMethodsText: {
-    fontSize: 14,
-    color: "#ff6b6b",
-    textAlign: "center",
-    fontStyle: "italic",
-    padding: 10,
-    backgroundColor: "#ffe0e0",
-    borderRadius: 8,
-  },
-
-  // Note & Buttons (customer parity)
-  noteLabel: { alignSelf: "flex-start", fontWeight: "600", marginTop: 12 },
-  noteInput: {
-    width: "100%",
-    borderWidth: 1,
-    borderColor: "#ddd",
-    borderRadius: 8,
-    padding: 10,
-    minHeight: 70,
-    textAlignVertical: "top",
-    backgroundColor: "#fff",
-    marginTop: 6,
-    marginBottom: 10,
-  },
   btn: { width: "100%", backgroundColor: "#A40C2D", padding: 12, borderRadius: 8, marginTop: 6, alignItems: "center" },
   btnAlt: { backgroundColor: "#333" },
   btnDisabled: { opacity: 0.6 },

@@ -139,6 +139,7 @@ const Menu = () => {
               <Text style={styles.sectionHeaderText}>{title}</Text>
             </View>
           )}
+          keyboardShouldPersistTaps="handled"
           renderItem={({ item }) => (
             <TouchableOpacity
               style={styles.card}

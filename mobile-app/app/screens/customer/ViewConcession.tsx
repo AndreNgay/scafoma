@@ -224,11 +224,6 @@ const ViewConcession = () => {
           <ActivityIndicator size="large" color="#A40C2D" />
           <Text style={{ color: "#666", marginTop: 10 }}>Loading menu items...</Text>
         </View>
-      ) : filteredItems.length === 0 ? (
-        <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: 20 }}>
-          <ListHeaderComponent />
-          <Text style={{ color: "#666", marginTop: 20, textAlign: "center" }}>No menu items found</Text>
-        </ScrollView>
       ) : (
         <SectionList
           sections={sections}
@@ -239,6 +234,11 @@ const ViewConcession = () => {
           )}
           contentContainerStyle={{ paddingBottom: 20 }}
           ListHeaderComponent={ListHeaderComponent}
+          ListEmptyComponent={
+            <Text style={{ color: "#666", marginTop: 20, textAlign: "center" }}>
+              No menu items found
+            </Text>
+          }
           onEndReached={loadMore}
           onEndReachedThreshold={0.5}
           refreshControl={
@@ -253,6 +253,7 @@ const ViewConcession = () => {
               />
             ) : null
           }
+          keyboardShouldPersistTaps="handled"
         />
       )}
     </View>

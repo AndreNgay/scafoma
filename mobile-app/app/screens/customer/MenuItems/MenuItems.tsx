@@ -278,6 +278,7 @@ const MenuItems = () => {
         placeholder="Search menu items..."
         value={searchQuery}
         onChangeText={setSearchQuery}
+        blurOnSubmit={false}
       />
 
       {/* Filter button */}
@@ -297,6 +298,7 @@ const MenuItems = () => {
           renderItem={renderItem}
           keyExtractor={(i) => i.id.toString()}
           contentContainerStyle={{ padding: 10 }}
+          keyboardShouldPersistTaps="handled"
           viewabilityConfig={viewabilityConfig}
           onViewableItemsChanged={onViewableItemsChanged}
           refreshing={refreshing}

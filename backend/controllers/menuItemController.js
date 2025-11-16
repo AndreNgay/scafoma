@@ -89,10 +89,12 @@ export const getMenuItems = async (req, res) => {
       const vRes = await pool.query(
         `SELECT ivg.id AS group_id, ivg.menu_item_id,
                 ivg.variation_group_name AS label,
-                ivg.multiple_selection, ivg.required_selection, ivg.min_selection, ivg.max_selection,
-                iv.variation_name, iv.additional_price, iv.max_amount, iv.id AS variation_id
+                ivg.min_selection, ivg.max_selection,
+                iv.variation_name, iv.additional_price, iv.max_amount, iv.id AS variation_id, iv.available
          FROM tblitemvariationgroup ivg
-         LEFT JOIN tblitemvariation iv ON iv.item_variation_group_id = ivg.id
+         LEFT JOIN tblitemvariation iv 
+           ON iv.item_variation_group_id = ivg.id
+          AND iv.available = TRUE
          WHERE ivg.menu_item_id = ANY($1::int[])`,
         [menuItemIds]
       );
@@ -102,8 +104,9 @@ export const getMenuItems = async (req, res) => {
         if (!variationsMap[v.menu_item_id][v.label]) {
           variationsMap[v.menu_item_id][v.label] = {
             label: v.label,
-            multiple_selection: v.multiple_selection,
-            required_selection: v.required_selection || false,
+            // derived booleans for compatibility if clients still read them
+            required_selection: (v.min_selection || 0) > 0,
+            multiple_selection: (v.max_selection || 1) > 1,
             min_selection: v.min_selection || 0,
             max_selection: v.max_selection,
             variations: []
@@ -115,6 +118,7 @@ export const getMenuItems = async (req, res) => {
             price: Number(v.additional_price),
             max_amount: v.max_amount || 1,
             variation_id: v.variation_id,
+            available: v.available !== false,
           });
         }
       }
@@ -361,11 +365,12 @@ export const getMenuItemsByConcessionaire = async (req, res) => {
       const vRes = await pool.query(
         `SELECT ivg.id AS group_id, ivg.menu_item_id, 
                 ivg.variation_group_name AS label,
-                ivg.multiple_selection, ivg.required_selection, ivg.min_selection, ivg.max_selection,
-                iv.variation_name, iv.additional_price, iv.image, iv.max_amount, iv.id AS variation_id
+                ivg.min_selection, ivg.max_selection,
+                iv.variation_name, iv.additional_price, iv.image, iv.max_amount, iv.id AS variation_id, iv.available
         FROM tblitemvariationgroup ivg
         LEFT JOIN tblitemvariation iv 
           ON iv.item_variation_group_id = ivg.id
+         AND iv.available = TRUE
         WHERE ivg.menu_item_id = ANY($1::int[])`,
         [menuItemIds]
       );
@@ -375,8 +380,8 @@ export const getMenuItemsByConcessionaire = async (req, res) => {
         if (!variationsMap[v.menu_item_id][v.label]) {
           variationsMap[v.menu_item_id][v.label] = {
             label: v.label,
-            multiple_selection: v.multiple_selection,
-            required_selection: v.required_selection || false,
+            required_selection: (v.min_selection || 0) > 0,
+            multiple_selection: (v.max_selection || 1) > 1,
             min_selection: v.min_selection || 0,
             max_selection: v.max_selection,
             variations: []
@@ -389,6 +394,7 @@ export const getMenuItemsByConcessionaire = async (req, res) => {
             image_url: makeImageDataUrl(v.image),
             max_amount: v.max_amount || 1,
             variation_id: v.variation_id,
+            available: v.available !== false,
           });
         }
       }
@@ -441,8 +447,8 @@ export const addMenuItem = async (req, res) => {
       variations
     } = req.body;
 
-    if (!item_name || !price) {
-      return res.status(400).json({ status: "failed", message: "Item name and price are required" });
+    if (!item_name) {
+      return res.status(400).json({ status: "failed", message: "Item name is required" });
     }
 
     // Assume concession_id comes from the authenticated user’s concessionaire account
@@ -477,7 +483,7 @@ export const addMenuItem = async (req, res) => {
       [
         concessionId,
         item_name.trim(),
-        Number(price),
+        Number(price) || 0,
         category || null,
         parseBool(availability),
         imageBuffer,
@@ -496,22 +502,49 @@ export const addMenuItem = async (req, res) => {
       }
 
       for (const group of parsed) {
+        const allVariations = Array.isArray(group.variations) ? group.variations : [];
+        const availableVariations = allVariations.filter((v) => v.available !== false);
+        const availableCount = availableVariations.length;
+        let minSel = Number(group.min_selection ?? 0) || 0;
+        let maxSel = Number(group.max_selection ?? 1) || 1;
+        if (availableCount > 0) {
+          if (maxSel > availableCount) maxSel = availableCount;
+          if (minSel > maxSel) minSel = maxSel;
+        }
+
         const groupRes = await client.query(
           `INSERT INTO tblitemvariationgroup 
-            (menu_item_id, variation_group_name, multiple_selection, required_selection, min_selection, max_selection)
-           VALUES ($1,$2,$3,$4,$5,$6)
+            (menu_item_id, variation_group_name, min_selection, max_selection)
+           VALUES ($1,$2,$3,$4)
            RETURNING id`,
-          [menuItemId, group.label, parseBool(group.multiple_selection), parseBool(group.required_selection), group.min_selection || 0, group.max_selection || 1]
+          [menuItemId, group.label, minSel, maxSel]
         );
 
         const groupId = groupRes.rows[0].id;
 
         for (const v of group.variations || []) {
+          const avail = (typeof v.available === 'boolean')
+            ? v.available
+            : (typeof v.available === 'string')
+              ? v.available.toLowerCase() === 'true'
+              : true; // default to true when undefined/null
+
+          let maxAmount = null;
+          if (typeof v.max_amount === 'number') {
+            maxAmount = v.max_amount > 0 ? v.max_amount : null;
+          } else if (typeof v.max_amount === 'string') {
+            const trimmed = v.max_amount.trim();
+            if (trimmed) {
+              const parsed = parseInt(trimmed, 10);
+              maxAmount = parsed > 0 ? parsed : null;
+            }
+          }
+
           await client.query(
             `INSERT INTO tblitemvariation 
-              (item_variation_group_id, variation_name, additional_price, max_amount)
-             VALUES ($1,$2,$3,$4)`,
-            [groupId, v.name, Number(v.price) || 0, v.max_amount || 1]
+              (item_variation_group_id, variation_name, additional_price, max_amount, available)
+             VALUES ($1,$2,$3,$4,$5)`,
+            [groupId, v.name, Number(v.price) || 0, maxAmount, avail]
           );
         }
       }
@@ -624,28 +657,53 @@ export const updateMenuItem = async (req, res) => {
 
     // Insert new variation groups & variations
     for (const group of variations) {
+      const allVariations = Array.isArray(group.variations) ? group.variations : [];
+      const availableVariations = allVariations.filter((v) => v.available !== false);
+      const availableCount = availableVariations.length;
+      let minSel = Number(group.min_selection ?? 0) || 0;
+      let maxSel = Number(group.max_selection ?? 1) || 1;
+      if (availableCount > 0) {
+        if (maxSel > availableCount) maxSel = availableCount;
+        if (minSel > maxSel) minSel = maxSel;
+      }
+
       const insertGroup = await client.query(
         `INSERT INTO tblitemvariationgroup 
-          (variation_group_name, menu_item_id, multiple_selection, required_selection, min_selection, max_selection) 
-        VALUES ($1, $2, $3, $4, $5, $6) RETURNING id`,
+          (variation_group_name, menu_item_id, min_selection, max_selection) 
+        VALUES ($1, $2, $3, $4) RETURNING id`,
         [
           group.label || "Default",
           id,
-          group.multiple_selection || false,
-          parseBool(group.required_selection),
-          group.min_selection || 0,
-          group.max_selection || 1,
+          minSel,
+          maxSel,
         ]
       );
       const groupId = insertGroup.rows[0].id;
 
       for (const v of group.variations) {
         if (!v.name) continue;
+        const avail = (typeof v.available === 'boolean')
+          ? v.available
+          : (typeof v.available === 'string')
+            ? v.available.toLowerCase() === 'true'
+            : true; // default to true when undefined/null
+
+        let maxAmount = null;
+        if (typeof v.max_amount === 'number') {
+          maxAmount = v.max_amount > 0 ? v.max_amount : null;
+        } else if (typeof v.max_amount === 'string') {
+          const trimmed = v.max_amount.trim();
+          if (trimmed) {
+            const parsed = parseInt(trimmed, 10);
+            maxAmount = parsed > 0 ? parsed : null;
+          }
+        }
+
         await client.query(
           `INSERT INTO tblitemvariation 
-            (item_variation_group_id, variation_name, additional_price, max_amount)
-          VALUES ($1, $2, $3, $4)`,
-          [groupId, v.name, parseFloat(v.price) || 0, v.max_amount || 1]
+            (item_variation_group_id, variation_name, additional_price, max_amount, available)
+          VALUES ($1, $2, $3, $4, $5)`,
+          [groupId, v.name, parseFloat(v.price) || 0, maxAmount, avail]
         );
       }
     }
