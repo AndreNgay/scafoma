@@ -14,27 +14,29 @@ import api from "../../../libs/apiCall";
 
 const ViewConcessionaireProfile = () => {
   const route = useRoute<any>();
-  const { concessionId } = route.params;
+  const { concessionaireId, concessionaireData } = route.params;
 
-  const [concession, setConcession] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
+  const [concessionaire, setConcessionaire] = useState<any>(concessionaireData || null);
+  const [loading, setLoading] = useState(!concessionaireData);
 
-  // Fetch concession profile
-  const fetchConcessionProfile = async () => {
+  // Fetch concessionaire profile if not provided
+  const fetchConcessionaireProfile = async () => {
     try {
       setLoading(true);
-      const res = await api.get(`/concession/${concessionId}`);
-      setConcession(res.data.data || res.data);
+      const res = await api.get(`/user/${concessionaireId}`);
+      setConcessionaire(res.data);
     } catch (err) {
-      console.error("Error fetching concession profile:", err);
+      console.error("Error fetching concessionaire profile:", err);
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchConcessionProfile();
-  }, [concessionId]);
+    if (!concessionaire && concessionaireId) {
+      fetchConcessionaireProfile();
+    }
+  }, [concessionaireId, concessionaire]);
 
   if (loading) {
     return (
@@ -44,7 +46,7 @@ const ViewConcessionaireProfile = () => {
     );
   }
 
-  if (!concession) {
+  if (!concessionaire) {
     return (
       <View style={styles.container}>
         <Text style={styles.emptyText}>Concessionaire not found</Text>
@@ -54,77 +56,123 @@ const ViewConcessionaireProfile = () => {
 
   return (
     <ScrollView style={styles.container}>
-      {/* Profile Image */}
-      <View style={styles.imageContainer}>
-        {concession.image_url ? (
-          <Image source={{ uri: concession.image_url }} style={styles.profileImage} />
-        ) : (
-          <View style={styles.profilePlaceholder}>
-            <Text style={styles.profileInitials}>
-              {concession.concession_name?.[0] || "C"}
+      {/* Header Card */}
+      <View style={styles.headerCard}>
+        {/* Profile Image */}
+        <View style={styles.imageContainer}>
+          {concessionaire.profile_image_url ? (
+            <Image source={{ uri: concessionaire.profile_image_url }} style={styles.profileImage} />
+          ) : (
+            <View style={styles.profilePlaceholder}>
+              <Text style={styles.profileInitials}>
+                {concessionaire.first_name?.[0] || ""}{concessionaire.last_name?.[0] || ""}
+              </Text>
+            </View>
+          )}
+        </View>
+
+        {/* Concessionaire Name */}
+        <Text style={styles.concessionaireName}>
+          {concessionaire.first_name} {concessionaire.last_name}
+        </Text>
+        
+        {/* Concessionaire Badge */}
+        <View style={styles.roleBadge}>
+          <Text style={styles.roleBadgeText}>Concessionaire</Text>
+        </View>
+        
+        {/* Member Since Badge */}
+        {concessionaire.created_at && (
+          <View style={styles.memberBadge}>
+            <Text style={styles.memberBadgeText}>
+              Member since {new Date(concessionaire.created_at).toLocaleDateString()}
             </Text>
           </View>
         )}
       </View>
 
-      {/* Concession Name */}
-      <Text style={styles.concessionName}>
-        {concession.concession_name}
-      </Text>
+      {/* Contact Information Card */}
+      <View style={styles.infoCard}>
+        <Text style={styles.cardTitle}>📞 Contact Information</Text>
+        
+        <View style={styles.infoItem}>
+          <View style={styles.infoIcon}>
+            <Text style={styles.iconText}>📧</Text>
+          </View>
+          <View style={styles.infoContent}>
+            <Text style={styles.infoLabel}>Email</Text>
+            <Text style={styles.infoValue}>{concessionaire.email}</Text>
+          </View>
+        </View>
 
-      {/* Cafeteria */}
-      <View style={styles.infoSection}>
-        <Text style={styles.infoLabel}>Cafeteria:</Text>
-        <Text style={styles.infoValue}>{concession.cafeteria_name}</Text>
+        <View style={styles.infoItem}>
+          <View style={styles.infoIcon}>
+            <Text style={styles.iconText}>📱</Text>
+          </View>
+          <View style={styles.infoContent}>
+            <Text style={styles.infoLabel}>Phone Number</Text>
+            <Text style={styles.infoValue}>
+              {concessionaire.contact_number || "Not provided"}
+            </Text>
+          </View>
+        </View>
+
+        {concessionaire.messenger_link && (
+          <TouchableOpacity
+            style={styles.infoItem}
+            onPress={async () => {
+              const raw = String(concessionaire.messenger_link).trim();
+              if (!raw) return;
+              const url = /^https?:\/\//i.test(raw) ? raw : `https://${raw}`;
+              try {
+                const canOpen = await Linking.canOpenURL(url);
+                if (canOpen) {
+                  await Linking.openURL(url);
+                }
+              } catch (err) {
+                console.error("Error opening messenger/facebook link:", err);
+              }
+            }}
+          >
+            <View style={styles.infoIcon}>
+              <Text style={styles.iconText}>💬</Text>
+            </View>
+            <View style={styles.infoContent}>
+              <Text style={styles.infoLabel}>Messenger/Facebook</Text>
+              <Text style={[styles.infoValue, styles.linkText]} numberOfLines={1}>
+                {concessionaire.messenger_link}
+              </Text>
+            </View>
+          </TouchableOpacity>
+        )}
       </View>
 
-      {/* Location */}
-      {concession.location && (
-        <View style={styles.infoSection}>
-          <Text style={styles.infoLabel}>Location:</Text>
-          <Text style={styles.infoValue}>{concession.location}</Text>
-        </View>
-      )}
-
-      {/* Status */}
-      <View style={styles.infoSection}>
-        <Text style={styles.infoLabel}>Status:</Text>
-        <Text style={[
-          styles.infoValue,
-          concession.status === 'open' ? styles.statusOpen : styles.statusClosed
-        ]}>
-          {concession.status?.toUpperCase() || 'UNKNOWN'}
-        </Text>
-      </View>
-
-      {/* Payment Methods */}
-      <Text style={styles.sectionHeader}>Payment Methods</Text>
-      
-      {concession.gcash_payment_available && (
-        <View style={styles.paymentMethod}>
-          <Text style={styles.paymentText}>
-            💳 GCash {concession.gcash_number ? `(${concession.gcash_number})` : ''}
-          </Text>
-        </View>
-      )}
-      
-      {concession.oncounter_payment_available && (
-        <View style={styles.paymentMethod}>
-          <Text style={styles.paymentText}>💰 On-Counter Payment</Text>
-        </View>
-      )}
-
-      {!concession.gcash_payment_available && !concession.oncounter_payment_available && (
-        <Text style={styles.noPaymentText}>No payment methods available</Text>
-      )}
-
-      {/* Created Date */}
-      {concession.created_at && (
-        <View style={styles.infoSection}>
-          <Text style={styles.infoLabel}>Member Since:</Text>
-          <Text style={styles.infoValue}>
-            {new Date(concession.created_at).toLocaleDateString()}
-          </Text>
+      {/* Business Information Card */}
+      {concessionaire.concession_name && (
+        <View style={styles.infoCard}>
+          <Text style={styles.cardTitle}>🏢 Business Information</Text>
+          
+          <View style={styles.infoItem}>
+            <View style={styles.infoIcon}>
+              <Text style={styles.iconText}>🏪</Text>
+            </View>
+            <View style={styles.infoContent}>
+              <Text style={styles.infoLabel}>Concession</Text>
+              <Text style={styles.infoValue}>{concessionaire.concession_name}</Text>
+            </View>
+          </View>
+          
+          {concessionaire.cafeteria_name && (
+            <View style={styles.infoItem}>
+              <View style={styles.infoIcon}>
+                <Text style={styles.iconText}>🏭</Text>
+              </View>
+              <View style={styles.infoContent}>
+                <Text style={styles.infoLabel}>Cafeteria</Text>
+                <Text style={styles.infoValue}>{concessionaire.cafeteria_name}</Text>
+              </View>
+            </View>
+          )}
         </View>
       )}
     </ScrollView>
@@ -134,90 +182,131 @@ const ViewConcessionaireProfile = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: 20,
+    backgroundColor: "#f8f9fa",
+  },
+  headerCard: {
     backgroundColor: "#fff",
+    padding: 24,
+    alignItems: "center",
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 3.84,
+    elevation: 5,
   },
   imageContainer: {
-    alignItems: "center",
-    marginBottom: 20,
+    marginBottom: 16,
   },
   profileImage: {
-    width: 120,
-    height: 120,
-    borderRadius: 60,
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    borderWidth: 3,
+    borderColor: "#A40C2D",
   },
   profilePlaceholder: {
-    width: 120,
-    height: 120,
-    borderRadius: 60,
+    width: 100,
+    height: 100,
+    borderRadius: 50,
     backgroundColor: "#A40C2D",
     alignItems: "center",
     justifyContent: "center",
+    borderWidth: 3,
+    borderColor: "#A40C2D",
   },
   profileInitials: {
     color: "#fff",
-    fontSize: 48,
+    fontSize: 36,
     fontWeight: "bold",
   },
-  concessionName: {
-    fontSize: 24,
+  concessionaireName: {
+    fontSize: 22,
     fontWeight: "bold",
-    color: "#A40C2D",
+    color: "#1f2937",
     textAlign: "center",
-    marginBottom: 30,
+    marginBottom: 8,
   },
-  sectionHeader: {
+  roleBadge: {
+    backgroundColor: "#A40C2D",
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    marginBottom: 8,
+  },
+  roleBadgeText: {
+    fontSize: 12,
+    color: "#fff",
+    fontWeight: "600",
+  },
+  memberBadge: {
+    backgroundColor: "#f3f4f6",
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+  },
+  memberBadgeText: {
+    fontSize: 12,
+    color: "#6b7280",
+    fontWeight: "500",
+  },
+  infoCard: {
+    backgroundColor: "#fff",
+    margin: 16,
+    borderRadius: 12,
+    padding: 20,
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 3.84,
+    elevation: 5,
+  },
+  cardTitle: {
     fontSize: 18,
     fontWeight: "600",
-    color: "#A40C2D",
-    marginTop: 20,
-    marginBottom: 10,
+    color: "#1f2937",
+    marginBottom: 16,
   },
-  infoSection: {
+  infoItem: {
     flexDirection: "row",
-    justifyContent: "space-between",
     alignItems: "center",
-    paddingVertical: 15,
+    paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: "#f0f0f0",
+    borderBottomColor: "#f3f4f6",
+  },
+  infoIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "#f3f4f6",
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: 12,
+  },
+  iconText: {
+    fontSize: 16,
+  },
+  infoContent: {
+    flex: 1,
   },
   infoLabel: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: "#333",
-    flex: 1,
+    fontSize: 12,
+    fontWeight: "500",
+    color: "#6b7280",
+    marginBottom: 2,
   },
   infoValue: {
     fontSize: 16,
-    color: "#666",
-    flex: 1,
-    textAlign: "right",
-  },
-  statusOpen: {
-    color: "#28a745",
-    fontWeight: "600",
-  },
-  statusClosed: {
-    color: "#dc3545",
-    fontWeight: "600",
-  },
-  paymentMethod: {
-    backgroundColor: "#f8f9fa",
-    padding: 12,
-    borderRadius: 8,
-    marginBottom: 8,
-  },
-  paymentText: {
-    fontSize: 16,
-    color: "#333",
+    color: "#1f2937",
     fontWeight: "500",
   },
-  noPaymentText: {
-    fontSize: 14,
-    color: "#888",
-    fontStyle: "italic",
-    textAlign: "center",
-    marginTop: 10,
+  linkText: {
+    color: "#2563eb",
   },
   emptyText: {
     textAlign: "center",

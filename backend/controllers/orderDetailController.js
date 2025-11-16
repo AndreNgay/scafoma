@@ -214,39 +214,62 @@ export const updateOrderDetailQuantity = async (req, res) => {
 // Aggregations: Most ordered items (overall)
 // ==========================
 export const getMostOrderedItems = async (req, res) => {
-  try {
-    const limit = parseInt(req.query.limit) || 10;
-    const result = await pool.query(
-      `SELECT mi.id, mi.item_name, mi.price, mi.category, mi.image,
-              SUM(od.quantity) AS total_qty,
-              c.concession_name, caf.cafeteria_name
-       FROM tblorderdetail od
-       JOIN tblmenuitem mi ON od.item_id = mi.id
-       JOIN tblconcession c ON mi.concession_id = c.id
-       JOIN tblcafeteria caf ON c.cafeteria_id = caf.id
-       GROUP BY mi.id, c.concession_name, caf.cafeteria_name
-       ORDER BY total_qty DESC
-       LIMIT $1`,
-      [limit]
-    );
+try {
+const limit = parseInt(req.query.limit) || 10;
+const result = await pool.query(
+  `SELECT mi.id, mi.item_name, mi.price, mi.category, mi.image,
+          SUM(od.quantity) AS total_qty,
+          c.concession_name, caf.cafeteria_name
+   FROM tblorderdetail od
+   JOIN tblmenuitem mi ON od.item_id = mi.id
+   JOIN tblconcession c ON mi.concession_id = c.id
+   JOIN tblcafeteria caf ON c.cafeteria_id = caf.id
+   GROUP BY mi.id, c.concession_name, caf.cafeteria_name
+   ORDER BY total_qty DESC
+   LIMIT $1`,
+  [limit]
+);
 
-    const items = result.rows.map(r => ({
-      id: r.id,
-      item_name: r.item_name,
-      price: Number(r.price),
-      category: r.category,
-      image_url: r.image ? `data:image/jpeg;base64,${r.image.toString("base64")}` : null,
-      total_qty: Number(r.total_qty),
-      concession_name: r.concession_name,
-      cafeteria_name: r.cafeteria_name,
-    }));
+const items = await Promise.all(result.rows.map(async (r) => {
+// Get variations for each menu item
+const variationsResult = await pool.query(
+  `SELECT iv.id, iv.variation_name, iv.additional_price, iv.available,
+          ivg.variation_group_name, ivg.min_selection, ivg.max_selection
+   FROM tblitemvariation iv
+   JOIN tblitemvariationgroup ivg ON iv.item_variation_group_id = ivg.id
+   WHERE ivg.menu_item_id = $1 AND iv.available = true
+   ORDER BY ivg.id, iv.id`,
+  [r.id]
+);
 
-    res.json({ status: "success", data: items });
-  } catch (err) {
-    console.error("Error fetching most ordered items:", err);
-    res.status(500).json({ status: "failed", message: "Server error" });
-  }
+return {
+  id: r.id,
+  item_name: r.item_name,
+  price: Number(r.price),
+  category: r.category,
+  image_url: r.image ? `data:image/jpeg;base64,${r.image.toString("base64")}` : null,
+  total_qty: Number(r.total_qty),
+  concession_name: r.concession_name,
+  cafeteria_name: r.cafeteria_name,
+  variations: variationsResult.rows.map(v => ({
+    id: v.id,
+    variation_name: v.variation_name,
+    additional_price: Number(v.additional_price),
+    available: v.available,
+    variation_group_name: v.variation_group_name,
+    min_selection: v.min_selection,
+    max_selection: v.max_selection,
+  })),
 };
+}));
+
+res.json({ status: "success", data: items });
+} catch (err) {
+console.error("Error fetching most ordered items:", err);
+res.status(500).json({ status: "failed", message: "Server error" });
+}
+};
+
 
 // ==========================
 // Aggregations: Trending items (current week)
@@ -270,15 +293,37 @@ export const getTrendingItemsThisWeek = async (req, res) => {
       [limit]
     );
 
-    const items = result.rows.map(r => ({
-      id: r.id,
-      item_name: r.item_name,
-      price: Number(r.price),
-      category: r.category,
-      image_url: r.image ? `data:image/jpeg;base64,${r.image.toString("base64")}` : null,
-      total_qty: Number(r.total_qty),
-      concession_name: r.concession_name,
-      cafeteria_name: r.cafeteria_name,
+    const items = await Promise.all(result.rows.map(async (r) => {
+      // Get variations for each menu item
+      const variationsResult = await pool.query(
+        `SELECT iv.id, iv.variation_name, iv.additional_price, iv.available,
+                ivg.variation_group_name, ivg.min_selection, ivg.max_selection
+         FROM tblitemvariation iv
+         JOIN tblitemvariationgroup ivg ON iv.item_variation_group_id = ivg.id
+         WHERE ivg.menu_item_id = $1 AND iv.available = true
+         ORDER BY ivg.id, iv.id`,
+        [r.id]
+      );
+
+      return {
+        id: r.id,
+        item_name: r.item_name,
+        price: Number(r.price),
+        category: r.category,
+        image_url: r.image ? `data:image/jpeg;base64,${r.image.toString("base64")}` : null,
+        total_qty: Number(r.total_qty),
+        concession_name: r.concession_name,
+        cafeteria_name: r.cafeteria_name,
+        variations: variationsResult.rows.map(v => ({
+          id: v.id,
+          variation_name: v.variation_name,
+          additional_price: Number(v.additional_price),
+          available: v.available,
+          variation_group_name: v.variation_group_name,
+          min_selection: v.min_selection,
+          max_selection: v.max_selection,
+        })),
+      };
     }));
 
     res.json({ status: "success", data: items });
@@ -318,15 +363,37 @@ export const getRecentItemsByUser = async (req, res) => {
       [userId, limit]
     );
 
-    const items = result.rows.map(r => ({
-      id: r.id,
-      item_name: r.item_name,
-      price: Number(r.price),
-      category: r.category,
-      image_url: r.image ? `data:image/jpeg;base64,${r.image.toString("base64")}` : null,
-      concession_name: r.concession_name,
-      cafeteria_name: r.cafeteria_name,
-      last_ordered_at: r.last_ordered_at,
+    const items = await Promise.all(result.rows.map(async (r) => {
+      // Get variations for each menu item
+      const variationsResult = await pool.query(
+        `SELECT iv.id, iv.variation_name, iv.additional_price, iv.available,
+                ivg.variation_group_name, ivg.min_selection, ivg.max_selection
+         FROM tblitemvariation iv
+         JOIN tblitemvariationgroup ivg ON iv.item_variation_group_id = ivg.id
+         WHERE ivg.menu_item_id = $1 AND iv.available = true
+         ORDER BY ivg.id, iv.id`,
+        [r.id]
+      );
+
+      return {
+        id: r.id,
+        item_name: r.item_name,
+        price: Number(r.price),
+        category: r.category,
+        image_url: r.image ? `data:image/jpeg;base64,${r.image.toString("base64")}` : null,
+        concession_name: r.concession_name,
+        cafeteria_name: r.cafeteria_name,
+        last_ordered_at: r.last_ordered_at,
+        variations: variationsResult.rows.map(v => ({
+          id: v.id,
+          variation_name: v.variation_name,
+          additional_price: Number(v.additional_price),
+          available: v.available,
+          variation_group_name: v.variation_group_name,
+          min_selection: v.min_selection,
+          max_selection: v.max_selection,
+        })),
+      };
     }));
 
     res.json({ status: "success", data: items });

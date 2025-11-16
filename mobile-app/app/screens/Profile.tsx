@@ -241,13 +241,43 @@ const Profile = () => {
     <View style={styles.screen}>
       {loading && (
         <View style={styles.loaderOverlay}>
-          <ActivityIndicator size="large" color="darkred" />
+          <ActivityIndicator size="large" color="#A40C2D" />
         </View>
       )}
 
-      <ScrollView contentContainerStyle={styles.container}>
-        {/* Tabs */}
-        <View style={styles.tabRow}>
+      <ScrollView style={styles.container}>
+        {/* Header Card with Profile Image */}
+        <View style={styles.headerCard}>
+          <TouchableOpacity onPress={pickImage} style={styles.imageContainer}>
+            {profile.profile_image_url ? (
+              <Image
+                source={{ uri: String(profile.profile_image_url) }}
+                style={styles.profileImage}
+              />
+            ) : (
+              <View style={styles.imagePlaceholder}>
+                <Text style={styles.imagePlaceholderText}>👤</Text>
+                <Text style={styles.imagePlaceholderLabel}>Tap to add photo</Text>
+              </View>
+            )}
+            <View style={styles.cameraIcon}>
+              <Text style={styles.cameraIconText}>📷</Text>
+            </View>
+          </TouchableOpacity>
+          
+          <Text style={styles.userName}>
+            {profile.first_name} {profile.last_name}
+          </Text>
+          
+          <View style={styles.userBadge}>
+            <Text style={styles.userBadgeText}>
+              {user?.role === 'concessionaire' ? 'Concessionaire' : 'Customer'}
+            </Text>
+          </View>
+        </View>
+
+        {/* Tab Navigation */}
+        <View style={styles.tabContainer}>
           {tabs.map((tab) => (
             <TouchableOpacity
               key={tab.key}
@@ -269,137 +299,153 @@ const Profile = () => {
           ))}
         </View>
 
-        {/* Profile Tab */}
+        {/* Profile Information Card */}
         {activeTab === "profile" && (
-          <>
-            <View style={styles.imageContainer}>
-              <TouchableOpacity onPress={pickImage}>
-                {profile.profile_image_url ? (
-                  <Image
-                    source={{ uri: String(profile.profile_image_url) }}
-                    style={styles.profileImage}
-                  />
-                ) : (
-                  <View style={[styles.profileImage, styles.imagePlaceholder]}>
-                    <Text style={{ color: "#666" }}>Pick Image</Text>
-                  </View>
-                )}
-              </TouchableOpacity>
+          <View style={styles.infoCard}>
+            <Text style={styles.cardTitle}>👤 Personal Information</Text>
+            
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>First Name</Text>
+              <TextInput
+                style={styles.input}
+                value={profile.first_name}
+                onChangeText={(t) => setProfile({ ...profile, first_name: t })}
+                placeholder="Enter your first name"
+              />
+              {errors.first_name && (
+                <Text style={styles.error}>{errors.first_name}</Text>
+              )}
             </View>
 
-            <Text style={styles.sectionTitle}>Profile</Text>
-
-            <Text style={styles.label}>First Name</Text>
-            <TextInput
-              style={styles.input}
-              value={profile.first_name}
-              onChangeText={(t) => setProfile({ ...profile, first_name: t })}
-            />
-            {errors.first_name && (
-              <Text style={styles.error}>{errors.first_name}</Text>
-            )}
-
-            <Text style={styles.label}>Last Name</Text>
-            <TextInput
-              style={styles.input}
-              value={profile.last_name}
-              onChangeText={(t) => setProfile({ ...profile, last_name: t })}
-            />
-            {errors.last_name && (
-              <Text style={styles.error}>{errors.last_name}</Text>
-            )}
-          </>
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>Last Name</Text>
+              <TextInput
+                style={styles.input}
+                value={profile.last_name}
+                onChangeText={(t) => setProfile({ ...profile, last_name: t })}
+                placeholder="Enter your last name"
+              />
+              {errors.last_name && (
+                <Text style={styles.error}>{errors.last_name}</Text>
+              )}
+            </View>
+          </View>
         )}
 
-        {/* Contact Tab */}
+        {/* Contact Information Card */}
         {activeTab === "contact" && (
-          <>
-            <Text style={styles.sectionTitle}>Contact</Text>
+          <View style={styles.infoCard}>
+            <Text style={styles.cardTitle}>📞 Contact Information</Text>
 
-            <Text style={styles.label}>Contact Number</Text>
-            <TextInput
-              style={styles.input}
-              keyboardType="number-pad"
-              value={profile.contact_number}
-              onChangeText={(t) =>
-                setProfile({ ...profile, contact_number: t })
-              }
-            />
-            {errors.contact_number && (
-              <Text style={styles.error}>{errors.contact_number}</Text>
-            )}
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>Email Address</Text>
+              <TextInput
+                style={[styles.input, styles.disabledInput]}
+                editable={false}
+                value={profile.email}
+                placeholder="Email address"
+              />
+              <Text style={styles.helperText}>Email cannot be changed</Text>
+            </View>
 
-            <Text style={styles.label}>Messenger/Facebook Link</Text>
-            <TextInput
-              style={styles.input}
-              keyboardType="url"
-              autoCapitalize="none"
-              value={profile.messenger_link}
-              onChangeText={(t) =>
-                setProfile({ ...profile, messenger_link: t })
-              }
-              placeholder="m.me/john.doe.2024"
-            />
-            {errors.messenger_link && (
-              <Text style={styles.error}>{errors.messenger_link}</Text>
-            )}
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>Phone Number</Text>
+              <TextInput
+                style={styles.input}
+                keyboardType="number-pad"
+                value={profile.contact_number}
+                onChangeText={(t) =>
+                  setProfile({ ...profile, contact_number: t })
+                }
+                placeholder="09XXXXXXXXX"
+              />
+              {errors.contact_number && (
+                <Text style={styles.error}>{errors.contact_number}</Text>
+              )}
+            </View>
 
-
-            <Text style={styles.label}>Email</Text>
-            <TextInput
-              style={[styles.input, { backgroundColor: "#eee" }]}
-              editable={false}
-              value={profile.email}
-            />
-            {errors.email && <Text style={styles.error}>{errors.email}</Text>}
-          </>
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>Messenger/Facebook Link</Text>
+              <TextInput
+                style={styles.input}
+                keyboardType="url"
+                autoCapitalize="none"
+                value={profile.messenger_link}
+                onChangeText={(t) =>
+                  setProfile({ ...profile, messenger_link: t })
+                }
+                placeholder="m.me/john.doe.2024"
+              />
+              {errors.messenger_link && (
+                <Text style={styles.error}>{errors.messenger_link}</Text>
+              )}
+              <Text style={styles.helperText}>
+                Optional: Add your Messenger link for easy contact
+              </Text>
+            </View>
+          </View>
         )}
 
-        {/* Password Tab */}
+        {/* Security Card */}
         {activeTab === "password" && (
-          <>
-            <Text style={styles.sectionTitle}>Change Password</Text>
+          <View style={styles.infoCard}>
+            <Text style={styles.cardTitle}>🔒 Security</Text>
 
-            <Text style={styles.label}>Current Password</Text>
-            <TextInput
-              style={styles.input}
-              secureTextEntry
-              value={passwords.currentPassword}
-              onChangeText={(t) =>
-                setPasswords({ ...passwords, currentPassword: t })
-              }
-            />
-            {errors.currentPassword && (
-              <Text style={styles.error}>{errors.currentPassword}</Text>
-            )}
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>Current Password</Text>
+              <TextInput
+                style={styles.input}
+                secureTextEntry
+                value={passwords.currentPassword}
+                onChangeText={(t) =>
+                  setPasswords({ ...passwords, currentPassword: t })
+                }
+                placeholder="Enter current password"
+              />
+              {errors.currentPassword && (
+                <Text style={styles.error}>{errors.currentPassword}</Text>
+              )}
+            </View>
 
-            <Text style={styles.label}>New Password</Text>
-            <TextInput
-              style={styles.input}
-              secureTextEntry
-              value={passwords.newPassword}
-              onChangeText={(t) =>
-                setPasswords({ ...passwords, newPassword: t })
-              }
-            />
-            {errors.newPassword && (
-              <Text style={styles.error}>{errors.newPassword}</Text>
-            )}
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>New Password</Text>
+              <TextInput
+                style={styles.input}
+                secureTextEntry
+                value={passwords.newPassword}
+                onChangeText={(t) =>
+                  setPasswords({ ...passwords, newPassword: t })
+                }
+                placeholder="Enter new password"
+              />
+              {errors.newPassword && (
+                <Text style={styles.error}>{errors.newPassword}</Text>
+              )}
+            </View>
 
-            <Text style={styles.label}>Confirm New Password</Text>
-            <TextInput
-              style={styles.input}
-              secureTextEntry
-              value={passwords.confirmPassword}
-              onChangeText={(t) =>
-                setPasswords({ ...passwords, confirmPassword: t })
-              }
-            />
-            {errors.confirmPassword && (
-              <Text style={styles.error}>{errors.confirmPassword}</Text>
-            )}
-          </>
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>Confirm New Password</Text>
+              <TextInput
+                style={styles.input}
+                secureTextEntry
+                value={passwords.confirmPassword}
+                onChangeText={(t) =>
+                  setPasswords({ ...passwords, confirmPassword: t })
+                }
+                placeholder="Confirm new password"
+              />
+              {errors.confirmPassword && (
+                <Text style={styles.error}>{errors.confirmPassword}</Text>
+              )}
+              <Text style={styles.helperText}>
+                Password must be at least 6 characters long
+              </Text>
+            </View>
+          </View>
         )}
+
+        {/* Bottom spacing for fixed buttons */}
+        <View style={styles.bottomSpacing} />
       </ScrollView>
 
       {/* Bottom actions */}
@@ -456,208 +502,282 @@ export default Profile;
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
-    backgroundColor: "#f9f9f9",
+    backgroundColor: "#f8f9fa",
   },
   container: {
-    padding: 16,
-    backgroundColor: "#f9f9f9",
-    flexGrow: 1,
-    paddingBottom: 100,
+    flex: 1,
+    backgroundColor: "#f8f9fa",
   },
-  tabRow: {
+  loaderOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(0,0,0,0.3)",
+    justifyContent: "center",
+    alignItems: "center",
+    zIndex: 10,
+  },
+  headerCard: {
+    backgroundColor: "#fff",
+    padding: 24,
+    alignItems: "center",
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 3.84,
+    elevation: 5,
+  },
+  imageContainer: {
+    position: "relative",
+    marginBottom: 16,
+  },
+  profileImage: {
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    borderWidth: 4,
+    borderColor: "#A40C2D",
+  },
+  imagePlaceholder: {
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    backgroundColor: "#f3f4f6",
+    borderWidth: 2,
+    borderColor: "#d1d5db",
+    borderStyle: "dashed",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  imagePlaceholderText: {
+    fontSize: 40,
+    marginBottom: 4,
+  },
+  imagePlaceholderLabel: {
+    fontSize: 12,
+    color: "#6b7280",
+    fontWeight: "500",
+  },
+  cameraIcon: {
+    position: "absolute",
+    bottom: 0,
+    right: 0,
+    backgroundColor: "#A40C2D",
+    borderRadius: 16,
+    width: 32,
+    height: 32,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 3,
+    borderColor: "#fff",
+  },
+  cameraIconText: {
+    fontSize: 14,
+  },
+  userName: {
+    fontSize: 24,
+    fontWeight: "bold",
+    color: "#1f2937",
+    textAlign: "center",
+    marginBottom: 8,
+  },
+  userBadge: {
+    backgroundColor: "#A40C2D",
+    paddingHorizontal: 16,
+    paddingVertical: 6,
+    borderRadius: 20,
+  },
+  userBadgeText: {
+    fontSize: 12,
+    color: "#fff",
+    fontWeight: "600",
+    textTransform: "uppercase",
+  },
+  tabContainer: {
     flexDirection: "row",
     backgroundColor: "#fff",
-    borderRadius: 999,
+    margin: 16,
+    borderRadius: 12,
     padding: 4,
-    marginBottom: 16,
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: 1,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 3,
   },
   tabButton: {
     flex: 1,
-    paddingVertical: 8,
-    borderRadius: 999,
+    paddingVertical: 12,
+    borderRadius: 8,
     alignItems: "center",
   },
   tabButtonActive: {
-    backgroundColor: "darkred",
+    backgroundColor: "#A40C2D",
   },
   tabText: {
     fontSize: 14,
     fontWeight: "500",
-    color: "#555",
+    color: "#6b7280",
   },
   tabTextActive: {
     color: "#fff",
     fontWeight: "600",
   },
-  loaderOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: "rgba(0,0,0,0.2)",
-    justifyContent: "center",
-    alignItems: "center",
-    zIndex: 10,
+  infoCard: {
+    backgroundColor: "#fff",
+    margin: 16,
+    borderRadius: 12,
+    padding: 20,
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 3.84,
+    elevation: 5,
   },
-  sectionTitle: {
+  cardTitle: {
     fontSize: 18,
     fontWeight: "600",
-    marginVertical: 12,
+    color: "#1f2937",
+    marginBottom: 20,
+  },
+  inputGroup: {
+    marginBottom: 20,
   },
   label: {
     fontSize: 14,
-    fontWeight: "500",
-    marginBottom: 4,
-    color: "#444",
+    fontWeight: "600",
+    color: "#374151",
+    marginBottom: 8,
   },
   input: {
     borderWidth: 1,
-    borderColor: "#ccc",
+    borderColor: "#d1d5db",
     borderRadius: 8,
     padding: 12,
-    marginBottom: 4,
+    fontSize: 16,
     backgroundColor: "#fff",
+    color: "#1f2937",
+  },
+  disabledInput: {
+    backgroundColor: "#f9fafb",
+    color: "#6b7280",
   },
   error: {
-    color: "red",
+    color: "#dc2626",
     fontSize: 12,
-    marginBottom: 8,
+    marginTop: 4,
+    fontWeight: "500",
   },
-  button: {
-    backgroundColor: "darkred",
-    padding: 14,
-    borderRadius: 8,
-    alignItems: "center",
-    marginTop: 8,
+  helperText: {
+    fontSize: 12,
+    color: "#6b7280",
+    marginTop: 4,
+    fontStyle: "italic",
   },
-  buttonText: {
-    color: "#fff",
-    fontWeight: "600",
-    fontSize: 16,
+  bottomSpacing: {
+    height: 100,
   },
   bottomBar: {
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    right: 0,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
     paddingHorizontal: 16,
-    paddingVertical: 10,
+    paddingVertical: 12,
+    paddingBottom: 24,
     borderTopWidth: 1,
-    borderTopColor: "#ddd",
+    borderTopColor: "#e5e7eb",
     backgroundColor: "#fff",
   },
   bottomButton: {
     flex: 1,
-    paddingVertical: 12,
+    paddingVertical: 14,
     borderRadius: 8,
     alignItems: "center",
     justifyContent: "center",
   },
   bottomSecondaryButton: {
     marginRight: 8,
-    backgroundColor: "#eee",
+    backgroundColor: "#f3f4f6",
+    borderWidth: 1,
+    borderColor: "#d1d5db",
   },
   bottomPrimaryButton: {
     marginLeft: 8,
-    backgroundColor: "darkred",
+    backgroundColor: "#A40C2D",
   },
   bottomPrimaryText: {
     color: "#fff",
     fontWeight: "600",
-    fontSize: 15,
+    fontSize: 16,
   },
   bottomSecondaryText: {
-    color: "#333",
-    fontWeight: "500",
-    fontSize: 15,
-  },
-  imageContainer: {
-    alignItems: "center",
-    marginBottom: 16,
-  },
-  profileImage: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-  },
-  imagePlaceholder: {
-    backgroundColor: "#eee",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  linkButton: {
-    marginTop: 8,
-    marginBottom: 4,
-    paddingVertical: 10,
-    paddingHorizontal: 14,
-    borderRadius: 8,
-    backgroundColor: "#1877F2",
-    alignItems: "center",
-  },
-  linkButtonText: {
-    color: "#fff",
+    color: "#374151",
     fontWeight: "600",
-    fontSize: 14,
-  },
-  toastContainer: {
-    marginTop: 12,
-    padding: 10,
-    borderRadius: 8,
-    alignItems: "center",
-  },
-  toastSuccess: {
-    backgroundColor: "#4caf50",
-  },
-  toastError: {
-    backgroundColor: "#f44336",
-  },
-  toastInfo: {
-    backgroundColor: "#333",
-  },
-  toastText: {
-    color: "#fff",
-    fontSize: 13,
+    fontSize: 16,
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: "rgba(0,0,0,0.4)",
+    backgroundColor: "rgba(0,0,0,0.5)",
     justifyContent: "center",
     alignItems: "center",
   },
   modalBox: {
-    width: "80%",
+    width: "85%",
     backgroundColor: "#fff",
-    borderRadius: 10,
-    padding: 20,
+    borderRadius: 16,
+    padding: 24,
   },
   modalTitle: {
-    fontSize: 18,
-    fontWeight: "600",
-    marginBottom: 10,
+    fontSize: 20,
+    fontWeight: "bold",
+    color: "#1f2937",
+    marginBottom: 8,
   },
   modalMessage: {
-    fontSize: 14,
-    color: "#555",
-    marginBottom: 20,
+    fontSize: 16,
+    color: "#6b7280",
+    marginBottom: 24,
+    lineHeight: 24,
   },
   modalButtonsRow: {
     flexDirection: "row",
     justifyContent: "flex-end",
-    gap: 10,
+    gap: 12,
   },
   modalButton: {
-    paddingVertical: 8,
-    paddingHorizontal: 14,
-    borderRadius: 6,
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 8,
+    minWidth: 80,
+    alignItems: "center",
   },
   modalCancelButton: {
-    backgroundColor: "#eee",
+    backgroundColor: "#f3f4f6",
+    borderWidth: 1,
+    borderColor: "#d1d5db",
   },
   modalConfirmButton: {
-    backgroundColor: "darkred",
+    backgroundColor: "#dc2626",
   },
   modalCancelText: {
-    color: "#333",
-    fontWeight: "500",
+    color: "#374151",
+    fontWeight: "600",
+    fontSize: 14,
   },
   modalConfirmText: {
     color: "#fff",
     fontWeight: "600",
+    fontSize: 14,
   },
 });

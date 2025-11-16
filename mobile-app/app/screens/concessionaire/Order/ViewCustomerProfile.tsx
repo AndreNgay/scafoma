@@ -55,44 +55,65 @@ const ViewCustomerProfile = () => {
 
   return (
     <ScrollView style={styles.container}>
-      {/* Profile Image */}
-      <View style={styles.imageContainer}>
-        {customer.profile_image_url ? (
-          <Image source={{ uri: customer.profile_image_url }} style={styles.profileImage} />
-        ) : (
-          <View style={styles.profilePlaceholder}>
-            <Text style={styles.profileInitials}>
-              {customer.first_name?.[0]}{customer.last_name?.[0]}
+      {/* Header Card */}
+      <View style={styles.headerCard}>
+        {/* Profile Image */}
+        <View style={styles.imageContainer}>
+          {customer.profile_image_url ? (
+            <Image source={{ uri: customer.profile_image_url }} style={styles.profileImage} />
+          ) : (
+            <View style={styles.profilePlaceholder}>
+              <Text style={styles.profileInitials}>
+                {customer.first_name?.[0]}{customer.last_name?.[0]}
+              </Text>
+            </View>
+          )}
+        </View>
+
+        {/* Customer Name */}
+        <Text style={styles.customerName}>
+          {customer.first_name} {customer.last_name}
+        </Text>
+        
+        {/* Member Since Badge */}
+        {customer.created_at && (
+          <View style={styles.memberBadge}>
+            <Text style={styles.memberBadgeText}>
+              Member since {new Date(customer.created_at).toLocaleDateString()}
             </Text>
           </View>
         )}
       </View>
 
-      {/* Customer Name */}
-      <Text style={styles.customerName}>
-        {customer.first_name} {customer.last_name}
-      </Text>
+      {/* Contact Information Card */}
+      <View style={styles.infoCard}>
+        <Text style={styles.cardTitle}>📞 Contact Information</Text>
+        
+        <View style={styles.infoItem}>
+          <View style={styles.infoIcon}>
+            <Text style={styles.iconText}>📧</Text>
+          </View>
+          <View style={styles.infoContent}>
+            <Text style={styles.infoLabel}>Email</Text>
+            <Text style={styles.infoValue}>{customer.email}</Text>
+          </View>
+        </View>
 
-      {/* Email */}
-      <View style={styles.infoSection}>
-        <Text style={styles.infoLabel}>Email:</Text>
-        <Text style={styles.infoValue}>{customer.email}</Text>
-      </View>
+        <View style={styles.infoItem}>
+          <View style={styles.infoIcon}>
+            <Text style={styles.iconText}>📱</Text>
+          </View>
+          <View style={styles.infoContent}>
+            <Text style={styles.infoLabel}>Phone Number</Text>
+            <Text style={styles.infoValue}>
+              {customer.contact_number || "Not provided"}
+            </Text>
+          </View>
+        </View>
 
-      {/* Contact Number */}
-      <View style={styles.infoSection}>
-        <Text style={styles.infoLabel}>Contact Number:</Text>
-        <Text style={styles.infoValue}>
-          {customer.contact_number || "Not provided"}
-        </Text>
-      </View>
-
-      {/* Messenger/Facebook Link */}
-      {customer.messenger_link ? (
-        <View style={styles.infoSection}>
-          <Text style={styles.infoLabel}>Messenger/Facebook:</Text>
+        {customer.messenger_link && (
           <TouchableOpacity
-            style={{ flex: 1 }}
+            style={styles.infoItem}
             onPress={async () => {
               const raw = String(customer.messenger_link).trim();
               if (!raw) return;
@@ -107,34 +128,18 @@ const ViewCustomerProfile = () => {
               }
             }}
           >
-            <Text
-              style={[
-                styles.infoValue,
-                { textAlign: "right", color: "#1d4ed8" },
-              ]}
-              numberOfLines={1}
-            >
-              {customer.messenger_link}
-            </Text>
+            <View style={styles.infoIcon}>
+              <Text style={styles.iconText}>💬</Text>
+            </View>
+            <View style={styles.infoContent}>
+              <Text style={styles.infoLabel}>Messenger/Facebook</Text>
+              <Text style={[styles.infoValue, styles.linkText]} numberOfLines={1}>
+                {customer.messenger_link}
+              </Text>
+            </View>
           </TouchableOpacity>
-        </View>
-      ) : null}
-
-      {/* Role */}
-      <View style={styles.infoSection}>
-        <Text style={styles.infoLabel}>Role:</Text>
-        <Text style={styles.infoValue}>{customer.role}</Text>
+        )}
       </View>
-
-      {/* Profile Created Date */}
-      {customer.created_at && (
-        <View style={styles.infoSection}>
-          <Text style={styles.infoLabel}>Member Since:</Text>
-          <Text style={styles.infoValue}>
-            {new Date(customer.created_at).toLocaleDateString()}
-          </Text>
-        </View>
-      )}
     </ScrollView>
   );
 };
@@ -142,57 +147,119 @@ const ViewCustomerProfile = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: 20,
+    backgroundColor: "#f8f9fa",
+  },
+  headerCard: {
     backgroundColor: "#fff",
+    padding: 24,
+    alignItems: "center",
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 3.84,
+    elevation: 5,
   },
   imageContainer: {
-    alignItems: "center",
-    marginBottom: 20,
+    marginBottom: 16,
   },
   profileImage: {
-    width: 120,
-    height: 120,
-    borderRadius: 60,
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    borderWidth: 3,
+    borderColor: "#A40C2D",
   },
   profilePlaceholder: {
-    width: 120,
-    height: 120,
-    borderRadius: 60,
+    width: 100,
+    height: 100,
+    borderRadius: 50,
     backgroundColor: "#A40C2D",
     alignItems: "center",
     justifyContent: "center",
+    borderWidth: 3,
+    borderColor: "#A40C2D",
   },
   profileInitials: {
     color: "#fff",
-    fontSize: 48,
+    fontSize: 36,
     fontWeight: "bold",
   },
   customerName: {
-    fontSize: 24,
+    fontSize: 22,
     fontWeight: "bold",
-    color: "#A40C2D",
+    color: "#1f2937",
     textAlign: "center",
-    marginBottom: 30,
+    marginBottom: 8,
   },
-  infoSection: {
+  memberBadge: {
+    backgroundColor: "#f3f4f6",
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+  },
+  memberBadgeText: {
+    fontSize: 12,
+    color: "#6b7280",
+    fontWeight: "500",
+  },
+  infoCard: {
+    backgroundColor: "#fff",
+    margin: 16,
+    borderRadius: 12,
+    padding: 20,
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 3.84,
+    elevation: 5,
+  },
+  cardTitle: {
+    fontSize: 18,
+    fontWeight: "600",
+    color: "#1f2937",
+    marginBottom: 16,
+  },
+  infoItem: {
     flexDirection: "row",
-    justifyContent: "space-between",
     alignItems: "center",
-    paddingVertical: 15,
+    paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: "#f0f0f0",
+    borderBottomColor: "#f3f4f6",
+  },
+  infoIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "#f3f4f6",
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: 12,
+  },
+  iconText: {
+    fontSize: 16,
+  },
+  infoContent: {
+    flex: 1,
   },
   infoLabel: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: "#333",
-    flex: 1,
+    fontSize: 12,
+    fontWeight: "500",
+    color: "#6b7280",
+    marginBottom: 2,
   },
   infoValue: {
     fontSize: 16,
-    color: "#666",
-    flex: 1,
-    textAlign: "right",
+    color: "#1f2937",
+    fontWeight: "500",
+  },
+  linkText: {
+    color: "#2563eb",
   },
   emptyText: {
     textAlign: "center",

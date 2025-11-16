@@ -16,6 +16,9 @@ import { useRoute, useNavigation } from "@react-navigation/native";
 import api from "../../../libs/apiCall";
 import { useToast } from "../../../contexts/ToastContext";
 
+// Import GCash icon
+const GCashIcon = require("../../../../assets/images/gcash-icon.png");
+
 const ViewOrderConcessionaire = () => {
   const route = useRoute<any>();
   const navigation = useNavigation<any>();
@@ -313,106 +316,127 @@ const ViewOrderConcessionaire = () => {
 
       <Text style={styles.header}>Order #{order.id}</Text>
       
-      {/* Order Status */}
-      <View style={styles.infoSection}>
-        <Text style={styles.infoLabel}>Status:</Text>
-        <Text style={[styles.status, styles.statusText]}>{order.order_status}</Text>
+      {/* Order Status & Basic Info */}
+      <View style={styles.sectionCard}>
+        <Text style={styles.sectionTitle}>📋 Order Details</Text>
+        <View style={styles.infoSection}>
+          <Text style={styles.infoLabel}>Status:</Text>
+          <Text style={[styles.status, styles.statusText]}>{order.order_status}</Text>
+        </View>
+        <View style={styles.infoSection}>
+          <Text style={styles.infoLabel}>Order Date:</Text>
+          <Text style={styles.infoValue}>{formatManila(order.created_at)}</Text>
+        </View>
+        {order.schedule_time && (
+          <View style={styles.infoSection}>
+            <Text style={styles.infoLabel}>Scheduled for:</Text>
+            <Text style={[styles.infoValue, styles.scheduleTime]}>
+              📅 {formatManila(order.schedule_time)}
+            </Text>
+          </View>
+        )}
+        <View style={styles.infoSection}>
+          <Text style={styles.infoLabel}>Dining Option:</Text>
+          <Text style={styles.infoValue}>
+            {order.dining_option === "dine-in" ? "🍽️ Dine-in" : "🥡 Take-out"}
+          </Text>
+        </View>
+        {order.note && (
+          <View style={styles.infoSection}>
+            <Text style={styles.infoLabel}>Note:</Text>
+            <Text style={styles.infoValue}>{order.note}</Text>
+          </View>
+        )}
       </View>
 
-      {/* Total Price */}
-      {order.updated_total_price !== null &&
-      order.updated_total_price !== undefined &&
-      !Number.isNaN(Number(order.updated_total_price)) &&
-      !Number.isNaN(Number(order.total_price)) &&
-      Number(order.updated_total_price) !== Number(order.total_price) ? (
-        <>
+      {/* Pricing Information */}
+      <View style={styles.sectionCard}>
+        <Text style={styles.sectionTitle}>💰 Pricing</Text>
+        {order.updated_total_price !== null &&
+        order.updated_total_price !== undefined &&
+        !Number.isNaN(Number(order.updated_total_price)) &&
+        !Number.isNaN(Number(order.total_price)) &&
+        Number(order.updated_total_price) !== Number(order.total_price) ? (
+          <>
+            <View style={styles.infoSection}>
+              <Text style={styles.infoLabel}>Original Total:</Text>
+              <Text style={styles.infoValue}>
+                ₱{Number(order.total_price).toFixed(2)}
+              </Text>
+            </View>
+            <View style={styles.infoSection}>
+              <Text style={styles.infoLabel}>Updated Total:</Text>
+              <Text style={[styles.infoValue, styles.updatedPrice]}>
+                ₱{Number(order.updated_total_price).toFixed(2)}
+              </Text>
+            </View>
+            {order.price_change_reason && (
+              <View style={styles.infoSection}>
+                <Text style={styles.infoLabel}>Price Change Reason:</Text>
+                <Text style={styles.infoValue}>{order.price_change_reason}</Text>
+              </View>
+            )}
+          </>
+        ) : (
           <View style={styles.infoSection}>
-            <Text style={styles.infoLabel}>Original Total:</Text>
-            <Text style={styles.infoValue}>
+            <Text style={styles.infoLabel}>Total:</Text>
+            <Text style={[styles.infoValue, styles.totalPrice]}>
               ₱{Number(order.total_price).toFixed(2)}
             </Text>
           </View>
-          <View style={styles.infoSection}>
-            <Text style={styles.infoLabel}>Updated Total:</Text>
-            <Text style={styles.infoValue}>
-              ₱{Number(order.updated_total_price).toFixed(2)}
-            </Text>
+        )}
+      </View>
+
+      {/* Payment Information */}
+      <View style={styles.sectionCard}>
+        <Text style={styles.sectionTitle}>💳 Payment</Text>
+        <View style={styles.infoSection}>
+          <Text style={styles.infoLabel}>Payment Method:</Text>
+          <View style={styles.paymentMethodDisplay}>
+            {order.payment_method === "gcash" ? (
+              <>
+                <Image source={GCashIcon} style={styles.gcashIconSmall} />
+                <Text style={styles.infoValue}>GCash</Text>
+              </>
+            ) : (
+              <Text style={styles.infoValue}>💰 On-Counter</Text>
+            )}
           </View>
-          {order.price_change_reason && (
-            <View style={styles.infoSection}>
-              <Text style={styles.infoLabel}>Price Change Reason:</Text>
-              <Text style={styles.infoValue}>{order.price_change_reason}</Text>
-            </View>
-          )}
-        </>
-      ) : (
-        <View style={styles.infoSection}>
-          <Text style={styles.infoLabel}>Total:</Text>
-          <Text style={styles.infoValue}>
-            ₱{Number(order.total_price).toFixed(2)}
-          </Text>
         </View>
-      )}
-
-      {/* Payment Method */}
-      <View style={styles.infoSection}>
-        <Text style={styles.infoLabel}>Payment Method:</Text>
-        <Text style={styles.infoValue}>
-          {order.payment_method === "gcash" ? "💳 GCash" : "💰 On-Counter"}
-        </Text>
+        {order.payment_method === "gcash" && (
+          <View style={styles.gcashSection}>
+            {order.gcash_number && (
+              <View style={styles.infoSection}>
+                <Text style={styles.infoLabel}>GCash Number:</Text>
+                <Text style={styles.infoValue}>{order.gcash_number}</Text>
+              </View>
+            )}
+            {order.gcash_screenshot && (
+              <View style={styles.paymentProofSection}>
+                <Text style={styles.infoLabel}>GCash Screenshot:</Text>
+                <Image source={{ uri: order.gcash_screenshot }} style={styles.paymentProof} />
+              </View>
+            )}
+          </View>
+        )}
       </View>
 
-      {/* Dining Option */}
-      <View style={styles.infoSection}>
-        <Text style={styles.infoLabel}>Dining Option:</Text>
-        <Text style={styles.infoValue}>
-          {order.dining_option === "dine-in" ? "🍽️ Dine-in" : "🥡 Take-out"}
-        </Text>
-      </View>
-
-      {/* Schedule Time */}
-      {order.schedule_time && (
-        <View style={styles.infoSection}>
-          <Text style={styles.infoLabel}>Scheduled for:</Text>
-          <Text style={[styles.infoValue, styles.scheduleTime]}>
-            📅 {formatManila(order.schedule_time)}
-          </Text>
-        </View>
-      )}
-
-      {/* Order Date */}
-      <View style={styles.infoSection}>
-        <Text style={styles.infoLabel}>Order Date:</Text>
-        <Text style={styles.infoValue}>{formatManila(order.created_at)}</Text>
-      </View>
-
-      {/* GCash screenshot */}
-      {order.gcash_screenshot && (
-        <>
-          <Text style={styles.sectionHeader}>GCash Screenshot:</Text>
-          <Image source={{ uri: order.gcash_screenshot }} style={styles.paymentProof} />
-        </>
-      )}
-
-      {order.note && (
-        <View style={styles.infoSection}>
-          <Text style={styles.infoLabel}>Note:</Text>
-          <Text style={styles.infoValue}>{order.note}</Text>
-        </View>
-      )}
-
-      {/* Decline Reason */}
+      {/* Decline Reason (if applicable) */}
       {order.order_status === "declined" && order.decline_reason && (
-        <View style={styles.infoSection}>
-          <Text style={styles.infoLabel}>Decline Reason:</Text>
-          <Text style={[styles.infoValue, styles.declineReason]}>{order.decline_reason}</Text>
+        <View style={[styles.sectionCard, styles.declineCard]}>
+          <Text style={styles.sectionTitle}>❌ Decline Information</Text>
+          <View style={styles.infoSection}>
+            <Text style={styles.infoLabel}>Reason:</Text>
+            <Text style={[styles.infoValue, styles.declineReason]}>{order.decline_reason}</Text>
+          </View>
         </View>
       )}
 
       {renderStatusButtons()}
 
-      {/* Order items */}
-      <Text style={styles.sectionHeader}>Items</Text>
+      {/* Order Items */}
+      <View style={styles.sectionCard}>
+        <Text style={styles.sectionTitle}>🛒 Order Items</Text>
       <FlatList
         data={order.items || []}
         keyExtractor={(item) => item.id.toString()}
@@ -437,6 +461,7 @@ const ViewOrderConcessionaire = () => {
         )}
         scrollEnabled={false}
       />
+      </View>
 
       {/* Accept Order Modal (optional price adjustment) */}
       <Modal visible={acceptModalVisible} animationType="slide" transparent={true}>
@@ -774,6 +799,59 @@ const styles = StyleSheet.create({
   submitDeclineText: {
     color: "#fff",
     fontWeight: "600",
+  },
+  sectionCard: {
+    backgroundColor: "#fff",
+    borderRadius: 12,
+    padding: 16,
+    marginVertical: 8,
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 3.84,
+    elevation: 5,
+  },
+  sectionTitle: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#A40C2D",
+    marginBottom: 12,
+  },
+  updatedPrice: {
+    fontWeight: "600",
+    color: "#28a745",
+  },
+  totalPrice: {
+    fontWeight: "600",
+    color: "#A40C2D",
+  },
+  paymentProofSection: {
+    marginTop: 12,
+  },
+  declineCard: {
+    borderLeftWidth: 4,
+    borderLeftColor: "#dc3545",
+    backgroundColor: "#fff5f5",
+  },
+  gcashSection: {
+    marginTop: 12,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: "#f0f0f0",
+  },
+  paymentMethodDisplay: {
+    flexDirection: "row",
+    alignItems: "center",
+    flex: 1,
+    justifyContent: "flex-end",
+  },
+  gcashIconSmall: {
+    width: 16,
+    height: 16,
+    marginRight: 4,
   },
 });
 

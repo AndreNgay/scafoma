@@ -317,16 +317,27 @@ export const getOrderById = async (req, res) => {
     // Get main order info with customer and concession details, including payment flags
     const orderResult = await pool.query(
       `SELECT o.*, 
-              u.first_name, u.last_name, u.email, u.profile_image,
+              customer.first_name AS customer_first_name, 
+              customer.last_name AS customer_last_name, 
+              customer.email AS customer_email, 
+              customer.profile_image AS customer_profile_image,
+              concessionaire.first_name AS concessionaire_first_name,
+              concessionaire.last_name AS concessionaire_last_name,
+              concessionaire.email AS concessionaire_email,
+              concessionaire.profile_image AS concessionaire_profile_image,
+              concessionaire.contact_number AS concessionaire_contact_number,
+              concessionaire.messenger_link AS concessionaire_messenger_link,
               c.concession_name,
               c.gcash_number,
               c.image AS concession_image,
               caf.cafeteria_name,
+              caf.location AS cafeteria_location,
               COALESCE(c.gcash_payment_available, FALSE) AS gcash_payment_available,
               COALESCE(c.oncounter_payment_available, FALSE) AS oncounter_payment_available
        FROM tblorder o
-       JOIN tbluser u ON o.customer_id = u.id
+       JOIN tbluser customer ON o.customer_id = customer.id
        JOIN tblconcession c ON o.concession_id = c.id
+       JOIN tbluser concessionaire ON c.concessionaire_id = concessionaire.id
        JOIN tblcafeteria caf ON c.cafeteria_id = caf.id
        WHERE o.id = $1`,
       [id]
@@ -339,12 +350,15 @@ export const getOrderById = async (req, res) => {
     const order = orderResult.rows[0];
 
     // Convert images to base64
-    order.profile_image = makeImageDataUrl(order.profile_image);
+    order.customer_profile_image = makeImageDataUrl(order.customer_profile_image);
+    order.concessionaire_profile_image_url = makeImageDataUrl(order.concessionaire_profile_image);
     order.concession_image_url = makeImageDataUrl(order.concession_image);
     order.gcash_screenshot = makeImageDataUrl(order.gcash_screenshot);
     order.payment_proof = order.gcash_screenshot || null;
 
-    delete order.concession_image; // raw buffer not needed on frontend
+    // Clean up raw buffers not needed on frontend
+    delete order.concession_image;
+    delete order.concessionaire_profile_image;
 
     // Get order items
     const itemsResult = await pool.query(

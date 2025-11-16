@@ -15,6 +15,9 @@ import useStore from "../../../store";
 import api from "../../../libs/apiCall";
 import { useToast } from "../../../contexts/ToastContext";
 
+// Import GCash icon
+const GCashIcon = require("../../../../assets/images/gcash-icon.png");
+
 const MenuItemDetails = () => {
   const navigation = useNavigation<any>();
   const route = useRoute<any>();
@@ -483,12 +486,15 @@ const MenuItemDetails = () => {
                     ]}
                     onPress={() => setPaymentMethod('gcash')}
                   >
-                    <Text style={[
-                      styles.paymentMethodText,
-                      paymentMethod === 'gcash' && styles.paymentMethodTextSelected
-                    ]}>
-                      💳 GCash
-                    </Text>
+                    <View style={styles.paymentMethodContent}>
+                      <Image source={GCashIcon} style={styles.paymentMethodIcon} />
+                      <Text style={[
+                        styles.paymentMethodText,
+                        paymentMethod === 'gcash' && styles.paymentMethodTextSelected
+                      ]}>
+                        GCash
+                      </Text>
+                    </View>
                   </TouchableOpacity>
                 )}
                 {availablePaymentMethods.onCounter && (
@@ -800,6 +806,16 @@ const styles = StyleSheet.create({
     marginTop: 8,
     textAlign: "center",
     fontStyle: "italic",
+  },
+  paymentMethodContent: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  paymentMethodIcon: {
+    width: 16,
+    height: 16,
+    marginRight: 6,
   },
   noPaymentMethodsText: {
     fontSize: 14,

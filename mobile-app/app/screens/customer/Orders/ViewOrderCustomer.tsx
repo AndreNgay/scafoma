@@ -20,6 +20,9 @@ import { Ionicons } from "@expo/vector-icons";
 import api from "../../../libs/apiCall";
 import { useToast } from "../../../contexts/ToastContext";
 
+// Import GCash icon
+const GCashIcon = require("../../../../assets/images/gcash-icon.png");
+
 const ViewOrderCustomer = () => {
   const route = useRoute<any>();
   const navigation = useNavigation<any>();
@@ -281,78 +284,134 @@ const ViewOrderCustomer = () => {
       }
     >
       <Text style={styles.header}>Order #{order.id}</Text>
-      <Text>
-        Status: <Text style={styles.status}>{order.order_status}</Text>
-      </Text>
+      
+      {/* Order Status & Basic Info */}
+      <View style={styles.sectionCard}>
+        <Text style={styles.sectionTitle}>📋 Order Status</Text>
+        <View style={styles.statusRow}>
+          <Text style={styles.statusLabel}>Status:</Text>
+          <Text style={[styles.status, styles.statusBadge]}>{order.order_status}</Text>
+        </View>
+        <View style={styles.infoRow}>
+          <Text style={styles.infoLabel}>Order Date:</Text>
+          <Text style={styles.infoValue}>{formatDateTime(order.created_at)}</Text>
+        </View>
+        <View style={styles.infoRow}>
+          <Text style={styles.infoLabel}>Dining Option:</Text>
+          <Text style={styles.infoValue}>
+            {order.dining_option === "dine-in" ? "🍽️ Dine-in" : "🥡 Take-out"}
+          </Text>
+        </View>
+        {order.schedule_time && (
+          <Text style={styles.scheduleTime}>
+            📅 Scheduled for: {formatSchedule(order.schedule_time)}
+          </Text>
+        )}
+      </View>
 
-      {/* Concessionaire / Stall info */}
-      <TouchableOpacity
-        style={styles.concessionCard}
-        onPress={() =>
-          navigation.navigate("View Concessionaire Profile", {
-            concessionId: order.concession_id,
-          })
-        }
-      >
-        {order.concession_image_url ? (
-          <Image
-            source={{ uri: order.concession_image_url }}
-            style={styles.concessionAvatar}
-          />
-        ) : (
-          <View style={styles.concessionAvatarPlaceholder}>
-            <Text style={styles.concessionAvatarInitials}>
-              {order.concession_name?.[0] || ""}
+      {/* Location & Concessionaire Info */}
+      <View style={styles.sectionCard}>
+        <Text style={styles.sectionTitle}>📍 Location & Vendor</Text>
+        <View style={styles.locationInfo}>
+          <Text style={styles.locationText}>
+            {order.cafeteria_name}
+            {order.cafeteria_location && ` • ${order.cafeteria_location}`}
+          </Text>
+          <Text style={styles.concessionText}>
+            Concession: {order.concession_name}
+          </Text>
+        </View>
+        
+        <TouchableOpacity
+          style={styles.concessionaireCard}
+          onPress={() =>
+            navigation.navigate("View Concessionaire Profile", {
+              concessionaireId: order.concessionaire_id || order.concession_id,
+              concessionaireData: {
+                first_name: order.concessionaire_first_name,
+                last_name: order.concessionaire_last_name,
+                email: order.concessionaire_email,
+                contact_number: order.concessionaire_contact_number,
+                messenger_link: order.concessionaire_messenger_link,
+                profile_image_url: order.concessionaire_profile_image_url,
+                concession_name: order.concession_name,
+                cafeteria_name: order.cafeteria_name,
+              }
+            })
+          }
+        >
+          {order.concessionaire_profile_image_url ? (
+            <Image
+              source={{ uri: order.concessionaire_profile_image_url }}
+              style={styles.concessionaireAvatar}
+            />
+          ) : (
+            <View style={styles.concessionaireAvatarPlaceholder}>
+              <Text style={styles.concessionaireAvatarInitials}>
+                {order.concessionaire_first_name?.[0] || ""}{order.concessionaire_last_name?.[0] || ""}
+              </Text>
+            </View>
+          )}
+          <View style={{ flex: 1 }}>
+            <Text style={styles.concessionaireLabel}>Concessionaire</Text>
+            <Text style={styles.concessionaireName}>
+              {order.concessionaire_first_name} {order.concessionaire_last_name}
             </Text>
           </View>
+        </TouchableOpacity>
+      </View>
+      {/* Pricing Information */}
+      <View style={styles.sectionCard}>
+        <Text style={styles.sectionTitle}>💰 Pricing</Text>
+        {order.updated_total_price !== null &&
+        order.updated_total_price !== undefined &&
+        !Number.isNaN(Number(order.updated_total_price)) &&
+        !Number.isNaN(Number(order.total_price)) &&
+        Number(order.updated_total_price) !== Number(order.total_price) ? (
+          <>
+            <View style={styles.infoRow}>
+              <Text style={styles.infoLabel}>Original Total:</Text>
+              <Text style={styles.infoValue}>₱{Number(order.total_price).toFixed(2)}</Text>
+            </View>
+            <View style={styles.infoRow}>
+              <Text style={styles.infoLabel}>Updated Total:</Text>
+              <Text style={[styles.infoValue, styles.updatedPrice]}>₱{Number(order.updated_total_price).toFixed(2)}</Text>
+            </View>
+            {order.price_change_reason && (
+              <View style={styles.infoRow}>
+                <Text style={styles.infoLabel}>Reason for change:</Text>
+                <Text style={styles.infoValue}>{order.price_change_reason}</Text>
+              </View>
+            )}
+          </>
+        ) : (
+          <View style={styles.infoRow}>
+            <Text style={styles.infoLabel}>Total:</Text>
+            <Text style={[styles.infoValue, styles.totalPrice]}>₱{Number(order.total_price).toFixed(2)}</Text>
+          </View>
         )}
-        <View style={{ flex: 1 }}>
-          <Text style={styles.concessionName}>{order.concession_name}</Text>
-          {order.cafeteria_name && (
-            <Text style={styles.concessionSub}>{order.cafeteria_name}</Text>
-          )}
-        </View>
-      </TouchableOpacity>
-      {order.updated_total_price !== null &&
-      order.updated_total_price !== undefined &&
-      !Number.isNaN(Number(order.updated_total_price)) &&
-      !Number.isNaN(Number(order.total_price)) &&
-      Number(order.updated_total_price) !== Number(order.total_price) ? (
-        <>
-          <Text>
-            Original Total: ₱{Number(order.total_price).toFixed(2)}
-          </Text>
-          <Text>
-            Updated Total: ₱{Number(order.updated_total_price).toFixed(2)}
-          </Text>
-          {order.price_change_reason && (
-            <Text>
-              Reason for change: {order.price_change_reason}
-            </Text>
-          )}
-        </>
-      ) : (
-        <Text>Total: ₱{Number(order.total_price).toFixed(2)}</Text>
-      )}
-      {order.note && <Text>Note: {order.note}</Text>}
-      {order.schedule_time && (
-        <Text style={styles.scheduleTime}>
-          📅 Scheduled for: {formatSchedule(order.schedule_time)}
-        </Text>
-      )}
-      
-      {/* Decline Reason */}
-      {order.order_status === "declined" && order.decline_reason && (
-        <View style={styles.declineReasonContainer}>
-          <Text style={styles.declineReasonLabel}>Decline Reason:</Text>
-          <Text style={styles.declineReasonText}>{order.decline_reason}</Text>
-        </View>
-      )}
-      
-      <Text>Date: {formatDateTime(order.created_at)}</Text>
+        {order.note && (
+          <View style={styles.noteSection}>
+            <Text style={styles.infoLabel}>Note:</Text>
+            <Text style={styles.noteText}>{order.note}</Text>
+          </View>
+        )}
+      </View>
 
-      <View style={{ marginTop: 15 }}>
-        <Text style={styles.paymentLabel}>Payment Method</Text>
+      {/* Decline Reason (if applicable) */}
+      {order.order_status === "declined" && order.decline_reason && (
+        <View style={[styles.sectionCard, styles.declineCard]}>
+          <Text style={styles.sectionTitle}>❌ Order Declined</Text>
+          <View style={styles.infoRow}>
+            <Text style={styles.infoLabel}>Reason:</Text>
+            <Text style={[styles.infoValue, styles.declineReason]}>{order.decline_reason}</Text>
+          </View>
+        </View>
+      )}
+
+      {/* Payment Information */}
+      <View style={styles.sectionCard}>
+        <Text style={styles.sectionTitle}>💳 Payment</Text>
         <View style={styles.paymentMethodButtons}>
           {/* GCash option */}
           <TouchableOpacity
@@ -364,15 +423,18 @@ const ViewOrderCustomer = () => {
             disabled={!order.gcash_payment_available || updatingPayment}
             onPress={() => changePaymentMethod('gcash')}
           >
-            <Text
-              style={[
-                styles.paymentMethodText,
-                order.payment_method === 'gcash' && styles.paymentMethodTextSelected,
-                !order.gcash_payment_available && styles.paymentMethodTextDisabled,
-              ]}
-            >
-              💳 GCash {(!order.gcash_payment_available) ? '(Unavailable)' : ''}
-            </Text>
+            <View style={styles.paymentMethodContent}>
+              <Image source={GCashIcon} style={styles.gcashIconSmall} />
+              <Text
+                style={[
+                  styles.paymentMethodText,
+                  order.payment_method === 'gcash' && styles.paymentMethodTextSelected,
+                  !order.gcash_payment_available && styles.paymentMethodTextDisabled,
+                ]}
+              >
+                GCash {(!order.gcash_payment_available) ? '(Unavailable)' : ''}
+              </Text>
+            </View>
           </TouchableOpacity>
 
           {/* On-Counter option */}
@@ -396,84 +458,94 @@ const ViewOrderCustomer = () => {
             </Text>
           </TouchableOpacity>
         </View>
+
+        {/* GCash Payment Details */}
+        {order.payment_method === "gcash" && (
+          <View style={styles.gcashDetailsCard}>
+            <View style={styles.gcashDetailsHeader}>
+              <Image source={GCashIcon} style={styles.gcashIcon} />
+              <Text style={styles.gcashSectionTitle}>GCash Payment Details</Text>
+            </View>
+            {order.gcash_number && (
+              <View style={styles.gcashNumberRow}>
+                <Text style={styles.paymentLabel}>
+                  GCash Number: {order.gcash_number}
+                </Text>
+                <TouchableOpacity
+                  style={styles.copyButton}
+                  onPress={copyGcashNumber}
+                >
+                  <Ionicons
+                    name="copy-outline"
+                    size={16}
+                    color="#fff"
+                    style={{ marginRight: 4 }}
+                  />
+                  <Text style={styles.copyButtonText}>Copy</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+
+            <Text style={styles.paymentLabel}>
+              Payment Screenshot {order.payment_proof ? "(Uploaded)" : "(Required)"}
+            </Text>
+            {order.payment_proof ? (
+              <View>
+                <Image source={{ uri: order.payment_proof }} style={styles.paymentProof} />
+                <Text style={styles.uploadedIndicator}>
+                  Screenshot uploaded successfully
+                </Text>
+              </View>
+            ) : (
+              <Text style={{ color: "#888", marginBottom: 10 }}>
+                No screenshot uploaded
+              </Text>
+            )}
+            
+            {(order.order_status === "accepted" || order.order_status === "ready for pickup") ? (
+              <TouchableOpacity
+                style={styles.uploadBtn}
+                onPress={pickImage}
+                disabled={uploading}
+              >
+                <Text>
+                  {uploading
+                    ? "Uploading..."
+                    : order.payment_proof
+                    ? "Replace Screenshot"
+                    : "Upload Screenshot"}
+                </Text>
+              </TouchableOpacity>
+            ) : (
+              <View style={styles.uploadDisabledContainer}>
+                <Text style={styles.uploadDisabledText}>
+                  {order.order_status === "pending"
+                    ? "⏳ Please wait for your order to be accepted before uploading payment proof."
+                    : order.order_status === "declined"
+                    ? "❌ This order has been declined. No payment proof needed."
+                    : order.order_status === "completed"
+                    ? "✅ Order completed. Payment proof already processed."
+                    : "⏳ Please wait for your order to be accepted before uploading payment proof."
+                  }
+                </Text>
+              </View>
+            )}
+          </View>
+        )}
+
+        {/* On-Counter Payment Message */}
+        {order.payment_method === "on-counter" && (
+          <View style={styles.onCounterSection}>
+            <Text style={{ color: "#888", fontStyle: "italic" }}>
+              You chose On-Counter payment. No screenshot required.
+            </Text>
+          </View>
+        )}
       </View>
 
-      {order.payment_method === "gcash" ? (
-        <View style={{ marginTop: 15 }}>
-          {order.gcash_number && (
-            <View style={styles.gcashNumberRow}>
-              <Text style={styles.paymentLabel}>
-                GCash Number: {order.gcash_number}
-              </Text>
-              <TouchableOpacity
-                style={styles.copyButton}
-                onPress={copyGcashNumber}
-              >
-                <Ionicons
-                  name="copy-outline"
-                  size={16}
-                  color="#fff"
-                  style={{ marginRight: 4 }}
-                />
-                <Text style={styles.copyButtonText}>Copy</Text>
-              </TouchableOpacity>
-            </View>
-          )}
-
-          <Text style={styles.paymentLabel}>
-            GCash Screenshot {order.payment_proof ? "(Uploaded)" : "(Required)"}
-          </Text>
-          {order.payment_proof ? (
-            <View>
-              <Image source={{ uri: order.payment_proof }} style={styles.paymentProof} />
-              <Text style={styles.uploadedIndicator}>
-                Screenshot uploaded successfully
-              </Text>
-            </View>
-          ) : (
-            <Text style={{ color: "#888", marginBottom: 10 }}>
-              No screenshot uploaded
-            </Text>
-          )}
-          
-          {(order.order_status === "accepted" || order.order_status === "ready for pickup") ? (
-            <TouchableOpacity
-              style={styles.uploadBtn}
-              onPress={pickImage}
-              disabled={uploading}
-            >
-              <Text>
-                {uploading
-                  ? "Uploading..."
-                  : order.payment_proof
-                  ? "Replace Screenshot"
-                  : "Upload Screenshot"}
-              </Text>
-            </TouchableOpacity>
-          ) : (
-            <View style={styles.uploadDisabledContainer}>
-              <Text style={styles.uploadDisabledText}>
-                {order.order_status === "pending"
-                  ? "⏳ Please wait for your order to be accepted before uploading payment proof."
-                  : order.order_status === "declined"
-                  ? "❌ This order has been declined. No payment proof needed."
-                  : order.order_status === "completed"
-                  ? "✅ Order completed. Payment proof already processed."
-                  : "⏳ Please wait for your order to be accepted before uploading payment proof."
-                }
-              </Text>
-            </View>
-          )}
-        </View>
-      ) : (
-        <View style={{ marginTop: 15 }}>
-          <Text style={{ color: "#888", fontStyle: "italic" }}>
-            You chose On-Counter payment. No screenshot required.
-          </Text>
-        </View>
-      )}
-
-      <Text style={styles.sectionHeader}>Items</Text>
+      {/* Order Items */}
+      <View style={styles.sectionCard}>
+        <Text style={styles.sectionTitle}>🛒 Order Items</Text>
       <FlatList
         data={order.items || []}
         keyExtractor={(item) => item.id.toString()}
@@ -500,6 +572,7 @@ const ViewOrderCustomer = () => {
         )}
         scrollEnabled={false}
       />
+      </View>
 
       {/* Cancel Order Button - Only show for pending orders */}
       {order.order_status === 'pending' && (
@@ -794,6 +867,214 @@ const styles = StyleSheet.create({
     color: "#fff",
     fontWeight: "600",
     fontSize: 12,
+  },
+  locationCard: {
+    backgroundColor: "#f8f9fa",
+    padding: 12,
+    marginTop: 10,
+    marginBottom: 5,
+    borderRadius: 8,
+    borderLeftWidth: 4,
+    borderLeftColor: "#28a745",
+  },
+  locationLabel: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#28a745",
+    marginBottom: 4,
+  },
+  locationText: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#111827",
+    marginBottom: 2,
+  },
+  concessionText: {
+    fontSize: 14,
+    color: "#6b7280",
+  },
+  concessionaireCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: 12,
+    marginTop: 5,
+    marginBottom: 5,
+    backgroundColor: "#fff",
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "#e5e7eb",
+  },
+  concessionaireAvatar: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    marginRight: 12,
+  },
+  concessionaireAvatarPlaceholder: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    marginRight: 12,
+    backgroundColor: "#A40C2D",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  concessionaireAvatarInitials: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#fff",
+  },
+  concessionaireLabel: {
+    fontSize: 12,
+    color: "#6b7280",
+    marginBottom: 2,
+  },
+  concessionaireName: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#A40C2D",
+  },
+  sectionCard: {
+    backgroundColor: "#fff",
+    borderRadius: 12,
+    padding: 16,
+    marginVertical: 8,
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 3.84,
+    elevation: 5,
+  },
+  sectionTitle: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#A40C2D",
+    marginBottom: 12,
+  },
+  statusRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 8,
+  },
+  statusLabel: {
+    fontSize: 14,
+    fontWeight: "500",
+    color: "#333",
+  },
+  statusBadge: {
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderRadius: 12,
+    backgroundColor: "#A40C2D22",
+    color: "#A40C2D",
+    fontWeight: "600",
+    fontSize: 12,
+    textTransform: "uppercase",
+  },
+  infoRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 8,
+  },
+  infoLabel: {
+    fontSize: 14,
+    fontWeight: "500",
+    color: "#333",
+    flex: 1,
+  },
+  infoValue: {
+    fontSize: 14,
+    color: "#666",
+    textAlign: "right",
+    flex: 1,
+  },
+  locationInfo: {
+    marginBottom: 12,
+    paddingBottom: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: "#f0f0f0",
+  },
+  updatedPrice: {
+    fontWeight: "600",
+    color: "#28a745",
+  },
+  totalPrice: {
+    fontWeight: "600",
+    color: "#A40C2D",
+    fontSize: 16,
+  },
+  noteSection: {
+    marginTop: 12,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: "#f0f0f0",
+  },
+  noteText: {
+    fontSize: 14,
+    color: "#666",
+    fontStyle: "italic",
+    marginTop: 4,
+  },
+  declineCard: {
+    borderLeftWidth: 4,
+    borderLeftColor: "#dc3545",
+    backgroundColor: "#fff5f5",
+  },
+  declineReason: {
+    color: "#dc3545",
+    fontWeight: "500",
+  },
+  gcashSection: {
+    marginTop: 12,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: "#f0f0f0",
+  },
+  gcashSectionTitle: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#A40C2D",
+    marginBottom: 8,
+  },
+  onCounterSection: {
+    marginTop: 12,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: "#f0f0f0",
+    textAlign: "center",
+  },
+  paymentMethodContent: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  gcashIconSmall: {
+    width: 16,
+    height: 16,
+    marginRight: 6,
+  },
+  gcashDetailsCard: {
+    backgroundColor: "#f8f9fa",
+    borderRadius: 8,
+    padding: 12,
+    marginTop: 12,
+    borderWidth: 1,
+    borderColor: "#e9ecef",
+  },
+  gcashDetailsHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 12,
+  },
+  gcashIcon: {
+    width: 20,
+    height: 20,
+    marginRight: 8,
   },
 });
 
