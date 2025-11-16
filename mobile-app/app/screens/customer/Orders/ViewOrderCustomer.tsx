@@ -11,6 +11,7 @@ import {
   Platform,
   BackHandler,
   Modal,
+  RefreshControl,
 } from "react-native";
 import { useRoute, useNavigation, useFocusEffect } from "@react-navigation/native";
 import * as ImagePicker from "expo-image-picker";
@@ -24,6 +25,7 @@ const ViewOrderCustomer = () => {
 
   const [order, setOrder] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [cancelling, setCancelling] = useState(false);
   const [updatingPayment, setUpdatingPayment] = useState(false);
@@ -77,9 +79,13 @@ const ViewOrderCustomer = () => {
   // ===============================
   // Fetch order by ID
   // ===============================
-  const fetchOrder = async () => {
+  const fetchOrder = async (isRefresh = false) => {
     try {
-      setLoading(true);
+      if (isRefresh) {
+        setRefreshing(true);
+      } else {
+        setLoading(true);
+      }
       const res = await api.get(`/order/${orderId}`);
       const data = res.data;
 
@@ -91,7 +97,11 @@ const ViewOrderCustomer = () => {
       console.error(err);
       showToast("error", "Failed to fetch order");
     } finally {
-      setLoading(false);
+      if (isRefresh) {
+        setRefreshing(false);
+      } else {
+        setLoading(false);
+      }
     }
   };
 
@@ -231,6 +241,11 @@ const ViewOrderCustomer = () => {
   // ===============================
   // Render
   // ===============================
+  const onRefresh = () => {
+    if (loading) return;
+    fetchOrder(true);
+  };
+
   if (loading)
     return <ActivityIndicator size="large" color="#A40C2D" style={{ flex: 1 }} />;
 
@@ -241,9 +256,17 @@ const ViewOrderCustomer = () => {
       </View>
     );
 
-
   return (
-    <ScrollView style={styles.container}>
+    <ScrollView
+      style={styles.container}
+      refreshControl={
+        <RefreshControl
+          refreshing={refreshing}
+          onRefresh={onRefresh}
+          tintColor="#A40C2D"
+        />
+      }
+    >
       <Text style={styles.header}>Order #{order.id}</Text>
       <Text>
         Status: <Text style={styles.status}>{order.order_status}</Text>

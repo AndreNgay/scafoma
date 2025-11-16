@@ -11,6 +11,7 @@ import {
   ActivityIndicator,
   TextInput,
 } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 import api from "../../../libs/apiCall"; // axios instance
 import { useNavigation } from "@react-navigation/native";
 
@@ -272,22 +273,23 @@ const MenuItems = () => {
 
   return (
     <View style={{ flex: 1 }}>
-      {/* Search bar */}
-      <TextInput
-        style={styles.searchInput}
-        placeholder="Search menu items..."
-        value={searchQuery}
-        onChangeText={setSearchQuery}
-        blurOnSubmit={false}
-      />
+      {/* Search + Filters */}
+      <View style={styles.searchFilterRow}>
+        <TextInput
+          style={styles.searchInput}
+          placeholder="Search menu items..."
+          value={searchQuery}
+          onChangeText={setSearchQuery}
+          blurOnSubmit={false}
+        />
 
-      {/* Filter button */}
-      <TouchableOpacity
-        style={styles.filterBtn}
-        onPress={() => setFiltersVisible(true)}
-      >
-        <Text style={styles.filterText}>Filters & Sort</Text>
-      </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.filterBtn}
+          onPress={() => setFiltersVisible(true)}
+        >
+          <Ionicons name="funnel-outline" size={20} color="#fff" />
+        </TouchableOpacity>
+      </View>
 
       {/* Items */}
       {loading && page === 1 ? (
@@ -338,79 +340,87 @@ const MenuItems = () => {
                 <>
                   {/* Cafeteria (multi-select) */}
                   <Text style={styles.label}>Cafeteria</Text>
-                  {cafeterias.map((caf) => {
-                    const active = cafeteriaIds.includes(caf.id);
-                    return (
-                      <TouchableOpacity
-                        key={caf.id}
-                        onPress={() => {
-                          setCafeteriaIds((prev) =>
-                            active ? prev.filter((id) => id !== caf.id) : [...prev, caf.id]
-                          );
-                        }}
-                      >
-                        <Text style={active ? styles.active : styles.option}>
-                          {caf.cafeteria_name}
-                        </Text>
-                      </TouchableOpacity>
-                    );
-                  })}
-
-                  {/* Concession (multi-select) */}
-                  <Text style={styles.label}>Concession</Text>
-                  {concessions
-                    .filter((c) =>
-                      cafeteriaIds.length ? cafeteriaIds.includes(c.cafeteria_id) : true
-                    )
-                    .map((c) => {
-                      const active = concessionIds.includes(c.id);
+                  <View style={styles.filterChipRow}>
+                    {cafeterias.map((caf) => {
+                      const active = cafeteriaIds.includes(caf.id);
                       return (
                         <TouchableOpacity
-                          key={c.id}
+                          key={caf.id}
                           onPress={() => {
-                            setConcessionIds((prev) =>
-                              active ? prev.filter((id) => id !== c.id) : [...prev, c.id]
+                            setCafeteriaIds((prev) =>
+                              active ? prev.filter((id) => id !== caf.id) : [...prev, caf.id]
                             );
                           }}
                         >
                           <Text style={active ? styles.active : styles.option}>
-                            {c.concession_name}
+                            {caf.cafeteria_name}
                           </Text>
                         </TouchableOpacity>
                       );
                     })}
+                  </View>
+
+                  {/* Concession (multi-select) */}
+                  <Text style={styles.label}>Concession</Text>
+                  <View style={styles.filterChipRow}>
+                    {concessions
+                      .filter((c) =>
+                        cafeteriaIds.length ? cafeteriaIds.includes(c.cafeteria_id) : true
+                      )
+                      .map((c) => {
+                        const active = concessionIds.includes(c.id);
+                        return (
+                          <TouchableOpacity
+                            key={c.id}
+                            onPress={() => {
+                              setConcessionIds((prev) =>
+                                active ? prev.filter((id) => id !== c.id) : [...prev, c.id]
+                              );
+                            }}
+                          >
+                            <Text style={active ? styles.active : styles.option}>
+                              {c.concession_name}
+                            </Text>
+                          </TouchableOpacity>
+                        );
+                      })}
+                  </View>
 
                   {/* Category (unique + multi-select) */}
                   <Text style={styles.label}>Category</Text>
-                  {categories.map((cat) => {
-                    const active = selectedCategories.includes(cat);
-                    return (
-                      <TouchableOpacity
-                        key={cat}
-                        onPress={() => {
-                          setSelectedCategories((prev) =>
-                            active ? prev.filter((c) => c !== cat) : [...prev, cat]
-                          );
-                        }}
-                      >
-                        <Text style={active ? styles.active : styles.option}>{cat}</Text>
-                      </TouchableOpacity>
-                    );
-                  })}
+                  <View style={styles.filterChipRow}>
+                    {categories.map((cat) => {
+                      const active = selectedCategories.includes(cat);
+                      return (
+                        <TouchableOpacity
+                          key={cat}
+                          onPress={() => {
+                            setSelectedCategories((prev) =>
+                              active ? prev.filter((c) => c !== cat) : [...prev, cat]
+                            );
+                          }}
+                        >
+                          <Text style={active ? styles.active : styles.option}>{cat}</Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
 
                   {/* Sort */}
                   <Text style={styles.label}>Sort by</Text>
-                  {[
-                    { key: "name", label: "Name (A → Z)" },
-                    { key: "price_asc", label: "Price (Low → High)" },
-                    { key: "price_desc", label: "Price (High → Low)" },
-                  ].map((opt) => (
-                    <TouchableOpacity key={opt.key} onPress={() => setSortBy(opt.key)}>
-                      <Text style={sortBy === opt.key ? styles.active : styles.option}>
-                        {opt.label}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
+                  <View style={styles.filterChipRow}>
+                    {[
+                      { key: "name", label: "Name (A → Z)" },
+                      { key: "price_asc", label: "Price (Low → High)" },
+                      { key: "price_desc", label: "Price (High → Low)" },
+                    ].map((opt) => (
+                      <TouchableOpacity key={opt.key} onPress={() => setSortBy(opt.key)}>
+                        <Text style={sortBy === opt.key ? styles.active : styles.option}>
+                          {opt.label}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
                 </>
               )}
             />
@@ -427,22 +437,28 @@ const MenuItems = () => {
 };
 
 const styles = StyleSheet.create({
+  searchFilterRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 10,
+    marginTop: 14,
+    marginBottom: 10,
+    columnGap: 10,
+  },
   searchInput: {
+    flex: 1,
     borderWidth: 1,
     borderColor: "#ccc",
-    borderRadius: 8,
-    padding: 10,
-    marginHorizontal: 10,
-    marginBottom: 10,
-    marginTop: 14, // space from header
+    borderRadius: 999,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
     backgroundColor: "#fff",
   },
   filterBtn: {
-    padding: 10,
+    paddingVertical: 8,
+    paddingHorizontal: 14,
     backgroundColor: "#A40C2D",
-    marginHorizontal: 10,
-    marginBottom: 10,
-    borderRadius: 8,
+    borderRadius: 999,
   },
   filterText: { color: "#fff", textAlign: "center", fontWeight: "600" },
   card: {
@@ -477,13 +493,30 @@ const styles = StyleSheet.create({
   filterHeaderRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 10 },
   closeText: { color: "#A40C2D", fontWeight: "600", fontSize: 14 },
   label: { marginTop: 15, fontWeight: "600" },
-  option: { padding: 8, fontSize: 14 },
-  active: {
-    padding: 8,
+  filterChipRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    marginTop: 8,
+    gap: 8,
+  },
+  option: {
+    paddingVertical: 6,
+    paddingHorizontal: 12,
     fontSize: 14,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: "#ccc",
+    color: "#333",
+  },
+  active: {
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    fontSize: 14,
+    borderRadius: 999,
     backgroundColor: "#A40C2D",
+    borderWidth: 1,
+    borderColor: "#A40C2D",
     color: "#fff",
-    borderRadius: 6,
   },
   applyBtn: {
     backgroundColor: "#A40C2D",

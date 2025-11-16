@@ -10,10 +10,13 @@ import {
   TouchableOpacity,
   TextInput,
   RefreshControl,
+  Alert,
 } from "react-native";
 import { useNavigation } from "@react-navigation/native";
+import { Ionicons } from "@expo/vector-icons";
 import useStore from "../../../store";
 import api from "../../../libs/apiCall";
+import { useToast } from "../../../contexts/ToastContext";
 
 type Variation = {
   label: string;
@@ -44,6 +47,9 @@ const Menu = () => {
 
   const navigation = useNavigation<any>();
   const hasInitialized = useRef(false);
+  const { showToast } = useToast();
+  const [selectedItem, setSelectedItem] = useState<MenuItem | null>(null); // item with open overflow
+  const [deleteLoading, setDeleteLoading] = useState(false);
 
   const fetchMenuItems = async (pageNum = 1, replace = false) => {
     try {
@@ -81,6 +87,52 @@ const Menu = () => {
 
   const loadMore = () => {
     if (!loadingMore && hasMore) fetchMenuItems(page + 1);
+  };
+
+  const openActions = (item: MenuItem) => {
+    setSelectedItem((prev) => (prev && prev.id === item.id ? null : item));
+  };
+
+  const closeActions = () => {
+    if (deleteLoading) return;
+    setSelectedItem(null);
+  };
+
+  const handleEditMenuItem = (item: MenuItem) => {
+    closeActions();
+    navigation.navigate("Edit Menu", { menuItem: item });
+  };
+
+  const performDeleteMenuItem = async (item: MenuItem) => {
+    try {
+      setDeleteLoading(true);
+      await api.delete(`/menu-item/${item.id}`);
+      setMenuItems((prev) => prev.filter((m) => m.id !== item.id));
+      showToast("success", "Menu item deleted successfully");
+      closeActions();
+    } catch (error: any) {
+      console.error("Error deleting menu item:", error);
+      const message =
+        error?.response?.data?.message || "Failed to delete menu item. Please try again.";
+      showToast("error", message);
+    } finally {
+      setDeleteLoading(false);
+    }
+  };
+
+  const handleDeleteMenuItem = (item: MenuItem) => {
+    Alert.alert(
+      "Delete menu item",
+      `Are you sure you want to delete "${item.item_name}"?`,
+      [
+        { text: "No", style: "cancel" },
+        {
+          text: "Yes, delete",
+          style: "destructive",
+          onPress: () => performDeleteMenuItem(item),
+        },
+      ]
+    );
   };
 
   const processedItems = useMemo(() => {
@@ -143,7 +195,15 @@ const Menu = () => {
           renderItem={({ item }) => (
             <TouchableOpacity
               style={styles.card}
-              onPress={() => navigation.navigate("View Menu", { menuItem: item })}
+              onPress={() => {
+                // If any menu is open, close it instead of navigating (click outside behavior)
+                if (selectedItem) {
+                  closeActions();
+                  return;
+                }
+                navigation.navigate("View Menu", { menuItem: item });
+              }}
+              activeOpacity={0.8}
             >
               {(!imageError[item.id] && item.image_url) ? (
                 <Image
@@ -211,13 +271,36 @@ const Menu = () => {
                 </Text>
               </View>
 
-              {/* Edit button */}
-              <TouchableOpacity
-                style={styles.editButton}
-                onPress={() => navigation.navigate("Edit Menu", { menuItem: item })}
-              >
-                <Text style={styles.editButtonText}>✎</Text>
-              </TouchableOpacity>
+              <View style={styles.overflowContainer} pointerEvents="box-none">
+                <TouchableOpacity
+                  style={styles.editButton}
+                  onPress={() => openActions(item)}
+                  activeOpacity={0.7}
+                >
+                  <Ionicons name="ellipsis-vertical" size={18} color="#fff" />
+                </TouchableOpacity>
+
+                {selectedItem?.id === item.id && (
+                  <View style={styles.overflowMenu}>
+                    <TouchableOpacity
+                      style={styles.overflowOption}
+                      onPress={() => handleEditMenuItem(item)}
+                      disabled={deleteLoading}
+                    >
+                      <Text style={styles.overflowOptionText}>Edit</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[styles.overflowOption, styles.overflowOptionDanger]}
+                      onPress={() => handleDeleteMenuItem(item)}
+                      disabled={deleteLoading}
+                    >
+                      <Text style={styles.overflowOptionDangerText}>
+                        {deleteLoading ? "Deleting..." : "Delete"}
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
+              </View>
             </TouchableOpacity>
           )}
         />
@@ -267,9 +350,6 @@ const styles = StyleSheet.create({
     backgroundColor: "#fff",
   },
   editButton: {
-    position: "absolute",
-    top: 8,
-    right: 8,
     backgroundColor: "darkred",
     width: 28,
     height: 28,
@@ -317,5 +397,44 @@ const styles = StyleSheet.create({
     color: "white",
     fontSize: 24,
     fontWeight: "bold",
+  },
+  overflowContainer: {
+    position: "absolute",
+    right: 8,
+    top: 0,
+    bottom: 0,
+    justifyContent: "center",
+    alignItems: "flex-end",
+  },
+  overflowMenu: {
+    position: "absolute",
+    right: 36,
+    justifyContent: "center",
+    backgroundColor: "#fff",
+    borderRadius: 8,
+    elevation: 4,
+    shadowColor: "#000",
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 2 },
+    paddingVertical: 4,
+    minWidth: 120,
+  },
+  overflowOption: {
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+  },
+  overflowOptionText: {
+    fontSize: 14,
+    color: "#333",
+  },
+  overflowOptionDanger: {
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: "#eee",
+  },
+  overflowOptionDangerText: {
+    fontSize: 14,
+    color: "#d32f2f",
+    fontWeight: "600",
   },
 });

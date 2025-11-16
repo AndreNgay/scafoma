@@ -11,6 +11,7 @@ import {
   Modal,
   RefreshControl,
 } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
 import api from "../../../libs/apiCall";
 import useStore from "../../../store";
@@ -28,6 +29,8 @@ interface Order {
 }
 
 const PAGE_SIZE = 10;
+const ACTIVE_STATUSES = ["pending", "accepted", "ready-for-pickup"];
+const HISTORY_STATUSES = ["completed", "declined", "cancelled"];
 
 const OrderList = () => {
   const navigation = useNavigation<any>();
@@ -53,40 +56,49 @@ const OrderList = () => {
   const user = useStore((state: any) => state.user);
   const hasInitialized = useRef(false);
 
-  const fetchOrders = useCallback(async (pageNum = 1, refresh = false) => {
-    try {
-      if (refresh || pageNum === 1) setInitialLoading(true);
+  const normalizeStatus = (value: any) =>
+    String(value || "")
+      .trim()
+      .toLowerCase()
+      .replace(/[_\s]+/g, "-");
 
-      setError(null);
+  const fetchOrders = useCallback(
+    async (pageNum = 1, refresh = false) => {
+      try {
+        if (refresh || pageNum === 1) setInitialLoading(true);
 
-      // Initial load/refresh: only fetch active orders, do NOT fetch history yet
-      if (refresh || pageNum === 1) {
-        const activeRes = await api.get(
-          `/order/concessionare/${user.id}?segment=active&limit=${PAGE_SIZE}`
-        );
-        const freshActive: Order[] = activeRes.data?.data || [];
-        setActiveOrders(freshActive);
-        setOrders(freshActive);
-        setHistoryStarted(false);
-        setHistoryPage(0);
-        setHasMoreHistory(true);
-        return;
+        setError(null);
+
+        // Initial load/refresh: only fetch active orders, do NOT fetch history yet
+        if (refresh || pageNum === 1) {
+          const activeRes = await api.get(
+            `/order/concessionare/${user.id}?segment=active&limit=${PAGE_SIZE}`
+          );
+          const freshActive: Order[] = activeRes.data?.data || [];
+          setActiveOrders(freshActive);
+          setOrders(freshActive);
+          setHistoryStarted(false);
+          setHistoryPage(0);
+          setHasMoreHistory(true);
+          return;
+        }
+      } catch (err) {
+        console.error(err);
+        setError("Failed to fetch orders");
+      } finally {
+        setLoading(false);
+        setInitialLoading(false);
+        if (refresh) setRefreshing(false);
       }
-    } catch (err) {
-      console.error(err);
-      setError("Failed to fetch orders");
-    } finally {
-      setLoading(false);
-      setInitialLoading(false);
-      if (refresh) setRefreshing(false);
-    }
-  }, [user?.id]);
+    },
+    [user?.id]
+  );
 
   // Only fetch on initial mount, not on every focus
   useEffect(() => {
     if (!hasInitialized.current) {
       hasInitialized.current = true;
-      setStatusFilter([]); // Show all by default
+      setStatusFilter(ACTIVE_STATUSES); // Default to ongoing orders only
       fetchOrders(1, true);
     }
   }, []); // Empty dependency array - only run once on mount
@@ -97,67 +109,95 @@ const OrderList = () => {
     fetchOrders(1, true);
   };
 
-  // Load more on scroll
+  // Start history (completed/declined) when needed
+  const startHistory = useCallback(async () => {
+    if (historyStarted || loading) return;
+    try {
+      setLoading(true);
+      const next = 1;
+      const histRes = await api.get(
+        `/order/concessionare/${user.id}?segment=history&page=${next}&limit=${PAGE_SIZE}`
+      );
+      const { data: chunk, totalPages } = histRes.data;
+      setOrders((prev) => {
+        const existingIds = new Set(prev.map((o) => o.id));
+        const deduped = (chunk || []).filter((o: any) => !existingIds.has(o.id));
+        return [...prev, ...deduped];
+      });
+      setHistoryStarted(true);
+      setHistoryPage(next);
+      setHasMoreHistory(next < totalPages);
+    } catch (e) {
+      console.error(e);
+      setError("Failed to fetch orders");
+    } finally {
+      setLoading(false);
+    }
+  }, [historyStarted, loading, user?.id]);
+
+  // Load more history on scroll only when history filters are active
   const loadMore = useCallback(async () => {
-    if (loading) return;
-    // Start history on first reach to bottom
-    if (!historyStarted) {
-      try {
-        setLoading(true);
-        const next = 1;
-        const histRes = await api.get(
-          `/order/concessionare/${user.id}?segment=history&page=${next}&limit=${PAGE_SIZE}`
-        );
-        const { data: chunk, totalPages } = histRes.data;
-        setOrders((prev) => [...prev, ...chunk]);
-        setHistoryStarted(true);
-        setHistoryPage(next);
-        setHasMoreHistory(next < totalPages);
-      } catch (e) {
-        console.error(e);
-        setError("Failed to fetch orders");
-      } finally {
-        setLoading(false);
-      }
-      return;
+    if (loading || !historyStarted || !hasMoreHistory) return;
+
+    const hasHistoryFilterSelected = statusFilter.some((s) =>
+      HISTORY_STATUSES.includes(normalizeStatus(s))
+    );
+    if (!hasHistoryFilterSelected) return;
+
+    try {
+      setLoading(true);
+      const next = historyPage + 1;
+      const histRes = await api.get(
+        `/order/concessionare/${user.id}?segment=history&page=${next}&limit=${PAGE_SIZE}`
+      );
+      const { data: chunk, totalPages } = histRes.data;
+      setOrders((prev) => {
+        const existingIds = new Set(prev.map((o) => o.id));
+        const deduped = (chunk || []).filter((o: any) => !existingIds.has(o.id));
+        return [...prev, ...deduped];
+      });
+      setHistoryPage(next);
+      setHasMoreHistory(next < totalPages);
+    } catch (e) {
+      console.error(e);
+      setError("Failed to fetch orders");
+    } finally {
+      setLoading(false);
     }
-    // Continue history pagination
-    if (hasMoreHistory) {
-      try {
-        setLoading(true);
-        const next = historyPage + 1;
-        const histRes = await api.get(
-          `/order/concessionare/${user.id}?segment=history&page=${next}&limit=${PAGE_SIZE}`
-        );
-        const { data: chunk, totalPages } = histRes.data;
-        setOrders((prev) => [...prev, ...chunk]);
-        setHistoryPage(next);
-        setHasMoreHistory(next < totalPages);
-      } catch (e) {
-        console.error(e);
-        setError("Failed to fetch orders");
-      } finally {
-        setLoading(false);
-      }
+  }, [loading, historyStarted, hasMoreHistory, historyPage, statusFilter, user?.id]);
+
+  // When history statuses are selected, lazily fetch them once
+  useEffect(() => {
+    const hasHistoryFilterSelected = statusFilter.some((s) =>
+      HISTORY_STATUSES.includes(normalizeStatus(s))
+    );
+    if (hasHistoryFilterSelected && !historyStarted) {
+      startHistory();
     }
-  }, [loading, historyStarted, historyPage, hasMoreHistory, user?.id]);
+  }, [statusFilter, historyStarted, startHistory]);
 
   // Apply search, filter, and sort
   useEffect(() => {
     let filtered = [...orders];
 
     if (searchQuery) {
+      const lowered = searchQuery.toLowerCase();
       filtered = filtered.filter(
         (o) =>
-          o.first_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          o.last_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          o.concession_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          o.first_name.toLowerCase().includes(lowered) ||
+          o.last_name.toLowerCase().includes(lowered) ||
+          o.concession_name.toLowerCase().includes(lowered) ||
           o.id.toString().includes(searchQuery)
       );
     }
 
     if (statusFilter.length > 0) {
-      filtered = filtered.filter((o) => statusFilter.includes(o.order_status));
+      const normalizedSelected = new Set(
+        statusFilter.map((s) => normalizeStatus(s))
+      );
+      filtered = filtered.filter((o) =>
+        normalizedSelected.has(normalizeStatus(o.order_status))
+      );
     }
 
     if (sortBy) {
@@ -225,13 +265,16 @@ const OrderList = () => {
     if (statusFilter.length > 0) return [] as { title: string; data: Order[] }[];
     const groups: Record<string, Order[]> = {};
     for (const o of filteredOrders) {
-      const key = (o.order_status || 'unknown').toLowerCase();
+      const key = normalizeStatus(o.order_status || 'unknown');
       if (!groups[key]) groups[key] = [];
       groups[key].push(o);
     }
-    const ongoingStatuses = ['pending', 'accepted', 'ready for pickup'];
-    const settledStatuses = ['completed', 'declined', 'cancelled'];
-    const toLabel = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+    const ongoingStatuses = ACTIVE_STATUSES;
+    const settledStatuses = HISTORY_STATUSES;
+    const toLabel = (s: string) =>
+      s
+        .replace(/-/g, " ")
+        .replace(/^(.)/, (c) => c.toUpperCase());
     
     // Separate ongoing and settled orders
     const ongoingKeys: string[] = [];
@@ -288,19 +331,21 @@ const OrderList = () => {
 
   return (
     <View style={styles.container}>
-      <TextInput
-        style={styles.searchInput}
-        placeholder="Search by customer, concession, or ID..."
-        value={searchQuery}
-        onChangeText={setSearchQuery}
-      />
+      <View style={styles.searchFilterRow}>
+        <TextInput
+          style={styles.searchInput}
+          placeholder="Search by customer, concession, or ID..."
+          value={searchQuery}
+          onChangeText={setSearchQuery}
+        />
 
-      <TouchableOpacity
-        style={styles.filterBtn}
-        onPress={() => setFiltersVisible(true)}
-      >
-        <Text style={styles.filterText}>Filters & Sort</Text>
-      </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.filterBtn}
+          onPress={() => setFiltersVisible(true)}
+        >
+          <Ionicons name="funnel-outline" size={20} color="#fff" />
+        </TouchableOpacity>
+      </View>
 
       {!orders.length ? (
         <View style={styles.emptyContainer}>
@@ -372,58 +417,66 @@ const OrderList = () => {
           </View>
 
           <Text style={styles.label}>Status (Select Multiple)</Text>
-          {[
-            "pending",
-            "accepted",
-            "ready-for-pickup",
-            "completed",
-            "declined",
-          ].map((status) => (
-            <TouchableOpacity
-              key={status}
-              onPress={() => {
-                if (statusFilter.includes(status)) {
-                  setStatusFilter(statusFilter.filter(s => s !== status));
-                } else {
-                  setStatusFilter([...statusFilter, status]);
-                }
-              }}
-            >
-              <Text
-                style={
-                  statusFilter.includes(status) ? styles.active : styles.option
-                }
+          <View style={styles.filterChipRow}>
+            {[
+              "pending",
+              "accepted",
+              "ready-for-pickup",
+              "completed",
+              "declined",
+              "cancelled",
+            ].map((status) => (
+              <TouchableOpacity
+                key={status}
+                onPress={() => {
+                  if (statusFilter.includes(status)) {
+                    setStatusFilter(statusFilter.filter((s) => s !== status));
+                  } else {
+                    setStatusFilter([...statusFilter, status]);
+                  }
+                }}
               >
-                {status}
-              </Text>
-            </TouchableOpacity>
-          ))}
+                <Text
+                  style={
+                    statusFilter.includes(status) ? styles.active : styles.option
+                  }
+                >
+                  {status}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
 
           <Text style={styles.label}>Sort by</Text>
-          {[
-            { key: "date_desc", label: "Date (Newest → Oldest)" },
-            { key: "date_asc", label: "Date (Oldest → Newest)" },
-            { key: "price_asc", label: "Total Price (Low → High)" },
-            { key: "price_desc", label: "Total Price (High → Low)" },
-          ].map((opt) => (
-            <TouchableOpacity
-              key={opt.key}
-              onPress={() =>
-                setSortBy(sortBy === opt.key ? null : opt.key)
-              }
-            >
-              <Text
-                style={sortBy === opt.key ? styles.active : styles.option}
+          <View style={styles.filterChipRow}>
+            {[
+              { key: "date_desc", label: "Date (Newest → Oldest)" },
+              { key: "date_asc", label: "Date (Oldest → Newest)" },
+              { key: "price_asc", label: "Total Price (Low → High)" },
+              { key: "price_desc", label: "Total Price (High → Low)" },
+            ].map((opt) => (
+              <TouchableOpacity
+                key={opt.key}
+                onPress={() =>
+                  setSortBy(sortBy === opt.key ? null : opt.key)
+                }
               >
-                {opt.label}
-              </Text>
-            </TouchableOpacity>
-          ))}
+                <Text
+                  style={sortBy === opt.key ? styles.active : styles.option}
+                >
+                  {opt.label}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
 
           <View style={styles.buttonRow}>
             <TouchableOpacity
               style={styles.clearBtn}
-              onPress={() => setStatusFilter([])}
+              onPress={() => {
+                setStatusFilter(ACTIVE_STATUSES);
+                setSortBy(null);
+              }}
             >
               <Text style={styles.clearText}>Clear All</Text>
             </TouchableOpacity>
@@ -449,19 +502,26 @@ const OrderList = () => {
 
 const styles = StyleSheet.create({
   container: { flex: 1, padding: 15, backgroundColor: "#fff" },
+  searchFilterRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 10,
+    columnGap: 10,
+  },
   searchInput: {
+    flex: 1,
     borderWidth: 1,
     borderColor: "#ccc",
-    borderRadius: 8,
-    padding: 10,
-    marginBottom: 10,
+    borderRadius: 999,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
     backgroundColor: "#fff",
   },
   filterBtn: {
-    padding: 10,
+    paddingVertical: 8,
+    paddingHorizontal: 14,
     backgroundColor: "#A40C2D",
-    marginBottom: 15,
-    borderRadius: 8,
+    borderRadius: 999,
   },
   filterText: { color: "#fff", textAlign: "center", fontWeight: "600" },
   orderCard: {
@@ -510,13 +570,30 @@ const styles = StyleSheet.create({
   },
   closeBtnText: { color: "#fff", fontWeight: "bold", fontSize: 16 },
   label: { marginTop: 15, fontWeight: "600" },
-  option: { padding: 8, fontSize: 14 },
-  active: {
-    padding: 8,
+  filterChipRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    marginTop: 8,
+    gap: 8,
+  },
+  option: {
+    paddingVertical: 6,
+    paddingHorizontal: 12,
     fontSize: 14,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: "#ccc",
+    color: "#333",
+  },
+  active: {
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    fontSize: 14,
+    borderRadius: 999,
     backgroundColor: "#A40C2D",
+    borderWidth: 1,
+    borderColor: "#A40C2D",
     color: "#fff",
-    borderRadius: 6,
   },
   buttonRow: { 
     flexDirection: "row", 

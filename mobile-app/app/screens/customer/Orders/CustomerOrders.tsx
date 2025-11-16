@@ -10,12 +10,15 @@ import {
   TouchableOpacity,
   RefreshControl,
 } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect, useNavigation } from "@react-navigation/native";
 import useStore from "../../../store";
 import api from "../../../libs/apiCall";
 import { useToast } from "../../../contexts/ToastContext";
 
 const PAGE_SIZE = 10;
+const ACTIVE_STATUSES = ["pending", "accepted", "ready-for-pickup"];
+const HISTORY_STATUSES = ["completed", "declined", "cancelled"];
 
 const CustomerOrders = () => {
   const navigation = useNavigation<any>();
@@ -29,6 +32,7 @@ const CustomerOrders = () => {
   // Pagination
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
+  const [historyLoaded, setHistoryLoaded] = useState(false);
 
   // Search & filter state
   const [searchQuery, setSearchQuery] = useState("");
@@ -93,51 +97,80 @@ const CustomerOrders = () => {
       .toLowerCase()
       .replace(/[_\s]+/g, "-");
 
-  // Fetch customer orders with pagination
-  const fetchOrders = useCallback(async (pageNum = 1, refresh = false) => {
-    if (!user) return;
-    try {
-      if (!refresh && pageNum > 1) {
-        setLoading(true); // show footer loader
-      }
-      if (pageNum === 1 && !refresh) {
-        setInitialLoading(true); // full screen loader
-      }
+  // Fetch active (ongoing) customer orders only (non-paginated)
+  const fetchOrders = useCallback(
+    async (refresh = false) => {
+      if (!user) return;
+      try {
+        if (!refresh) {
+          setInitialLoading(true); // full screen loader
+        }
 
-      const res = await api.get(`/order/customer/${user.id}?page=${pageNum}&limit=${PAGE_SIZE}`);
-      
-      // Backend returns { page, limit, total, totalPages, data }
-      const responseData = res.data.data || [];
-      const totalPages = Number(res.data.totalPages) || 1;
+        const res = await api.get(
+          `/order/customer/${user.id}?segment=active&limit=${PAGE_SIZE}`
+        );
 
-      if (refresh || pageNum === 1) {
+        const responseData = res.data?.data || [];
         setOrders(responseData);
-      } else {
-        // Use functional update to avoid stale closure
-        setOrders((prevOrders) => [...prevOrders, ...responseData]);
-      }
 
-      setHasMore(pageNum < totalPages);
-    } catch (err) {
-      console.error("Error fetching customer orders:", err);
-      if (pageNum === 1) {
+        // Active segment is treated as a single page
+        setPage(0);
+        setHasMore(false);
+        setHistoryLoaded(false);
+      } catch (err) {
+        console.error("Error fetching customer orders:", err);
         setOrders([]);
         setFilteredOrders([]);
+      } finally {
+        setLoading(false);
+        setInitialLoading(false);
+        if (refresh) setRefreshing(false);
       }
-    } finally {
-      setLoading(false);
-      setInitialLoading(false);
-      if (refresh) setRefreshing(false);
-    }
-  }, [user]);
+    },
+    [user]
+  );
+
+  // Lazily fetch completed/declined history with pagination
+  const fetchHistory = useCallback(
+    async (pageNum = 1) => {
+      if (!user) return;
+      try {
+        setLoading(true);
+
+        const res = await api.get(
+          `/order/customer/${user.id}?segment=history&page=${pageNum}&limit=${PAGE_SIZE}`
+        );
+        const responseData = res.data?.data || [];
+        const totalPages = Number(res.data?.totalPages) || 1;
+
+        setOrders((prevOrders) => {
+          if (!prevOrders || prevOrders.length === 0) return responseData;
+          const existingIds = new Set(prevOrders.map((o: any) => o.id));
+          const deduped = responseData.filter((o: any) => !existingIds.has(o.id));
+          return [...prevOrders, ...deduped];
+        });
+
+        setPage(pageNum);
+        setHasMore(pageNum < totalPages);
+        setHistoryLoaded(true);
+      } catch (err) {
+        console.error("Error fetching customer order history:", err);
+      } finally {
+        setLoading(false);
+      }
+    },
+    [user]
+  );
 
   // Refresh when screen is focused
   useFocusEffect(
     useCallback(() => {
       setPage(1);
-      setStatusFilter([]); // No default filter - show all orders
+      setHasMore(true);
+      setHistoryLoaded(false);
+      setStatusFilter(ACTIVE_STATUSES); // Default to ongoing orders only
       setSortBy("date_desc"); // Default sort by newest to oldest
-      fetchOrders(1, true);
+      fetchOrders(true);
     }, [fetchOrders])
   );
 
@@ -145,36 +178,53 @@ const CustomerOrders = () => {
   const onRefresh = () => {
     setRefreshing(true);
     setPage(1);
-    fetchOrders(1, true);
+    fetchOrders(true);
   };
 
   // Load more on scroll
   const loadMore = useCallback(() => {
-    if (!loading && hasMore) {
-      setPage((prevPage) => {
-        const nextPage = prevPage + 1;
-        fetchOrders(nextPage);
-        return nextPage;
-      });
+    if (loading || !hasMore) return;
+
+    const involvesHistory = statusFilter.some((s) =>
+      HISTORY_STATUSES.includes(normalizeStatus(s))
+    );
+    if (!involvesHistory) return;
+
+    const nextPage = page + 1;
+    fetchHistory(nextPage);
+  }, [loading, hasMore, statusFilter, page, fetchHistory]);
+
+  // When history statuses are selected, lazily fetch them once
+  useEffect(() => {
+    const involvesHistory = statusFilter.some((s) =>
+      HISTORY_STATUSES.includes(normalizeStatus(s))
+    );
+    if (involvesHistory && !historyLoaded) {
+      fetchHistory(1);
     }
-  }, [loading, hasMore, fetchOrders]);
+  }, [statusFilter, historyLoaded, fetchHistory]);
 
   // Apply search & filter
   useEffect(() => {
     let filtered = [...orders];
 
     if (searchQuery) {
+      const lowered = searchQuery.toLowerCase();
       filtered = filtered.filter(
         (o) =>
-          o.cafeteria_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          o.concession_name.toLowerCase().includes(searchQuery.toLowerCase()) 
+          o.cafeteria_name.toLowerCase().includes(lowered) ||
+          o.concession_name.toLowerCase().includes(lowered)
       );
     }
 
     // Filter by status (normalized)
     if (statusFilter.length > 0) {
-      const normalizedSelected = new Set(statusFilter.map((s) => normalizeStatus(s)));
-      filtered = filtered.filter((o) => normalizedSelected.has(normalizeStatus(o.order_status)));
+      const normalizedSelected = new Set(
+        statusFilter.map((s) => normalizeStatus(s))
+      );
+      filtered = filtered.filter((o) =>
+        normalizedSelected.has(normalizeStatus(o.order_status))
+      );
     }
 
     // Sort orders
@@ -209,15 +259,6 @@ const CustomerOrders = () => {
     setFilteredOrders(filtered);
   }, [searchQuery, statusFilter, sortBy, orders]);
 
-  // If a status filter is applied and no results are visible yet, auto-load more pages
-  useEffect(() => {
-    if (statusFilter.length > 0 && filteredOrders.length === 0 && hasMore && !loading) {
-      const nextPage = page + 1;
-      setPage(nextPage);
-      fetchOrders(nextPage);
-    }
-  }, [statusFilter, filteredOrders.length, hasMore, loading, page, fetchOrders]);
-
   const handleConfirmCancelOrder = async () => {
     if (!cancelOrderId) return;
 
@@ -225,8 +266,7 @@ const CustomerOrders = () => {
       setCancelLoading(true);
       await api.put(`/order/cancel/${cancelOrderId}`);
       showToast("success", "Order cancelled successfully");
-      setPage(1);
-      await fetchOrders(1, true);
+      await fetchOrders(true);
     } catch (error: any) {
       console.error("Error cancelling order:", error);
       const message =
@@ -308,21 +348,23 @@ const CustomerOrders = () => {
     <View style={styles.container}>
       <Text style={styles.header}>My Orders</Text>
 
-      {/* Search bar */}
-      <TextInput
-        style={styles.searchInput}
-        placeholder="Search orders..."
-        value={searchQuery}
-        onChangeText={setSearchQuery}
-      />
+      {/* Search + Filter */}
+      <View style={styles.searchFilterRow}>
+        <TextInput
+          style={styles.searchInput}
+          placeholder="Search orders..."
+          value={searchQuery}
+          onChangeText={setSearchQuery}
+        />
 
-      {/* Filter button */}
-      <TouchableOpacity
-        style={styles.filterBtn}
-        onPress={() => setFiltersVisible(true)}
-      >
-        <Text style={styles.filterText}>Filters</Text>
-      </TouchableOpacity>
+        {/* Filter button */}
+        <TouchableOpacity
+          style={styles.filterBtn}
+          onPress={() => setFiltersVisible(true)}
+        >
+          <Ionicons name="funnel-outline" size={20} color="#fff" />
+        </TouchableOpacity>
+      </View>
 
       {/* Orders list */}
       {filteredOrders.length === 0 ? (
@@ -366,50 +408,60 @@ const CustomerOrders = () => {
 
           {/* Status filter */}
           <Text style={styles.label}>Status (Select Multiple)</Text>
-          {["pending", "accepted", "ready-for-pickup", "completed", "declined"].map(
-            (status) => (
-              <TouchableOpacity
-                key={status}
-                onPress={() => {
-                  if (statusFilter.includes(status)) {
-                    setStatusFilter(statusFilter.filter(s => s !== status));
-                  } else {
-                    setStatusFilter([...statusFilter, status]);
-                  }
-                }}
-              >
-                <Text style={statusFilter.includes(status) ? styles.active : styles.option}>
-                  {status}
-                </Text>
-              </TouchableOpacity>
-            )
-          )}
+          <View style={styles.filterChipRow}>
+            {["pending", "accepted", "ready-for-pickup", "completed", "declined", "cancelled"].map(
+              (status) => (
+                <TouchableOpacity
+                  key={status}
+                  onPress={() => {
+                    if (statusFilter.includes(status)) {
+                      setStatusFilter(statusFilter.filter((s) => s !== status));
+                    } else {
+                      setStatusFilter([...statusFilter, status]);
+                    }
+                  }}
+                >
+                  <Text
+                    style={
+                      statusFilter.includes(status) ? styles.active : styles.option
+                    }
+                  >
+                    {status}
+                  </Text>
+                </TouchableOpacity>
+              )
+            )}
+          </View>
 
           {/* Sort options */}
           <Text style={styles.label}>Sort by</Text>
-          {[
-            { key: "date_desc", label: "Date (Newest → Oldest)" },
-            { key: "date_asc", label: "Date (Oldest → Newest)" },
-            { key: "price_asc", label: "Total Price (Low → High)" },
-            { key: "price_desc", label: "Total Price (High → Low)" },
-            { key: "status", label: "Status (A → Z)" },
-          ].map((opt) => (
-            <TouchableOpacity
-              key={opt.key}
-              onPress={() => setSortBy(opt.key)}
-            >
-              <Text style={sortBy === opt.key ? styles.active : styles.option}>
-                {opt.label}
-              </Text>
-            </TouchableOpacity>
-          ))}
+          <View style={styles.filterChipRow}>
+            {[
+              { key: "date_desc", label: "Date (Newest → Oldest)" },
+              { key: "date_asc", label: "Date (Oldest → Newest)" },
+              { key: "price_asc", label: "Total Price (Low → High)" },
+              { key: "price_desc", label: "Total Price (High → Low)" },
+              { key: "status", label: "Status (A → Z)" },
+            ].map((opt) => (
+              <TouchableOpacity
+                key={opt.key}
+                onPress={() => setSortBy(opt.key)}
+              >
+                <Text
+                  style={sortBy === opt.key ? styles.active : styles.option}
+                >
+                  {opt.label}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
 
           {/* Close modal */}
           <View style={styles.buttonRow}>
             <TouchableOpacity
               style={styles.clearBtn}
               onPress={() => {
-                setStatusFilter([]);
+                setStatusFilter(ACTIVE_STATUSES);
                 setSortBy("date_desc");
               }}
             >
@@ -469,19 +521,26 @@ const styles = StyleSheet.create({
     marginBottom: 10,
     color: "#A40C2D",
   },
+  searchFilterRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 10,
+    columnGap: 10,
+  },
   searchInput: {
+    flex: 1,
     borderWidth: 1,
     borderColor: "#ccc",
-    borderRadius: 8,
-    padding: 10,
-    marginBottom: 10,
+    borderRadius: 999,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
     backgroundColor: "#fff",
   },
   filterBtn: {
-    padding: 10,
+    paddingVertical: 8,
+    paddingHorizontal: 14,
     backgroundColor: "#A40C2D",
-    marginBottom: 15,
-    borderRadius: 8,
+    borderRadius: 999,
   },
   filterText: { color: "#fff", textAlign: "center", fontWeight: "600" },
   card: {
@@ -518,13 +577,30 @@ const styles = StyleSheet.create({
   },
   closeBtnText: { color: "#fff", fontWeight: "bold", fontSize: 16 },
   label: { marginTop: 15, fontWeight: "600" },
-  option: { padding: 8, fontSize: 14 },
-  active: {
-    padding: 8,
+  filterChipRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    marginTop: 8,
+    gap: 8,
+  },
+  option: {
+    paddingVertical: 6,
+    paddingHorizontal: 12,
     fontSize: 14,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: "#ccc",
+    color: "#333",
+  },
+  active: {
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    fontSize: 14,
+    borderRadius: 999,
     backgroundColor: "#A40C2D",
+    borderWidth: 1,
+    borderColor: "#A40C2D",
     color: "#fff",
-    borderRadius: 6,
   },
   buttonRow: { 
     flexDirection: "row", 

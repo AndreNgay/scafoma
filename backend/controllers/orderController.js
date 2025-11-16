@@ -125,14 +125,131 @@ export const getOrdersByConcessionaireId = async (req, res) => {
 
 // ==========================
 // Get orders for a customer
+// Supports segment=active|history similar to concessionaire API
 // ==========================
 export const getOrdersByCustomerId = async (req, res) => {
   const { id } = req.params;
-  const { page = 1, limit = 10 } = req.query;
+  const { page = 1, limit = 10, segment } = req.query;
 
   try {
     const offset = (page - 1) * limit;
 
+    const activeStatuses = [
+      "pending",
+      "accepted",
+      "ready-for-pickup",
+      "ready for pickup", // handle both spellings
+    ];
+    const historyStatuses = ["completed", "declined", "cancelled"];
+
+    const isActiveSegment = segment === "active";
+    const isHistorySegment = segment === "history";
+
+    // Active segment: return all ongoing orders without pagination
+    if (isActiveSegment) {
+      const result = await pool.query(
+        `SELECT o.*, 
+                o.payment_method,
+                c.concession_name, 
+                caf.cafeteria_name,
+                COALESCE(c.gcash_payment_available, FALSE) AS gcash_payment_available,
+                COALESCE(c.oncounter_payment_available, FALSE) AS oncounter_payment_available,
+                (
+                  SELECT ARRAY(
+                    SELECT m.item_name
+                    FROM tblorderdetail d
+                    JOIN tblmenuitem m ON d.item_id = m.id
+                    WHERE d.order_id = o.id
+                    ORDER BY d.id
+                    LIMIT 3
+                  )
+                ) AS item_names_preview,
+                (
+                  SELECT COUNT(*)::int FROM tblorderdetail d2 WHERE d2.order_id = o.id
+                ) AS item_count
+         FROM tblorder o
+         JOIN tblconcession c ON o.concession_id = c.id
+         JOIN tblcafeteria caf ON c.cafeteria_id = caf.id
+         WHERE o.customer_id = $1
+           AND o.in_cart = FALSE
+           AND LOWER(o.order_status) = ANY($2)
+         ORDER BY o.created_at DESC`,
+        [id, activeStatuses.map((s) => s.toLowerCase())]
+      );
+
+      const orders = result.rows.map((order) => {
+        order.payment_proof = makeImageDataUrl(order.gcash_screenshot);
+        return order;
+      });
+
+      return res.status(200).json({
+        page: 1,
+        limit: Number(limit),
+        total: orders.length,
+        totalPages: 1,
+        data: orders,
+      });
+    }
+
+    // History segment: paginated completed/declined/cancelled orders
+    if (isHistorySegment) {
+      const result = await pool.query(
+        `SELECT o.*, 
+                o.payment_method,
+                c.concession_name, 
+                caf.cafeteria_name,
+                COALESCE(c.gcash_payment_available, FALSE) AS gcash_payment_available,
+                COALESCE(c.oncounter_payment_available, FALSE) AS oncounter_payment_available,
+                (
+                  SELECT ARRAY(
+                    SELECT m.item_name
+                    FROM tblorderdetail d
+                    JOIN tblmenuitem m ON d.item_id = m.id
+                    WHERE d.order_id = o.id
+                    ORDER BY d.id
+                    LIMIT 3
+                  )
+                ) AS item_names_preview,
+                (
+                  SELECT COUNT(*)::int FROM tblorderdetail d2 WHERE d2.order_id = o.id
+                ) AS item_count
+         FROM tblorder o
+         JOIN tblconcession c ON o.concession_id = c.id
+         JOIN tblcafeteria caf ON c.cafeteria_id = caf.id
+         WHERE o.customer_id = $1
+           AND o.in_cart = FALSE
+           AND LOWER(o.order_status) = ANY($2)
+         ORDER BY o.created_at DESC
+         LIMIT $3 OFFSET $4`,
+        [id, historyStatuses.map((s) => s.toLowerCase()), limit, offset]
+      );
+
+      const orders = result.rows.map((order) => {
+        order.payment_proof = makeImageDataUrl(order.gcash_screenshot);
+        return order;
+      });
+
+      const countResult = await pool.query(
+        `SELECT COUNT(*) AS total
+         FROM tblorder o
+         WHERE o.customer_id = $1
+           AND o.in_cart = FALSE
+           AND LOWER(o.order_status) = ANY($2)`,
+        [id, historyStatuses.map((s) => s.toLowerCase())]
+      );
+
+      const totalOrders = parseInt(countResult.rows[0].total, 10);
+
+      return res.status(200).json({
+        page: Number(page),
+        limit: Number(limit),
+        total: totalOrders,
+        totalPages: Math.ceil(totalOrders / limit),
+        data: orders,
+      });
+    }
+
+    // Default behaviour (no segment): keep existing implementation for backwards compatibility
     const result = await pool.query(
       `SELECT o.*, 
               o.payment_method,
@@ -163,7 +280,7 @@ export const getOrdersByCustomerId = async (req, res) => {
       [id, limit, offset]
     );
 
-    const orders = result.rows.map(order => {
+    const orders = result.rows.map((order) => {
       order.payment_proof = makeImageDataUrl(order.gcash_screenshot);
       return order;
     });

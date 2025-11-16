@@ -10,6 +10,7 @@ import {
   TouchableOpacity,
   Modal,
   TextInput,
+  RefreshControl,
 } from "react-native";
 import { useRoute, useNavigation } from "@react-navigation/native";
 import api from "../../../libs/apiCall";
@@ -22,6 +23,7 @@ const ViewOrderConcessionaire = () => {
 
   const [order, setOrder] = useState<any>(null);
   const [loading, setLoading] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   const [updatingStatus, setUpdatingStatus] = useState(false);
   const [declineModalVisible, setDeclineModalVisible] = useState(false);
   const [selectedReason, setSelectedReason] = useState<string>("");
@@ -71,16 +73,24 @@ const ViewOrderConcessionaire = () => {
   };
 
   // Fetch order details from backend
-  const fetchOrderDetails = async () => {
+  const fetchOrderDetails = async (isRefresh = false) => {
     try {
-      setLoading(true);
+      if (isRefresh) {
+        setRefreshing(true);
+      } else {
+        setLoading(true);
+      }
       const res = await api.get(`/order/${orderId}`); // Backend route /order/:id
       setOrder(res.data);
     } catch (err) {
       console.error("Error fetching order details:", err);
       showToast("error", "Failed to fetch order details");
     } finally {
-      setLoading(false);
+      if (isRefresh) {
+        setRefreshing(false);
+      } else {
+        setLoading(false);
+      }
     }
   };
 
@@ -132,6 +142,11 @@ const ViewOrderConcessionaire = () => {
     setDeclineModalVisible(false);
     setSelectedReason("");
     setCustomReason("");
+  };
+
+  const onRefresh = () => {
+    if (loading) return;
+    fetchOrderDetails(true);
   };
 
   if (loading)
@@ -193,7 +208,16 @@ const ViewOrderConcessionaire = () => {
   };
 
   return (
-    <ScrollView style={styles.container}>
+    <ScrollView
+      style={styles.container}
+      refreshControl={
+        <RefreshControl
+          refreshing={refreshing}
+          onRefresh={onRefresh}
+          tintColor="#A40C2D"
+        />
+      }
+    >
       {/* Customer Info Section */}
       <TouchableOpacity 
         style={styles.customerSection}
