@@ -12,30 +12,34 @@ import {
 import { useRoute } from "@react-navigation/native";
 import api from "../../../libs/apiCall";
 
-const ViewCustomerProfile = () => {
+const ViewConcessionaireProfile = () => {
   const route = useRoute<any>();
-  const { customerId } = route.params;
+  const { concessionaireId } = route.params;
 
-  const [customer, setCustomer] = useState<any>(null);
+  const [concessionaire, setConcessionaire] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
-  // Fetch customer profile
-  const fetchCustomerProfile = async () => {
+  // Fetch concessionaire profile (concession details + user info)
+  const fetchConcessionaireProfile = async () => {
     try {
       setLoading(true);
-      const res = await api.get(`/user/${customerId}`);
-      // Handle both formats: { user: {...} } or direct user object
-      setCustomer(res.data.user || res.data);
+      // Concession details
+      const concessionRes = await api.get(`/concession/${concessionaireId}`);
+      const concession = concessionRes.data.data || concessionRes.data;
+      // Concessionaire user info
+      const userRes = await api.get(`/user/${concession.concessionaire_id}`);
+      const user = userRes.data.user || userRes.data;
+      setConcessionaire({ ...concession, ...user });
     } catch (err) {
-      console.error("Error fetching customer profile:", err);
+      console.error("Error fetching concessionaire profile:", err);
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchCustomerProfile();
-  }, [customerId]);
+    fetchConcessionaireProfile();
+  }, [concessionaireId]);
 
   const openMessengerLink = async (link: string) => {
     const raw = String(link).trim();
@@ -59,10 +63,10 @@ const ViewCustomerProfile = () => {
     );
   }
 
-  if (!customer) {
+  if (!concessionaire) {
     return (
       <View style={styles.container}>
-        <Text style={styles.emptyText}>Customer not found</Text>
+        <Text style={styles.emptyText}>Concessionaire not found</Text>
       </View>
     );
   }
@@ -71,43 +75,47 @@ const ViewCustomerProfile = () => {
     <ScrollView style={styles.container}>
       {/* Profile Image */}
       <View style={styles.imageContainer}>
-        {customer.profile_image_url ? (
-          <Image source={{ uri: customer.profile_image_url }} style={styles.profileImage} />
+        {concessionaire.image_url ? (
+          <Image source={{ uri: concessionaire.image_url }} style={styles.profileImage} />
         ) : (
           <View style={styles.profilePlaceholder}>
             <Text style={styles.profileInitials}>
-              {customer.first_name?.[0]}{customer.last_name?.[0]}
+              {concessionaire.first_name?.[0]}{concessionaire.last_name?.[0]}
             </Text>
           </View>
         )}
       </View>
 
-      {/* Customer Name */}
-      <Text style={styles.customerName}>
-        {customer.first_name} {customer.last_name}
+      {/* Concessionaire Name */}
+      <Text style={styles.concessionaireName}>
+        {concessionaire.first_name} {concessionaire.last_name}
       </Text>
+      <Text style={styles.concessionName}>{concessionaire.concession_name}</Text>
+      {concessionaire.cafeteria_name && (
+        <Text style={styles.subText}>{concessionaire.cafeteria_name} {concessionaire.location ? `• ${concessionaire.location}` : ""}</Text>
+      )}
 
       {/* Email */}
       <View style={styles.infoSection}>
         <Text style={styles.infoLabel}>Email:</Text>
-        <Text style={styles.infoValue}>{customer.email}</Text>
+        <Text style={styles.infoValue}>{concessionaire.email}</Text>
       </View>
 
       {/* Contact Number */}
       <View style={styles.infoSection}>
         <Text style={styles.infoLabel}>Contact Number:</Text>
         <Text style={styles.infoValue}>
-          {customer.contact_number || "Not provided"}
+          {concessionaire.contact_number || "Not provided"}
         </Text>
       </View>
 
       {/* Messenger/Facebook Link */}
-      {customer.messenger_link ? (
+      {concessionaire.messenger_link ? (
         <View style={styles.infoSection}>
           <Text style={styles.infoLabel}>Messenger/Facebook:</Text>
           <TouchableOpacity
             style={{ flex: 1 }}
-            onPress={() => openMessengerLink(customer.messenger_link)}
+            onPress={() => openMessengerLink(concessionaire.messenger_link)}
           >
             <Text
               style={[
@@ -116,24 +124,36 @@ const ViewCustomerProfile = () => {
               ]}
               numberOfLines={1}
             >
-              {customer.messenger_link}
+              {concessionaire.messenger_link}
             </Text>
           </TouchableOpacity>
         </View>
       ) : null}
 
-      {/* Role */}
+      {/* GCash */}
+      {concessionaire.gcash_payment_available && (
+        <View style={styles.infoSection}>
+          <Text style={styles.infoLabel}>GCash Number:</Text>
+          <Text style={styles.infoValue}>
+            {concessionaire.gcash_number || "Not provided"}
+          </Text>
+        </View>
+      )}
+
+      {/* Status */}
       <View style={styles.infoSection}>
-        <Text style={styles.infoLabel}>Role:</Text>
-        <Text style={styles.infoValue}>{customer.role}</Text>
+        <Text style={styles.infoLabel}>Status:</Text>
+        <Text style={styles.infoValue}>
+          {concessionaire.status ? concessionaire.status.toUpperCase() : "UNKNOWN"}
+        </Text>
       </View>
 
-      {/* Profile Created Date */}
-      {customer.created_at && (
+      {/* Member Since */}
+      {concessionaire.created_at && (
         <View style={styles.infoSection}>
           <Text style={styles.infoLabel}>Member Since:</Text>
           <Text style={styles.infoValue}>
-            {new Date(customer.created_at).toLocaleDateString()}
+            {new Date(concessionaire.created_at).toLocaleDateString()}
           </Text>
         </View>
       )}
@@ -169,12 +189,25 @@ const styles = StyleSheet.create({
     fontSize: 48,
     fontWeight: "bold",
   },
-  customerName: {
+  concessionaireName: {
     fontSize: 24,
     fontWeight: "bold",
     color: "#A40C2D",
     textAlign: "center",
-    marginBottom: 30,
+    marginBottom: 5,
+  },
+  concessionName: {
+    fontSize: 18,
+    fontWeight: "600",
+    color: "#333",
+    textAlign: "center",
+    marginBottom: 5,
+  },
+  subText: {
+    fontSize: 14,
+    color: "#666",
+    textAlign: "center",
+    marginBottom: 20,
   },
   infoSection: {
     flexDirection: "row",
@@ -203,5 +236,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default ViewCustomerProfile;
-
+export default ViewConcessionaireProfile;

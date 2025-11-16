@@ -318,7 +318,9 @@ export const getOrderById = async (req, res) => {
     const orderResult = await pool.query(
       `SELECT o.*, 
               u.first_name, u.last_name, u.email, u.profile_image,
-              c.concession_name, 
+              c.concession_name,
+              c.gcash_number,
+              c.image AS concession_image,
               caf.cafeteria_name,
               COALESCE(c.gcash_payment_available, FALSE) AS gcash_payment_available,
               COALESCE(c.oncounter_payment_available, FALSE) AS oncounter_payment_available
@@ -338,8 +340,11 @@ export const getOrderById = async (req, res) => {
 
     // Convert images to base64
     order.profile_image = makeImageDataUrl(order.profile_image);
+    order.concession_image_url = makeImageDataUrl(order.concession_image);
     order.gcash_screenshot = makeImageDataUrl(order.gcash_screenshot);
     order.payment_proof = order.gcash_screenshot || null;
+
+    delete order.concession_image;
 
     // Get order items
     const itemsResult = await pool.query(

@@ -12,9 +12,11 @@ import {
   BackHandler,
   Modal,
   RefreshControl,
+  Clipboard,
 } from "react-native";
 import { useRoute, useNavigation, useFocusEffect } from "@react-navigation/native";
 import * as ImagePicker from "expo-image-picker";
+import { Ionicons } from "@expo/vector-icons";
 import api from "../../../libs/apiCall";
 import { useToast } from "../../../contexts/ToastContext";
 
@@ -31,6 +33,17 @@ const ViewOrderCustomer = () => {
   const [updatingPayment, setUpdatingPayment] = useState(false);
   const [cancelConfirmVisible, setCancelConfirmVisible] = useState(false);
   const { showToast } = useToast();
+
+  const copyGcashNumber = async () => {
+    if (!order?.gcash_number) return;
+    try {
+      await Clipboard.setString(String(order.gcash_number));
+      showToast("success", "GCash number copied");
+    } catch (err) {
+      console.error("Error copying GCash number:", err);
+      showToast("error", "Failed to copy GCash number");
+    }
+  };
 
   const formatManila = (value: any) => {
     if (!value) return "";
@@ -271,6 +284,35 @@ const ViewOrderCustomer = () => {
       <Text>
         Status: <Text style={styles.status}>{order.order_status}</Text>
       </Text>
+
+      {/* Concessionaire / Stall info */}
+      <TouchableOpacity
+        style={styles.concessionCard}
+        onPress={() =>
+          navigation.navigate("ViewConcessionaireProfile", {
+            concessionaireId: order.concession_id,
+          })
+        }
+      >
+        {order.concession_image_url ? (
+          <Image
+            source={{ uri: order.concession_image_url }}
+            style={styles.concessionAvatar}
+          />
+        ) : (
+          <View style={styles.concessionAvatarPlaceholder}>
+            <Text style={styles.concessionAvatarInitials}>
+              {order.concession_name?.[0] || ""}
+            </Text>
+          </View>
+        )}
+        <View style={{ flex: 1 }}>
+          <Text style={styles.concessionName}>{order.concession_name}</Text>
+          {order.cafeteria_name && (
+            <Text style={styles.concessionSub}>{order.cafeteria_name}</Text>
+          )}
+        </View>
+      </TouchableOpacity>
       {order.updated_total_price !== null &&
       order.updated_total_price !== undefined &&
       !Number.isNaN(Number(order.updated_total_price)) &&
@@ -358,6 +400,26 @@ const ViewOrderCustomer = () => {
 
       {order.payment_method === "gcash" ? (
         <View style={{ marginTop: 15 }}>
+          {order.gcash_number && (
+            <View style={styles.gcashNumberRow}>
+              <Text style={styles.paymentLabel}>
+                GCash Number: {order.gcash_number}
+              </Text>
+              <TouchableOpacity
+                style={styles.copyButton}
+                onPress={copyGcashNumber}
+              >
+                <Ionicons
+                  name="copy-outline"
+                  size={16}
+                  color="#fff"
+                  style={{ marginRight: 4 }}
+                />
+                <Text style={styles.copyButtonText}>Copy</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+
           <Text style={styles.paymentLabel}>
             GCash Screenshot {order.payment_proof ? "(Uploaded)" : "(Required)"}
           </Text>
@@ -675,6 +737,63 @@ const styles = StyleSheet.create({
   modalConfirmText: {
     color: "#fff",
     fontWeight: "600",
+  },
+  concessionCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: 10,
+    marginTop: 10,
+    marginBottom: 5,
+    backgroundColor: "#f9f9f9",
+    borderRadius: 8,
+  },
+  concessionAvatar: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    marginRight: 10,
+  },
+  concessionAvatarPlaceholder: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    marginRight: 10,
+    backgroundColor: "#e5e7eb",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  concessionAvatarInitials: {
+    fontSize: 18,
+    fontWeight: "600",
+    color: "#374151",
+  },
+  concessionName: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#111827",
+  },
+  concessionSub: {
+    fontSize: 13,
+    color: "#6b7280",
+  },
+  gcashNumberRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 4,
+  },
+  copyButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 6,
+    backgroundColor: "#A40C2D",
+  },
+  copyButtonText: {
+    color: "#fff",
+    fontWeight: "600",
+    fontSize: 12,
   },
 });
 

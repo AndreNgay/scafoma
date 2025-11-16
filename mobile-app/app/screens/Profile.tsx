@@ -31,7 +31,7 @@ const profileSchema = z.object({
   messenger_link: z
     .string()
     .trim()
-    .max(255, "Messenger link is too long")
+    .max(255, "Messenger/Facebook link is too long")
     .or(z.literal("")),
   profile_image_url: z
     .string()
@@ -244,187 +244,195 @@ const Profile = () => {
     { key: "password", label: "Password" },
   ];
 
+  const primaryActionLabel =
+    activeTab === "profile"
+      ? "Save Profile"
+      : activeTab === "contact"
+      ? "Save Contact"
+      : "Change Password";
+
+  const primaryActionHandler =
+    activeTab === "password" ? handleChangePassword : handleUpdateProfile;
+
   return (
-    <ScrollView contentContainerStyle={styles.container}>
+    <View style={styles.screen}>
       {loading && (
         <View style={styles.loaderOverlay}>
           <ActivityIndicator size="large" color="darkred" />
         </View>
       )}
 
-      {/* Tabs */}
-      <View style={styles.tabRow}>
-        {tabs.map((tab) => (
-          <TouchableOpacity
-            key={tab.key}
-            style={[
-              styles.tabButton,
-              activeTab === tab.key && styles.tabButtonActive,
-            ]}
-            onPress={() => setActiveTab(tab.key)}
-          >
-            <Text
-              style={[
-                styles.tabText,
-                activeTab === tab.key && styles.tabTextActive,
-              ]}
-            >
-              {tab.label}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </View>
-
-      {/* Profile Tab */}
-      {activeTab === "profile" && (
-        <>
-          <View style={styles.imageContainer}>
-            <TouchableOpacity onPress={pickImage}>
-              {profile.profile_image_url ? (
-                <Image
-                  source={{ uri: String(profile.profile_image_url) }}
-                  style={styles.profileImage}
-                />
-              ) : (
-                <View style={[styles.profileImage, styles.imagePlaceholder]}>
-                  <Text style={{ color: "#666" }}>Pick Image</Text>
-                </View>
-              )}
-            </TouchableOpacity>
-          </View>
-
-          <Text style={styles.sectionTitle}>Profile</Text>
-
-          <Text style={styles.label}>First Name</Text>
-          <TextInput
-            style={styles.input}
-            value={profile.first_name}
-            onChangeText={(t) => setProfile({ ...profile, first_name: t })}
-          />
-          {errors.first_name && <Text style={styles.error}>{errors.first_name}</Text>}
-
-          <Text style={styles.label}>Last Name</Text>
-          <TextInput
-            style={styles.input}
-            value={profile.last_name}
-            onChangeText={(t) => setProfile({ ...profile, last_name: t })}
-          />
-          {errors.last_name && <Text style={styles.error}>{errors.last_name}</Text>}
-
-          <TouchableOpacity style={styles.button} onPress={handleUpdateProfile}>
-            <Text style={styles.buttonText}>Save Profile</Text>
-          </TouchableOpacity>
-        </>
-      )}
-
-      {/* Contact Tab */}
-      {activeTab === "contact" && (
-        <>
-          <Text style={styles.sectionTitle}>Contact</Text>
-
-          <Text style={styles.label}>Contact Number</Text>
-          <TextInput
-            style={styles.input}
-            keyboardType="number-pad"
-            value={profile.contact_number}
-            onChangeText={(t) => setProfile({ ...profile, contact_number: t })}
-          />
-          {errors.contact_number && (
-            <Text style={styles.error}>{errors.contact_number}</Text>
-          )}
-
-          <Text style={styles.label}>Messenger Link</Text>
-          <TextInput
-            style={styles.input}
-            keyboardType="url"
-            autoCapitalize="none"
-            value={profile.messenger_link}
-            onChangeText={(t) => setProfile({ ...profile, messenger_link: t })}
-          />
-          {errors.messenger_link && (
-            <Text style={styles.error}>{errors.messenger_link}</Text>
-          )}
-
-          {profile.messenger_link?.trim() ? (
+      <ScrollView contentContainerStyle={styles.container}>
+        {/* Tabs */}
+        <View style={styles.tabRow}>
+          {tabs.map((tab) => (
             <TouchableOpacity
-              style={styles.linkButton}
-              onPress={openMessengerLink}
+              key={tab.key}
+              style={[
+                styles.tabButton,
+                activeTab === tab.key && styles.tabButtonActive,
+              ]}
+              onPress={() => setActiveTab(tab.key)}
             >
-              <Text style={styles.linkButtonText}>Open Messenger Link</Text>
+              <Text
+                style={[
+                  styles.tabText,
+                  activeTab === tab.key && styles.tabTextActive,
+                ]}
+              >
+                {tab.label}
+              </Text>
             </TouchableOpacity>
-          ) : null}
+          ))}
+        </View>
 
-          <Text style={styles.label}>Email</Text>
-          <TextInput
-            style={[styles.input, { backgroundColor: "#eee" }]}
-            editable={false}
-            value={profile.email}
-          />
-          {errors.email && <Text style={styles.error}>{errors.email}</Text>}
+        {/* Profile Tab */}
+        {activeTab === "profile" && (
+          <>
+            <View style={styles.imageContainer}>
+              <TouchableOpacity onPress={pickImage}>
+                {profile.profile_image_url ? (
+                  <Image
+                    source={{ uri: String(profile.profile_image_url) }}
+                    style={styles.profileImage}
+                  />
+                ) : (
+                  <View style={[styles.profileImage, styles.imagePlaceholder]}>
+                    <Text style={{ color: "#666" }}>Pick Image</Text>
+                  </View>
+                )}
+              </TouchableOpacity>
+            </View>
 
-          <TouchableOpacity style={styles.button} onPress={handleUpdateProfile}>
-            <Text style={styles.buttonText}>Save Contact</Text>
-          </TouchableOpacity>
-        </>
-      )}
+            <Text style={styles.sectionTitle}>Profile</Text>
 
-      {/* Password Tab */}
-      {activeTab === "password" && (
-        <>
-          <Text style={styles.sectionTitle}>Change Password</Text>
+            <Text style={styles.label}>First Name</Text>
+            <TextInput
+              style={styles.input}
+              value={profile.first_name}
+              onChangeText={(t) => setProfile({ ...profile, first_name: t })}
+            />
+            {errors.first_name && (
+              <Text style={styles.error}>{errors.first_name}</Text>
+            )}
 
-          <Text style={styles.label}>Current Password</Text>
-          <TextInput
-            style={styles.input}
-            secureTextEntry
-            value={passwords.currentPassword}
-            onChangeText={(t) =>
-              setPasswords({ ...passwords, currentPassword: t })
-            }
-          />
-          {errors.currentPassword && (
-            <Text style={styles.error}>{errors.currentPassword}</Text>
-          )}
+            <Text style={styles.label}>Last Name</Text>
+            <TextInput
+              style={styles.input}
+              value={profile.last_name}
+              onChangeText={(t) => setProfile({ ...profile, last_name: t })}
+            />
+            {errors.last_name && (
+              <Text style={styles.error}>{errors.last_name}</Text>
+            )}
+          </>
+        )}
 
-          <Text style={styles.label}>New Password</Text>
-          <TextInput
-            style={styles.input}
-            secureTextEntry
-            value={passwords.newPassword}
-            onChangeText={(t) =>
-              setPasswords({ ...passwords, newPassword: t })
-            }
-          />
-          {errors.newPassword && (
-            <Text style={styles.error}>{errors.newPassword}</Text>
-          )}
+        {/* Contact Tab */}
+        {activeTab === "contact" && (
+          <>
+            <Text style={styles.sectionTitle}>Contact</Text>
 
-          <Text style={styles.label}>Confirm New Password</Text>
-          <TextInput
-            style={styles.input}
-            secureTextEntry
-            value={passwords.confirmPassword}
-            onChangeText={(t) =>
-              setPasswords({ ...passwords, confirmPassword: t })
-            }
-          />
-          {errors.confirmPassword && (
-            <Text style={styles.error}>{errors.confirmPassword}</Text>
-          )}
+            <Text style={styles.label}>Contact Number</Text>
+            <TextInput
+              style={styles.input}
+              keyboardType="number-pad"
+              value={profile.contact_number}
+              onChangeText={(t) =>
+                setProfile({ ...profile, contact_number: t })
+              }
+            />
+            {errors.contact_number && (
+              <Text style={styles.error}>{errors.contact_number}</Text>
+            )}
 
-          <TouchableOpacity style={styles.button} onPress={handleChangePassword}>
-            <Text style={styles.buttonText}>Change Password</Text>
-          </TouchableOpacity>
-        </>
-      )}
+            <Text style={styles.label}>Messenger/Facebook Link</Text>
+            <TextInput
+              style={styles.input}
+              keyboardType="url"
+              autoCapitalize="none"
+              value={profile.messenger_link}
+              onChangeText={(t) =>
+                setProfile({ ...profile, messenger_link: t })
+              }
+              placeholder="m.me/john.doe.2024"
+            />
+            {errors.messenger_link && (
+              <Text style={styles.error}>{errors.messenger_link}</Text>
+            )}
 
-      {/* Logout (global) */}
-      <TouchableOpacity
-        style={[styles.button, { backgroundColor: "gray" }]}
-        onPress={handleLogout}
-      >
-        <Text style={styles.buttonText}>Logout</Text>
-      </TouchableOpacity>
+            <Text style={styles.label}>Email</Text>
+            <TextInput
+              style={[styles.input, { backgroundColor: "#eee" }]}
+              editable={false}
+              value={profile.email}
+            />
+            {errors.email && <Text style={styles.error}>{errors.email}</Text>}
+          </>
+        )}
+
+        {/* Password Tab */}
+        {activeTab === "password" && (
+          <>
+            <Text style={styles.sectionTitle}>Change Password</Text>
+
+            <Text style={styles.label}>Current Password</Text>
+            <TextInput
+              style={styles.input}
+              secureTextEntry
+              value={passwords.currentPassword}
+              onChangeText={(t) =>
+                setPasswords({ ...passwords, currentPassword: t })
+              }
+            />
+            {errors.currentPassword && (
+              <Text style={styles.error}>{errors.currentPassword}</Text>
+            )}
+
+            <Text style={styles.label}>New Password</Text>
+            <TextInput
+              style={styles.input}
+              secureTextEntry
+              value={passwords.newPassword}
+              onChangeText={(t) =>
+                setPasswords({ ...passwords, newPassword: t })
+              }
+            />
+            {errors.newPassword && (
+              <Text style={styles.error}>{errors.newPassword}</Text>
+            )}
+
+            <Text style={styles.label}>Confirm New Password</Text>
+            <TextInput
+              style={styles.input}
+              secureTextEntry
+              value={passwords.confirmPassword}
+              onChangeText={(t) =>
+                setPasswords({ ...passwords, confirmPassword: t })
+              }
+            />
+            {errors.confirmPassword && (
+              <Text style={styles.error}>{errors.confirmPassword}</Text>
+            )}
+          </>
+        )}
+      </ScrollView>
+
+      {/* Bottom actions */}
+      <View style={styles.bottomBar}>
+        <TouchableOpacity
+          style={[styles.bottomButton, styles.bottomSecondaryButton]}
+          onPress={handleLogout}
+        >
+          <Text style={styles.bottomSecondaryText}>Logout</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.bottomButton, styles.bottomPrimaryButton]}
+          onPress={primaryActionHandler}
+        >
+          <Text style={styles.bottomPrimaryText}>{primaryActionLabel}</Text>
+        </TouchableOpacity>
+      </View>
 
       <Modal
         transparent
@@ -455,17 +463,22 @@ const Profile = () => {
           </View>
         </View>
       </Modal>
-    </ScrollView>
+    </View>
   );
 }
 
 export default Profile;
 
 const styles = StyleSheet.create({
+  screen: {
+    flex: 1,
+    backgroundColor: "#f9f9f9",
+  },
   container: {
     padding: 16,
     backgroundColor: "#f9f9f9",
     flexGrow: 1,
+    paddingBottom: 100,
   },
   tabRow: {
     flexDirection: "row",
@@ -534,6 +547,41 @@ const styles = StyleSheet.create({
     color: "#fff",
     fontWeight: "600",
     fontSize: 16,
+  },
+  bottomBar: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderTopWidth: 1,
+    borderTopColor: "#ddd",
+    backgroundColor: "#fff",
+  },
+  bottomButton: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 8,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  bottomSecondaryButton: {
+    marginRight: 8,
+    backgroundColor: "#eee",
+  },
+  bottomPrimaryButton: {
+    marginLeft: 8,
+    backgroundColor: "darkred",
+  },
+  bottomPrimaryText: {
+    color: "#fff",
+    fontWeight: "600",
+    fontSize: 15,
+  },
+  bottomSecondaryText: {
+    color: "#333",
+    fontWeight: "500",
+    fontSize: 15,
   },
   imageContainer: {
     alignItems: "center",

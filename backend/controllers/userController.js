@@ -116,7 +116,7 @@ export const getUserById = async (req, res) => {
   try {
     const { id } = req.params;
 
-    const result = await pool.query("SELECT id, first_name, last_name, email, role, profile_image, created_at, updated_at FROM tbluser WHERE id = $1", [id]);
+    const result = await pool.query("SELECT id, first_name, last_name, email, role, contact_number, messenger_link, profile_image, created_at, updated_at FROM tbluser WHERE id = $1", [id]);
 
     if (result.rows.length === 0) {
       return res.status(404).json({ message: "User not found" });
