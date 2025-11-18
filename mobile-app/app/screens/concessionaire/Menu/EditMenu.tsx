@@ -9,6 +9,7 @@ import {
   ScrollView,
   Image,
   Switch,
+  ActivityIndicator,
 } from "react-native";
 import { useNavigation, useRoute } from "@react-navigation/native";
 import * as ImagePicker from "expo-image-picker";
@@ -49,6 +50,7 @@ const EditMenu: React.FC = () => {
   );
   const [variationGroups, setVariationGroups] = useState<VariationGroup[]>([]);
   const [loading, setLoading] = useState(false);
+  const [variationGroupsLoading, setVariationGroupsLoading] = useState(true);
   const [existingCategories, setExistingCategories] = useState<string[]>([]);
   const { showToast } = useToast();
 
@@ -57,6 +59,7 @@ const EditMenu: React.FC = () => {
   useEffect(() => {
     const loadVariationGroups = async () => {
       try {
+        setVariationGroupsLoading(true);
         const groupsRes = await api.get(`/item-variation-group/${menuItem.id}`);
         const groups = groupsRes.data.data || [];
 
@@ -89,6 +92,8 @@ const EditMenu: React.FC = () => {
       } catch (err) {
         console.error("Error loading variation groups for edit:", err);
         setVariationGroups([]);
+      } finally {
+        setVariationGroupsLoading(false);
       }
     };
 
@@ -554,6 +559,13 @@ const EditMenu: React.FC = () => {
         <Text style={[styles.label, { marginTop: 18 }]}>Variations</Text>
       </View>
 
+      {variationGroupsLoading && variationGroups.length === 0 ? (
+        <View style={styles.variationLoadingRow}>
+          <ActivityIndicator size="small" color="#A40C2D" />
+          <Text style={styles.variationLoadingText}>Loading options...</Text>
+        </View>
+      ) : null}
+
       {variationGroups.map((group, gIndex) => (
         <View key={gIndex} style={styles.groupBox}>
           <TextInput
@@ -801,6 +813,16 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
     marginTop: 8,
+  },
+  variationLoadingRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: 8,
+    gap: 8,
+  },
+  variationLoadingText: {
+    fontSize: 12,
+    color: "#666",
   },
   groupBox: {
     borderWidth: 1,

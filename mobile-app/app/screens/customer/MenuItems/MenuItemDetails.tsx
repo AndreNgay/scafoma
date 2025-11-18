@@ -5,10 +5,12 @@ import {
   Image,
   ScrollView,
   TouchableOpacity,
+  Alert,
   StyleSheet,
   TextInput,
   KeyboardAvoidingView,
   Platform,
+  ActivityIndicator,
 } from "react-native";
 import { useNavigation, useRoute } from "@react-navigation/native";
 import useStore from "../../../store";
@@ -28,6 +30,7 @@ const MenuItemDetails = () => {
   const [diningOption, setDiningOption] = useState<'dine-in' | 'take-out'>('dine-in');
   const [paymentMethod, setPaymentMethod] = useState<'gcash' | 'on-counter'>('on-counter');
   const [groupedVariations, setGroupedVariations] = useState<any>({});
+  const [loadingVariations, setLoadingVariations] = useState<boolean>(false);
   const [selectedVariations, setSelectedVariations] = useState<any[]>([]);
   // Track quantities for variations with max_amount > 1
   const [variationQuantities, setVariationQuantities] = useState<Record<number, number>>({});
@@ -60,6 +63,7 @@ const MenuItemDetails = () => {
   useEffect(() => {
     const fetchVariations = async () => {
       try {
+        setLoadingVariations(true);
         const res = await api.get(`/item-variation-group/${item.id}`);
         const groups = res.data.data;
 
@@ -74,6 +78,9 @@ const MenuItemDetails = () => {
         setGroupedVariations(grouped);
       } catch (err) {
         console.error("Error fetching variations:", err);
+        setGroupedVariations({});
+      } finally {
+        setLoadingVariations(false);
       }
     };
 
@@ -524,7 +531,9 @@ const MenuItemDetails = () => {
         </View>
 
         {/* Variations */}
-        {Object.entries<any>(groupedVariations).map(([groupName, group]) => {
+        {loadingVariations ? (
+          <ActivityIndicator style={{ marginTop: 10 }} color="#A40C2D" />
+        ) : Object.entries<any>(groupedVariations).map(([groupName, group]) => {
           const selectionsInGroup = selectedVariations.filter((v) => v.group_id === group.id);
           const maxSelection = group.max_selection || 1;
           const minSelection = group.min_selection || 0;

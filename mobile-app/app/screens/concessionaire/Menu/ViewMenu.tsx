@@ -7,8 +7,11 @@ import {
   Image,
   StyleSheet,
   TouchableOpacity,
+  Alert,
+  TextInput,
   KeyboardAvoidingView,
   Platform,
+  ActivityIndicator,
 } from "react-native";
 import { useRoute } from "@react-navigation/native";
 import api from "../../../libs/apiCall";
@@ -29,8 +32,9 @@ const ViewMenu: React.FC = () => {
   const route = useRoute<any>();
   const { menuItem } = route.params;
 
-  const [variationGroups, setVariationGroups] = useState<VariationGroup[]>(menuItem?.variations || []);
+  const [variationGroups, setVariationGroups] = useState<VariationGroup[]>([]);
   const [feedbacks, setFeedbacks] = useState<any[]>([]);
+  const [note, setNote] = useState<string>("");
   const [quantity, setQuantity] = useState<number>(1);
   const [selectedVariations, setSelectedVariations] = useState<SelectedVariation[]>([]);
   const [variationQuantities, setVariationQuantities] = useState<Record<string, number>>({});
@@ -50,6 +54,14 @@ const ViewMenu: React.FC = () => {
 
     fetchFeedbacks();
   }, [menuItem.id]);
+
+  // Initialize variation groups with a tiny loading window
+  const [loadingVariations, setLoadingVariations] = useState<boolean>(true);
+  useEffect(() => {
+    const groups = (menuItem as any)?.variations || [];
+    setVariationGroups(groups);
+    setLoadingVariations(false);
+  }, [menuItem?.variations]);
 
   // Helpers for preview selection logic
   const basePrice = Number(menuItem.price) || 0;
@@ -236,7 +248,9 @@ const ViewMenu: React.FC = () => {
       </Text>
 
       {/* Variations - Interactive Preview */}
-      {variationGroups.length > 0 && (
+      {loadingVariations ? (
+        <ActivityIndicator style={{ marginTop: 10 }} color="#A40C2D" />
+      ) : variationGroups.length > 0 && (
         <>
           <Text style={styles.label}>Variations</Text>
           {variationGroups.map((group: VariationGroup, gIndex: number) => {

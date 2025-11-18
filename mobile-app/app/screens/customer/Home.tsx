@@ -17,7 +17,6 @@ const Home = ({ navigation }: any) => {
   const [refreshing, setRefreshing] = useState(false);
   const [categories, setCategories] = useState<string[]>([]);
   const [featuredConcessions, setFeaturedConcessions] = useState<any[]>([]);
-  const [popularDishes, setPopularDishes] = useState<any[]>([]);
   const [trendingDishes, setTrendingDishes] = useState<any[]>([]);
   const [recommendations, setRecommendations] = useState<any[]>([]);
   const [activeOrders, setActiveOrders] = useState<any[]>([]);
@@ -47,10 +46,6 @@ const Home = ({ navigation }: any) => {
         new Set((items as any[]).map((i: any) => (i.category ? String(i.category) : "")).filter((c: string) => !!c))
       ) as string[];
       setCategories(uniqueCategories as string[]);
-
-      // Popular dishes (most ordered overall)
-      const popRes = await api.get("/order-detail/analytics/most-ordered", { params: { limit: 10 } });
-      setPopularDishes(popRes.data.data || popRes.data || []);
 
       // Trending dishes (this week)
       const trendRes = await api.get("/order-detail/analytics/trending-week", { params: { limit: 10 } });
@@ -429,23 +424,6 @@ const Home = ({ navigation }: any) => {
             data={featuredConcessions.slice(0, 8)}
             keyExtractor={(i) => String(i.id)}
             renderItem={({ item }) => <ConcessionCard item={item} />}
-            contentContainerStyle={styles.horizontalList}
-          />
-        </View>
-      )}
-
-      {/* Popular Dishes */}
-      {popularDishes.length > 0 && (
-        <View style={styles.section}>
-          <View style={styles.sectionHeaderContainer}>
-            <Text style={styles.sectionHeader}>Popular Dishes</Text>
-          </View>
-          <FlatList
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            data={popularDishes.slice(0, 8)}
-            keyExtractor={(i) => String(i.id)}
-            renderItem={({ item }) => <DishCard item={item} />}
             contentContainerStyle={styles.horizontalList}
           />
         </View>

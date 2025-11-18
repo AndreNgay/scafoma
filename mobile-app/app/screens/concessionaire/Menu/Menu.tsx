@@ -11,6 +11,7 @@ import {
   TextInput,
   RefreshControl,
   Alert,
+  Modal,
 } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import { Ionicons } from "@expo/vector-icons";
@@ -50,6 +51,7 @@ const Menu = () => {
   const { showToast } = useToast();
   const [selectedItem, setSelectedItem] = useState<MenuItem | null>(null); // item with open overflow
   const [deleteLoading, setDeleteLoading] = useState(false);
+  const [availabilityLoadingId, setAvailabilityLoadingId] = useState<number | null>(null);
 
   const fetchMenuItems = async (pageNum = 1, replace = false) => {
     try {
@@ -90,7 +92,7 @@ const Menu = () => {
   };
 
   const openActions = (item: MenuItem) => {
-    setSelectedItem((prev) => (prev && prev.id === item.id ? null : item));
+    setSelectedItem(item);
   };
 
   const closeActions = () => {
@@ -101,6 +103,45 @@ const Menu = () => {
   const handleEditMenuItem = (item: MenuItem) => {
     closeActions();
     navigation.navigate("Edit Menu", { menuItem: item });
+  };
+
+  const handlePreviewAsCustomer = (item: MenuItem) => {
+    closeActions();
+    navigation.navigate("View Menu", { menuItem: item });
+  };
+
+  const handleToggleAvailability = async (item: MenuItem, nextAvailable: boolean) => {
+    try {
+      setAvailabilityLoadingId(item.id);
+      const formData = new FormData();
+      formData.append("availability", nextAvailable ? "true" : "false");
+
+      const existingVariations = (item as any).variations;
+      if (existingVariations && Array.isArray(existingVariations)) {
+        formData.append("variations", JSON.stringify(existingVariations));
+      }
+
+      await api.put(`/menu-item/${item.id}`, formData, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+
+      setMenuItems((prev) =>
+        prev.map((m) => (m.id === item.id ? { ...m, availability: nextAvailable } : m))
+      );
+
+      showToast(
+        "success",
+        nextAvailable ? "Menu item marked as available" : "Menu item marked as unavailable"
+      );
+      closeActions();
+    } catch (error: any) {
+      console.error("Error updating availability:", error);
+      const message =
+        error?.response?.data?.message || "Failed to update availability. Please try again.";
+      showToast("error", message);
+    } finally {
+      setAvailabilityLoadingId(null);
+    }
   };
 
   const performDeleteMenuItem = async (item: MenuItem) => {
@@ -196,14 +237,11 @@ const Menu = () => {
             <TouchableOpacity
               style={styles.card}
               onPress={() => {
-                // If any menu is open, close it instead of navigating (click outside behavior)
-                if (selectedItem) {
-                  closeActions();
-                  return;
-                }
-                navigation.navigate("View Menu", { menuItem: item });
+                navigation.navigate("Edit Menu", { menuItem: item });
               }}
-              activeOpacity={0.8}
+              onLongPress={() => openActions(item)}
+              delayLongPress={250}
+              activeOpacity={0.9}
             >
               {(!imageError[item.id] && item.image_url) ? (
                 <Image
@@ -215,7 +253,26 @@ const Menu = () => {
                 <View style={styles.placeholder} />
               )}
               <View style={styles.info}>
-                <Text style={styles.name}>{item.item_name}</Text>
+                <View style={styles.infoHeader}>
+                  <Text style={styles.name} numberOfLines={1}>{item.item_name}</Text>
+                  <View
+                    style={[
+                      styles.statusChip,
+                      item.availability ? styles.statusChipAvailable : styles.statusChipUnavailable,
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.statusChipText,
+                        item.availability
+                          ? styles.statusChipTextAvailable
+                          : styles.statusChipTextUnavailable,
+                      ]}
+                    >
+                      {item.availability ? "Available" : "Unavailable"}
+                    </Text>
+                  </View>
+                </View>
                 {item.category ? (
                   <Text style={styles.categoryTag}>{item.category}</Text>
                 ) : null}
@@ -266,52 +323,91 @@ const Menu = () => {
                     </Text>
                   );
                 })()}
-                <Text style={{ color: item.availability ? "green" : "red", marginTop: 2 }}>
-                  {item.availability ? "Available" : "Unavailable"}
-                </Text>
-              </View>
-
-              <View style={styles.overflowContainer} pointerEvents="box-none">
-                <TouchableOpacity
-                  style={styles.editButton}
-                  onPress={() => openActions(item)}
-                  activeOpacity={0.7}
-                >
-                  <Ionicons name="ellipsis-vertical" size={18} color="#fff" />
-                </TouchableOpacity>
-
-                {selectedItem?.id === item.id && (
-                  <View style={styles.overflowMenu}>
-                    <TouchableOpacity
-                      style={styles.overflowOption}
-                      onPress={() => handleEditMenuItem(item)}
-                      disabled={deleteLoading}
-                    >
-                      <Text style={styles.overflowOptionText}>Edit</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      style={[styles.overflowOption, styles.overflowOptionDanger]}
-                      onPress={() => handleDeleteMenuItem(item)}
-                      disabled={deleteLoading}
-                    >
-                      <Text style={styles.overflowOptionDangerText}>
-                        {deleteLoading ? "Deleting..." : "Delete"}
-                      </Text>
-                    </TouchableOpacity>
-                  </View>
-                )}
               </View>
             </TouchableOpacity>
           )}
         />
+      )}
+      {selectedItem && (
+        <Modal
+          visible={!!selectedItem}
+          transparent
+          animationType="fade"
+          onRequestClose={closeActions}
+        >
+          <TouchableOpacity
+            style={styles.modalBackdrop}
+            activeOpacity={1}
+            onPress={closeActions}
+          >
+            <TouchableOpacity
+              activeOpacity={1}
+              style={styles.modalSheet}
+              onPress={() => {}}
+            >
+              <Text style={styles.modalTitle} numberOfLines={2}>
+                {selectedItem.item_name}
+              </Text>
+              <Text style={styles.modalSubtitle}>Choose an action</Text>
+
+              <TouchableOpacity
+                style={styles.modalOption}
+                onPress={() => handleEditMenuItem(selectedItem)}
+                disabled={deleteLoading || availabilityLoadingId === selectedItem.id}
+              >
+                <Text style={styles.modalOptionText}>Edit item</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.modalOption}
+                onPress={() => handlePreviewAsCustomer(selectedItem)}
+                disabled={deleteLoading || availabilityLoadingId === selectedItem.id}
+              >
+                <Text style={styles.modalOptionText}>Customer preview</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.modalOption}
+                onPress={() =>
+                  handleToggleAvailability(
+                    selectedItem,
+                    selectedItem.availability === false ? true : false
+                  )
+                }
+                disabled={deleteLoading || availabilityLoadingId === selectedItem.id}
+              >
+                <Text style={styles.modalOptionText}>
+                  {availabilityLoadingId === selectedItem.id
+                    ? "Updating availability..."
+                    : selectedItem.availability === false
+                    ? "Mark as available"
+                    : "Mark as unavailable"}
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.modalOption, styles.modalOptionDanger]}
+                onPress={() => handleDeleteMenuItem(selectedItem)}
+                disabled={deleteLoading || availabilityLoadingId === selectedItem.id}
+              >
+                <Text style={styles.modalOptionDangerText}>
+                  {deleteLoading ? "Deleting..." : "Delete item"}
+                </Text>
+              </TouchableOpacity>
+
+            </TouchableOpacity>
+          </TouchableOpacity>
+        </Modal>
       )}
       
       {/* Floating Add Button */}
       <TouchableOpacity
         style={styles.floatingAddButton}
         onPress={() => navigation.navigate("Add Menu")}
+        activeOpacity={0.9}
       >
-        <Text style={styles.floatingAddButtonText}>+</Text>
+        <Ionicons name="add" size={22} color="#fff" />
+        <Text style={styles.floatingAddButtonText}>New menu item</Text>
       </TouchableOpacity>
     </View>
   );
@@ -335,6 +431,11 @@ const styles = StyleSheet.create({
   image: { width: 70, height: 70, borderRadius: 8, marginRight: 12 },
   placeholder: { width: 70, height: 70, borderRadius: 8, backgroundColor: "#ddd", marginRight: 12 },
   info: { flex: 1 },
+  infoHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
   name: { fontSize: 16, fontWeight: "600" },
   price: { marginTop: 5, fontSize: 14, color: "#A40C2D", fontWeight: "600" },
   categoryTag: { marginTop: 3, fontSize: 12, color: "#A40C2D", fontWeight: "600" },
@@ -379,11 +480,13 @@ const styles = StyleSheet.create({
     bottom: 20,
     right: 20,
     backgroundColor: "darkred",
-    width: 56,
-    height: 56,
-    borderRadius: 28,
+    borderRadius: 999,
+    paddingHorizontal: 18,
+    height: 48,
+    flexDirection: "row",
     justifyContent: "center",
     alignItems: "center",
+    columnGap: 8,
     elevation: 8,
     shadowColor: "#000",
     shadowOffset: {
@@ -395,8 +498,81 @@ const styles = StyleSheet.create({
   },
   floatingAddButtonText: {
     color: "white",
-    fontSize: 24,
-    fontWeight: "bold",
+    fontSize: 16,
+    fontWeight: "600",
+  },
+  statusChip: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 999,
+    marginLeft: 8,
+  },
+  statusChipAvailable: {
+    backgroundColor: "#e4f7ec",
+  },
+  statusChipUnavailable: {
+    backgroundColor: "#fdecea",
+  },
+  statusChipText: {
+    fontSize: 11,
+    fontWeight: "600",
+  },
+  statusChipTextAvailable: {
+    color: "#1b5e20",
+  },
+  statusChipTextUnavailable: {
+    color: "#b71c1c",
+  },
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.4)",
+    justifyContent: "flex-end",
+  },
+  modalSheet: {
+    backgroundColor: "#fff",
+    paddingHorizontal: 20,
+    paddingTop: 16,
+    paddingBottom: 24,
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 16,
+  },
+  modalTitle: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: "#111",
+  },
+  modalSubtitle: {
+    marginTop: 4,
+    marginBottom: 12,
+    fontSize: 13,
+    color: "#555",
+  },
+  modalOption: {
+    paddingVertical: 10,
+  },
+  modalOptionText: {
+    fontSize: 15,
+    color: "#222",
+  },
+  modalOptionDanger: {
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: "#eee",
+    marginTop: 4,
+    paddingTop: 12,
+  },
+  modalOptionDangerText: {
+    fontSize: 15,
+    color: "#d32f2f",
+    fontWeight: "600",
+  },
+  modalCancel: {
+    marginTop: 8,
+    paddingVertical: 10,
+  },
+  modalCancelText: {
+    fontSize: 15,
+    color: "#555",
+    textAlign: "center",
   },
   overflowContainer: {
     position: "absolute",
