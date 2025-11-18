@@ -10,6 +10,7 @@ import {
   Image,
   Switch,
   ActivityIndicator,
+  Modal,
 } from "react-native";
 import { useNavigation, useRoute } from "@react-navigation/native";
 import * as ImagePicker from "expo-image-picker";
@@ -53,6 +54,11 @@ const EditMenu: React.FC = () => {
   const [variationGroupsLoading, setVariationGroupsLoading] = useState(true);
   const [existingCategories, setExistingCategories] = useState<string[]>([]);
   const { showToast } = useToast();
+
+  const [importModalVisible, setImportModalVisible] = useState(false);
+  const [importItemsLoading, setImportItemsLoading] = useState(false);
+  const [importSourceItems, setImportSourceItems] = useState<any[]>([]);
+  const [importFromItemLoading, setImportFromItemLoading] = useState(false);
 
   // Tooltips removed
 
@@ -99,6 +105,68 @@ const EditMenu: React.FC = () => {
 
     loadVariationGroups();
   }, [menuItem.id]);
+
+  const loadImportSourceItems = async () => {
+    try {
+      setImportItemsLoading(true);
+      const res = await api.get("/menu-item", { params: { page: 1, limit: 100 } });
+      const items = (res.data?.data || res.data || []) as any[];
+      const filtered = items.filter((item) => {
+        if (item.id === menuItem.id) return false;
+        const groups = (item as any).variations || [];
+        return Array.isArray(groups) && groups.length > 0;
+      });
+      setImportSourceItems(filtered);
+    } catch (err) {
+      console.error("Error loading items for variation import:", err);
+      showToast("error", "Failed to load items to import from.");
+    } finally {
+      setImportItemsLoading(false);
+    }
+  };
+
+  const openImportModal = () => {
+    setImportModalVisible(true);
+    loadImportSourceItems();
+  };
+
+  const handleImportFromItem = async (sourceItem: any) => {
+    try {
+      setImportFromItemLoading(true);
+      const groupsFromSource = (sourceItem.variations || []) as any[];
+      if (!groupsFromSource.length) {
+        showToast("error", "Selected item has no variations to import.");
+        return;
+      }
+
+      const importedGroups: VariationGroup[] = groupsFromSource.map((g: any) => ({
+        label: g.label,
+        required_selection: g.required_selection || false,
+        min_selection: g.min_selection || 0,
+        max_selection: g.max_selection || 1,
+        variations: (g.variations || []).map((v: any) => ({
+          name: v.name,
+          price: v.price != null ? String(v.price) : "",
+          max_amount:
+            typeof v.max_amount === "number" && v.max_amount > 0
+              ? v.max_amount
+              : undefined,
+          image_url: v.image_url,
+          variation_id: v.variation_id,
+          available: v.available !== false,
+        })),
+      }));
+
+      setVariationGroups((prev) => [...prev, ...importedGroups]);
+      showToast("success", "Variations imported from selected item.");
+      setImportModalVisible(false);
+    } catch (err) {
+      console.error("Error importing variation groups:", err);
+      showToast("error", "Failed to import variations. Please try again.");
+    } finally {
+      setImportFromItemLoading(false);
+    }
+  };
 
   // Load existing categories for this concessionaire (same as AddMenu)
   useEffect(() => {
@@ -557,6 +625,13 @@ const EditMenu: React.FC = () => {
       {/* Variations */}
       <View style={styles.labelRow}>
         <Text style={[styles.label, { marginTop: 18 }]}>Variations</Text>
+        <TouchableOpacity
+          style={styles.importButton}
+          onPress={openImportModal}
+          disabled={variationGroupsLoading}
+        >
+          <Text style={styles.importButtonText}>Import from item</Text>
+        </TouchableOpacity>
       </View>
 
       {variationGroupsLoading && variationGroups.length === 0 ? (
@@ -766,6 +841,65 @@ const EditMenu: React.FC = () => {
           {loading ? "Saving..." : "Save Changes"}
         </Text>
       </TouchableOpacity>
+
+      {importModalVisible && (
+        <Modal
+          visible={importModalVisible}
+          transparent
+          animationType="slide"
+          onRequestClose={() => {
+            if (!importFromItemLoading) setImportModalVisible(false);
+          }}
+        >
+          <TouchableOpacity
+            style={styles.modalBackdrop}
+            activeOpacity={1}
+            onPress={() => {
+              if (!importFromItemLoading) setImportModalVisible(false);
+            }}
+          >
+            <TouchableOpacity
+              activeOpacity={1}
+              style={styles.modalSheet}
+              onPress={() => {}}
+            >
+              <Text style={styles.modalTitle}>Import variations</Text>
+              <Text style={styles.modalSubtitle}>
+                Choose an existing menu item to copy its variation groups.
+              </Text>
+
+              {importItemsLoading ? (
+                <View style={styles.modalLoadingRow}>
+                  <ActivityIndicator size="small" color="#A40C2D" />
+                  <Text style={styles.modalLoadingText}>Loading items...</Text>
+                </View>
+              ) : importSourceItems.length === 0 ? (
+                <Text style={styles.modalEmptyText}>
+                  No other items with variations found.
+                </Text>
+              ) : (
+                importSourceItems.map((item) => (
+                  <TouchableOpacity
+                    key={item.id}
+                    style={styles.modalOption}
+                    onPress={() => handleImportFromItem(item)}
+                    disabled={importFromItemLoading}
+                  >
+                    <Text style={styles.modalOptionText}>{item.item_name}</Text>
+                    {item.category ? (
+                      <Text style={styles.modalOptionMeta}>{item.category}</Text>
+                    ) : null}
+                  </TouchableOpacity>
+                ))
+              )}
+
+              {importFromItemLoading ? (
+                <Text style={styles.modalImportHint}>Importing variations...</Text>
+              ) : null}
+            </TouchableOpacity>
+          </TouchableOpacity>
+        </Modal>
+      )}
     </ScrollView>
   );
 };
@@ -1040,6 +1174,65 @@ const styles = StyleSheet.create({
     color: "#666",
     marginTop: 4,
     marginLeft: 8,
+  },
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.4)",
+    justifyContent: "flex-end",
+  },
+  modalSheet: {
+    backgroundColor: "#fff",
+    paddingHorizontal: 20,
+    paddingTop: 16,
+    paddingBottom: 24,
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 16,
+  },
+  modalTitle: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: "#111",
+    marginBottom: 4,
+  },
+  modalSubtitle: {
+    fontSize: 13,
+    color: "#555",
+    marginBottom: 10,
+  },
+  modalLoadingRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: 8,
+    gap: 8,
+  },
+  modalLoadingText: {
+    fontSize: 12,
+    color: "#666",
+  },
+  modalOption: {
+    paddingVertical: 10,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: "#eee",
+  },
+  modalOptionText: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#111",
+  },
+  modalOptionMeta: {
+    fontSize: 12,
+    color: "#666",
+    marginTop: 2,
+  },
+  modalEmptyText: {
+    fontSize: 12,
+    color: "#666",
+    marginTop: 8,
+  },
+  modalImportHint: {
+    fontSize: 12,
+    color: "#A40C2D",
+    marginTop: 10,
   },
   categoryChipsContainer: {
     flexDirection: "row",
