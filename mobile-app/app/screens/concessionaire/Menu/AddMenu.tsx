@@ -395,17 +395,22 @@ const AddMenu: React.FC = () => {
     formData.append("category", category.trim()); // ✅ send typed category
     formData.append("availability", availability ? "true" : "false");
     
-    // Separate variations with images from those without
-    const variationsWithoutImages = variationGroups.map(group => ({
+    // Separate variations with images from those without, but keep image_url
+    // so the backend can clone imported images via data URLs.
+    const variationsForPayload = variationGroups.map(group => ({
       ...group,
       variations: group.variations.map(v => ({ 
         name: v.name, 
         price: v.price, 
         max_amount: typeof v.max_amount === "number" && v.max_amount > 0 ? v.max_amount : undefined,
-        available: v.available !== false
+        available: v.available !== false,
+        // image_url may be a data URL (imported) or undefined. The backend will
+        // ignore non-data URLs and still rely on the separate upload endpoint
+        // for newly picked images.
+        image_url: v.image_url,
       }))
     }));
-    formData.append("variations", JSON.stringify(variationsWithoutImages));
+    formData.append("variations", JSON.stringify(variationsForPayload));
 
     if (image?.uri) {
       formData.append("image", {

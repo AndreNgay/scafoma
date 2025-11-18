@@ -12,6 +12,24 @@ const makeImageDataUrl = (imageBuffer, mime = "jpeg") => {
   return `data:image/${mime};base64,${base64}`;
 };
 
+// Helper: parse data URL (data:image/...;base64,...) into a Buffer
+// Used to automatically clone images when variations are imported
+const parseImageDataUrlToBuffer = (dataUrl) => {
+  if (!dataUrl || typeof dataUrl !== "string") return null;
+
+  // Only handle data URLs; ignore file paths or http URLs
+  const match = dataUrl.match(/^data:image\/(\w+);base64,(.+)$/);
+  if (!match) return null;
+
+  const base64 = match[2];
+  try {
+    return Buffer.from(base64, "base64");
+  } catch (err) {
+    console.error("Failed to parse image data URL:", err);
+    return null;
+  }
+};
+
 // Helper: parse boolean safely
 const parseBool = (val) => {
   if (typeof val === "boolean") return val;
@@ -540,11 +558,17 @@ export const addMenuItem = async (req, res) => {
             }
           }
 
+          // If image_url is a data URL, decode it so imported variations clone their images
+          let imageBuffer = null;
+          if (v.image_url) {
+            imageBuffer = parseImageDataUrlToBuffer(v.image_url);
+          }
+
           await client.query(
             `INSERT INTO tblitemvariation 
-              (item_variation_group_id, variation_name, additional_price, max_amount, available)
-             VALUES ($1,$2,$3,$4,$5)`,
-            [groupId, v.name, Number(v.price) || 0, maxAmount, avail]
+              (item_variation_group_id, variation_name, additional_price, max_amount, available, image)
+             VALUES ($1,$2,$3,$4,$5,$6)`,
+            [groupId, v.name, Number(v.price) || 0, maxAmount, avail, imageBuffer]
           );
         }
       }
@@ -699,11 +723,17 @@ export const updateMenuItem = async (req, res) => {
           }
         }
 
+        // If image_url is a data URL, decode it so imported / existing variations keep their images
+        let imageBuffer = null;
+        if (v.image_url) {
+          imageBuffer = parseImageDataUrlToBuffer(v.image_url);
+        }
+
         await client.query(
           `INSERT INTO tblitemvariation 
-            (item_variation_group_id, variation_name, additional_price, max_amount, available)
-          VALUES ($1, $2, $3, $4, $5)`,
-          [groupId, v.name, parseFloat(v.price) || 0, maxAmount, avail]
+            (item_variation_group_id, variation_name, additional_price, max_amount, available, image)
+          VALUES ($1, $2, $3, $4, $5, $6)`,
+          [groupId, v.name, parseFloat(v.price) || 0, maxAmount, avail, imageBuffer]
         );
       }
     }

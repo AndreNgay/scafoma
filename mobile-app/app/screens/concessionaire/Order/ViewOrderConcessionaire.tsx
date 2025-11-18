@@ -32,6 +32,7 @@ const ViewOrderConcessionaire = () => {
   const [adjustedTotal, setAdjustedTotal] = useState<string>("");
   const [priceReason, setPriceReason] = useState<string>("");
   const [customPriceReason, setCustomPriceReason] = useState<string>("");
+  const [gcashModalVisible, setGcashModalVisible] = useState(false);
   const { showToast } = useToast();
 
   // Format dates with Asia/Manila timezone
@@ -333,12 +334,6 @@ const ViewOrderConcessionaire = () => {
             </Text>
           </View>
         )}
-        <View style={styles.infoSection}>
-          <Text style={styles.infoLabel}>Dining Option:</Text>
-          <Text style={styles.infoValue}>
-            {order.dining_option === "dine-in" ? "🍽️ Dine-in" : "🥡 Take-out"}
-          </Text>
-        </View>
         {order.note && (
           <View style={styles.infoSection}>
             <Text style={styles.infoLabel}>Note:</Text>
@@ -403,7 +398,9 @@ const ViewOrderConcessionaire = () => {
             {order.gcash_screenshot && (
               <View style={styles.paymentProofSection}>
                 <Text style={styles.infoLabel}>GCash Screenshot:</Text>
-                <Image source={{ uri: order.gcash_screenshot }} style={styles.paymentProof} />
+                <TouchableOpacity onPress={() => setGcashModalVisible(true)}>
+                  <Image source={{ uri: order.gcash_screenshot }} style={styles.paymentProof} />
+                </TouchableOpacity>
               </View>
             )}
           </View>
@@ -430,6 +427,10 @@ const ViewOrderConcessionaire = () => {
         renderItem={({ item }) => (
           <View style={styles.itemCard}>
             <Text style={styles.itemName}>{Number(item.quantity ?? 1)} x {item.item_name}</Text>
+            <Text style={styles.infoLabel}>Dining Option:</Text>
+            <Text style={styles.infoValue}>
+              {item.dining_option === "take-out" ? "📦 Take-out" : "🍽️ Dine-in"}
+            </Text>
             <Text>₱{Number(item.total_price).toFixed(2)}</Text>
             {item.note && <Text style={styles.note}>Note: {item.note}</Text>}
             {item.variations?.length > 0 && (
@@ -451,6 +452,28 @@ const ViewOrderConcessionaire = () => {
       </View>
 
       {renderStatusButtons()}
+
+      <Modal
+        visible={gcashModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setGcashModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <TouchableOpacity
+            style={styles.fullImageContainer}
+            activeOpacity={1}
+            onPress={() => setGcashModalVisible(false)}
+          >
+            {order.gcash_screenshot && (
+              <Image
+                source={{ uri: order.gcash_screenshot }}
+                style={styles.paymentProof}
+              />
+            )}
+          </TouchableOpacity>
+        </View>
+      </Modal>
 
       {/* Accept Order Modal (optional price adjustment) */}
       <Modal visible={acceptModalVisible} animationType="slide" transparent={true}>
@@ -809,6 +832,18 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     color: "#A40C2D",
     marginBottom: 12,
+  },
+  fullImageContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 10,
+  },
+  fullPaymentProof: {
+    width: "100%",
+    height: "80%",
+    borderRadius: 10,
+    backgroundColor: "#000",
   },
   updatedPrice: {
     fontWeight: "600",

@@ -339,7 +339,6 @@ const MenuItemDetails = () => {
       const orderRes = await api.post("/order", {
         customer_id: user.id,
         concession_id: item.concession_id,
-        dining_option: diningOption,
         order_status: inCart ? "cart" : "pending",
         total_price: 0,
         in_cart: inCart,
@@ -356,6 +355,7 @@ const MenuItemDetails = () => {
         item_price: item.price,
         total_price: displayPrice,
         note,
+        dining_option: diningOption,
       });
 
       const orderDetailId = detailRes.data.id;

@@ -333,7 +333,14 @@ export const getOrderById = async (req, res) => {
               caf.cafeteria_name,
               caf.location AS cafeteria_location,
               COALESCE(c.gcash_payment_available, FALSE) AS gcash_payment_available,
-              COALESCE(c.oncounter_payment_available, FALSE) AS oncounter_payment_available
+              COALESCE(c.oncounter_payment_available, FALSE) AS oncounter_payment_available,
+              (
+                SELECT od.dining_option
+                FROM tblorderdetail od
+                WHERE od.order_id = o.id
+                ORDER BY od.id
+                LIMIT 1
+              ) AS dining_option
        FROM tblorder o
        JOIN tbluser customer ON o.customer_id = customer.id
        JOIN tblconcession c ON o.concession_id = c.id
@@ -623,9 +630,9 @@ export const addOrder = async (req, res) => {
     }
 
     const result = await pool.query(
-      `INSERT INTO tblorder (customer_id, concession_id, dining_option, order_status, total_price, in_cart, payment_method)
-       VALUES ($1,$2,$3,COALESCE($4, 'pending'),$5,$6,$7) RETURNING *`,
-      [customer_id, concession_id, dining_option || 'dine-in', status, total_price, in_cart ?? false, payment_method]
+      `INSERT INTO tblorder (customer_id, concession_id, order_status, total_price, in_cart, payment_method)
+       VALUES ($1,$2,COALESCE($3, 'pending'),$4,$5,$6) RETURNING *`,
+      [customer_id, concession_id, status, total_price, in_cart ?? false, payment_method]
     );
     res.status(201).json(result.rows[0]);
   } catch (err) {
@@ -745,7 +752,7 @@ export const getCartByCustomerId = async (req, res) => {
     const query = `
       SELECT o.id AS order_id,
              o.total_price,
-             o.dining_option,
+             od.dining_option,
              od.id AS order_detail_id,
              od.quantity,
              od.total_price AS order_detail_total,
@@ -766,7 +773,7 @@ export const getCartByCustomerId = async (req, res) => {
       WHERE o.customer_id = $1 AND o.in_cart = TRUE
         AND m.available = TRUE 
         AND c.status = 'open'
-      GROUP BY o.id, od.id, m.item_name, m.price, c.concession_name, caf.cafeteria_name, o.dining_option, m.available, c.status
+      GROUP BY o.id, od.id, m.item_name, m.price, c.concession_name, caf.cafeteria_name, od.dining_option, m.available, c.status
       ORDER BY o.created_at DESC;
     `;
     const result = await pool.query(query, [id]);

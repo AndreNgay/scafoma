@@ -49,12 +49,12 @@ export const getOrderDetailsById = async (req, res) => {
 // Add order detail
 // ==========================
 export const addOrderDetail = async (req, res) => {
-  const { order_id, item_id, quantity, item_price, total_price, note } = req.body;
+  const { order_id, item_id, quantity, item_price, total_price, note, dining_option } = req.body;
   try {
     const result = await pool.query(
-      `INSERT INTO tblorderdetail (order_id, item_id, quantity, item_price, total_price, note)
-       VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
-      [order_id, item_id, quantity, item_price, total_price, note]
+      `INSERT INTO tblorderdetail (order_id, item_id, quantity, item_price, total_price, note, dining_option)
+       VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
+      [order_id, item_id, quantity, item_price, total_price, note, dining_option || 'dine-in']
     );
     // Recalculate order total after insert
     await pool.query(

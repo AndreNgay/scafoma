@@ -35,6 +35,7 @@ const ViewOrderCustomer = () => {
   const [cancelling, setCancelling] = useState(false);
   const [updatingPayment, setUpdatingPayment] = useState(false);
   const [cancelConfirmVisible, setCancelConfirmVisible] = useState(false);
+  const [paymentProofModalVisible, setPaymentProofModalVisible] = useState(false);
   const { showToast } = useToast();
 
   const copyGcashNumber = async () => {
@@ -180,6 +181,7 @@ const ViewOrderCustomer = () => {
 
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: false,
         quality: 0.8,
       });
 
@@ -295,12 +297,6 @@ const ViewOrderCustomer = () => {
         <View style={styles.infoRow}>
           <Text style={styles.infoLabel}>Order Date:</Text>
           <Text style={styles.infoValue}>{formatDateTime(order.created_at)}</Text>
-        </View>
-        <View style={styles.infoRow}>
-          <Text style={styles.infoLabel}>Dining Option:</Text>
-          <Text style={styles.infoValue}>
-            {order.dining_option === "dine-in" ? "🍽️ Dine-in" : "🥡 Take-out"}
-          </Text>
         </View>
         {order.schedule_time && (
           <Text style={styles.scheduleTime}>
@@ -491,7 +487,9 @@ const ViewOrderCustomer = () => {
             </Text>
             {order.payment_proof ? (
               <View>
-                <Image source={{ uri: order.payment_proof }} style={styles.paymentProof} />
+                <TouchableOpacity onPress={() => setPaymentProofModalVisible(true)}>
+                  <Image source={{ uri: order.payment_proof }} style={styles.paymentProof} />
+                </TouchableOpacity>
                 <Text style={styles.uploadedIndicator}>
                   Screenshot uploaded successfully
                 </Text>
@@ -554,6 +552,10 @@ const ViewOrderCustomer = () => {
             <Text style={styles.itemName}>
               {item.item_name} x{item.quantity}
             </Text>
+            <Text style={styles.infoLabel}>Dining Option:</Text>
+            <Text style={styles.infoValue}>
+              {item.dining_option === "take-out" ? "📦 Take-out" : "🍽️ Dine-in"}
+            </Text>
             <Text>₱{Number(item.total_price).toFixed(2)}</Text>
             {item.note && <Text>Note: {item.note}</Text>}
             {item.variations?.length > 0 && (
@@ -590,6 +592,28 @@ const ViewOrderCustomer = () => {
           </TouchableOpacity>
         </View>
       )}
+
+      <Modal
+        transparent
+        visible={paymentProofModalVisible}
+        animationType="fade"
+        onRequestClose={() => setPaymentProofModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <TouchableOpacity
+            style={styles.fullImageContainer}
+            activeOpacity={1}
+            onPress={() => setPaymentProofModalVisible(false)}
+          >
+            {order.payment_proof && (
+              <Image
+                source={{ uri: order.payment_proof }}
+                style={styles.paymentProof}
+              />
+            )}
+          </TouchableOpacity>
+        </View>
+      </Modal>
 
       <Modal
         transparent
@@ -933,6 +957,18 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "600",
     color: "#A40C2D",
+  },
+  fullImageContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 10,
+  },
+  fullPaymentProof: {
+    width: "100%",
+    height: "80%",
+    borderRadius: 10,
+    backgroundColor: "#000",
   },
   sectionCard: {
     backgroundColor: "#fff",
