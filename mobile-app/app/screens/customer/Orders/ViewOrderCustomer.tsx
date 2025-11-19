@@ -20,7 +20,7 @@ import { Ionicons } from "@expo/vector-icons";
 import api from "../../../libs/apiCall";
 import { useToast } from "../../../contexts/ToastContext";
 
-// Import GCash icon
+// Import icons
 const GCashIcon = require("../../../../assets/images/gcash-icon.png");
 
 const ViewOrderCustomer = () => {
@@ -289,7 +289,9 @@ const ViewOrderCustomer = () => {
       
       {/* Order Status & Basic Info */}
       <View style={styles.sectionCard}>
-        <Text style={styles.sectionTitle}>📋 Order Status</Text>
+        <Text style={styles.sectionTitle}>
+          <Ionicons name="clipboard-outline" size={16} color="#A40C2D" style={styles.inlineIcon} /> Order Status
+        </Text>
         <View style={styles.statusRow}>
           <Text style={styles.statusLabel}>Status:</Text>
           <Text style={[styles.status, styles.statusBadge]}>{order.order_status}</Text>
@@ -300,14 +302,16 @@ const ViewOrderCustomer = () => {
         </View>
         {order.schedule_time && (
           <Text style={styles.scheduleTime}>
-            📅 Scheduled for: {formatSchedule(order.schedule_time)}
+            <Ionicons name="time-outline" size={14} color="#28a745" style={styles.inlineIcon} /> Scheduled for: {formatSchedule(order.schedule_time)}
           </Text>
         )}
       </View>
 
       {/* Location & Concessionaire Info */}
       <View style={styles.sectionCard}>
-        <Text style={styles.sectionTitle}>📍 Location & Vendor</Text>
+        <Text style={styles.sectionTitle}>
+          <Ionicons name="location-outline" size={16} color="#A40C2D" style={styles.inlineIcon} /> Location & Vendor
+        </Text>
         <View style={styles.locationInfo}>
           <Text style={styles.locationText}>
             {order.cafeteria_name}
@@ -358,7 +362,9 @@ const ViewOrderCustomer = () => {
       </View>
       {/* Pricing Information */}
       <View style={styles.sectionCard}>
-        <Text style={styles.sectionTitle}>💰 Pricing</Text>
+        <Text style={styles.sectionTitle}>
+          <Ionicons name="pricetag-outline" size={16} color="#A40C2D" style={styles.inlineIcon} /> Pricing
+        </Text>
         {order.updated_total_price !== null &&
         order.updated_total_price !== undefined &&
         !Number.isNaN(Number(order.updated_total_price)) &&
@@ -397,7 +403,9 @@ const ViewOrderCustomer = () => {
       {/* Decline Reason (if applicable) */}
       {order.order_status === "declined" && order.decline_reason && (
         <View style={[styles.sectionCard, styles.declineCard]}>
-          <Text style={styles.sectionTitle}>❌ Order Declined</Text>
+          <Text style={styles.sectionTitle}>
+            <Ionicons name="close-circle-outline" size={16} color="#dc3545" style={styles.inlineIcon} /> Order Declined
+          </Text>
           <View style={styles.infoRow}>
             <Text style={styles.infoLabel}>Reason:</Text>
             <Text style={[styles.infoValue, styles.declineReason]}>{order.decline_reason}</Text>
@@ -407,7 +415,9 @@ const ViewOrderCustomer = () => {
 
       {/* Payment Information */}
       <View style={styles.sectionCard}>
-        <Text style={styles.sectionTitle}>💳 Payment</Text>
+        <Text style={styles.sectionTitle}>
+          <Ionicons name="card-outline" size={16} color="#A40C2D" style={styles.inlineIcon} /> Payment
+        </Text>
         <View style={styles.paymentMethodButtons}>
           {/* GCash option */}
           <TouchableOpacity
@@ -450,7 +460,8 @@ const ViewOrderCustomer = () => {
                 !order.oncounter_payment_available && styles.paymentMethodTextDisabled,
               ]}
             >
-              💰 On-Counter {(!order.oncounter_payment_available) ? '(Unavailable)' : ''}
+              <Ionicons name="cash-outline" size={14} color={order.payment_method === 'on-counter' ? "#A40C2D" : "#666"} style={styles.inlineIcon} />
+              On-Counter {(!order.oncounter_payment_available) ? '(Unavailable)' : ''}
             </Text>
           </TouchableOpacity>
         </View>
@@ -518,12 +529,12 @@ const ViewOrderCustomer = () => {
               <View style={styles.uploadDisabledContainer}>
                 <Text style={styles.uploadDisabledText}>
                   {order.order_status === "pending"
-                    ? "⏳ Please wait for your order to be accepted before uploading payment proof."
+                    ? "Please wait for your order to be accepted before uploading payment proof."
                     : order.order_status === "declined"
-                    ? "❌ This order has been declined. No payment proof needed."
+                    ? "This order has been declined. No payment proof needed."
                     : order.order_status === "completed"
-                    ? "✅ Order completed. Payment proof already processed."
-                    : "⏳ Please wait for your order to be accepted before uploading payment proof."
+                    ? "Order completed. Payment proof already processed."
+                    : "Please wait for your order to be accepted before uploading payment proof."
                   }
                 </Text>
               </View>
@@ -543,7 +554,9 @@ const ViewOrderCustomer = () => {
 
       {/* Order Items */}
       <View style={styles.sectionCard}>
-        <Text style={styles.sectionTitle}>🛒 Order Items</Text>
+        <Text style={styles.sectionTitle}>
+          <Ionicons name="cart-outline" size={16} color="#A40C2D" style={styles.inlineIcon} /> Order Items
+        </Text>
       <FlatList
         data={order.items || []}
         keyExtractor={(item) => item.id.toString()}
@@ -554,7 +567,13 @@ const ViewOrderCustomer = () => {
             </Text>
             <Text style={styles.infoLabel}>Dining Option:</Text>
             <Text style={styles.infoValue}>
-              {item.dining_option === "take-out" ? "📦 Take-out" : "🍽️ Dine-in"}
+              <Ionicons
+                name={item.dining_option === "take-out" ? "cube-outline" : "restaurant-outline"}
+                size={14}
+                color="#666"
+                style={styles.inlineIcon}
+              />
+              {item.dining_option === "take-out" ? "Take-out" : "Dine-in"}
             </Text>
             <Text>₱{Number(item.total_price).toFixed(2)}</Text>
             {item.note && <Text>Note: {item.note}</Text>}
@@ -656,6 +675,9 @@ const styles = StyleSheet.create({
   container: { flex: 1, padding: 15, backgroundColor: "#fff" },
   header: { fontSize: 20, fontWeight: "bold", marginBottom: 10, color: "#A40C2D" },
   status: { fontWeight: "600", color: "#A40C2D" },
+  inlineIcon: {
+    marginRight: 6,
+  },
   sectionHeader: { fontSize: 18, fontWeight: "600", marginTop: 20, marginBottom: 10 },
   itemCard: { backgroundColor: "#f9f9f9", padding: 10, borderRadius: 8, marginBottom: 8 },
   itemName: { fontWeight: "600" },

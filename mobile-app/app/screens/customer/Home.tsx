@@ -5,7 +5,7 @@ import { useFocusEffect } from "@react-navigation/native";
 import api from "../../libs/apiCall";
 import useStore from "../../store";
 
-// Import GCash icon
+// Import icons
 const GCashIcon = require("../../../assets/images/gcash-icon.png");
 
 const { width } = Dimensions.get("window");
@@ -205,7 +205,9 @@ const Home = ({ navigation }: any) => {
       )}
       <View style={styles.concessionInfo}>
         <Text style={styles.concessionName} numberOfLines={1}>{item.concession_name}</Text>
-        <Text style={styles.concessionLocation} numberOfLines={1}>📍 {item.cafeteria_name}</Text>
+        <Text style={styles.concessionLocation} numberOfLines={1}>
+          <Ionicons name="location-outline" size={12} color="#6b7280" style={styles.inlineIcon} /> {item.cafeteria_name}
+        </Text>
         <View style={styles.paymentMethods}>
           {item.gcash_payment_available && (
             <View style={styles.paymentBadge}>
@@ -368,7 +370,7 @@ const Home = ({ navigation }: any) => {
       <View style={styles.header}>
         <View style={styles.greetingSection}>
           <Text style={styles.greeting}>{getGreeting()},</Text>
-          <Text style={styles.userName}>{user?.first_name || "Guest"}! 👋</Text>
+          <Text style={styles.userName}>{user?.first_name || "Guest"}!</Text>
         </View>
         
         {/* User Stats */}
@@ -497,6 +499,11 @@ const styles = StyleSheet.create({
     fontSize: 24,
     fontWeight: "bold",
     color: "#1f2937",
+  },
+  inlineIcon: {
+    width: 12,
+    height: 12,
+    marginRight: 4,
   },
   statsContainer: {
     flexDirection: "row",

@@ -11,13 +11,15 @@ import {
   KeyboardAvoidingView,
   Platform,
   ActivityIndicator,
+  RefreshControl,
 } from "react-native";
 import { useNavigation, useRoute } from "@react-navigation/native";
 import useStore from "../../../store";
 import api from "../../../libs/apiCall";
 import { useToast } from "../../../contexts/ToastContext";
+import { Ionicons } from "@expo/vector-icons";
 
-// Import GCash icon
+// Import icons
 const GCashIcon = require("../../../../assets/images/gcash-icon.png");
 
 const MenuItemDetails = () => {
@@ -41,6 +43,7 @@ const MenuItemDetails = () => {
   const [feedbackRating, setFeedbackRating] = useState<number>(5);
   const [feedbackComment, setFeedbackComment] = useState<string>("");
   const [submittingFeedback, setSubmittingFeedback] = useState<boolean>(false);
+  const [refreshing, setRefreshing] = useState<boolean>(false);
   const user = useStore.getState().user;
   const { showToast } = useToast();
 
@@ -111,6 +114,60 @@ const MenuItemDetails = () => {
     fetchFeedbacks();
     checkEligibility();
   }, [item.id, user?.id]);
+
+  const onRefresh = async () => {
+    try {
+      setRefreshing(true);
+
+      // Reload variations
+      try {
+        setLoadingVariations(true);
+        const res = await api.get(`/item-variation-group/${item.id}`);
+        const groups = res.data.data;
+
+        const grouped: any = {};
+        for (const g of groups) {
+          const vRes = await api.get(`/item-variation/group/${g.id}`);
+          grouped[g.variation_group_name] = {
+            ...g,
+            variations: vRes.data.data,
+          };
+        }
+        setGroupedVariations(grouped);
+        // Clear selections so user re-selects based on the latest options
+        setSelectedVariations([]);
+        setVariationQuantities({});
+      } catch (err) {
+        console.error("Error refreshing variations:", err);
+        setGroupedVariations({});
+      } finally {
+        setLoadingVariations(false);
+      }
+
+      // Reload feedbacks
+      try {
+        const res = await api.get(`/feedback/${item.id}`);
+        setFeedbacks(res.data);
+      } catch (err: any) {
+        console.log("No feedback found on refresh", err.response?.data?.message || "");
+        setFeedbacks([]);
+      }
+
+      // Re-check feedback eligibility
+      try {
+        if (!user?.id) return;
+        const res = await api.get(`/feedback/can-leave/${item.id}/${user.id}`);
+        setCanLeaveFeedback(!!res.data?.canLeave);
+      } catch (err) {
+        console.error("Error refreshing feedback eligibility:", err);
+        setCanLeaveFeedback(false);
+      } finally {
+        setEligibilityChecked(true);
+      }
+    } finally {
+      setRefreshing(false);
+    }
+  };
 
   const submitFeedback = async () => {
     try {
@@ -275,12 +332,29 @@ const MenuItemDetails = () => {
   // Submit order/cart
   const submitOrder = async (inCart: boolean) => {
     try {
-      setPlacingOrder(true);
       if (!user) {
         showToast("error", "You must be logged in to place an order.");
-        setPlacingOrder(false);
         return;
       }
+
+      // Prevent ordering while variations are still loading
+      if (loadingVariations) {
+        showToast("error", "Please wait while item options are loading before placing your order.");
+        return;
+      }
+
+      // If this item is known to have required variations but none were loaded,
+      // block ordering to avoid creating invalid orders without required options.
+      const itemHasRequiredVariations = Array.isArray((item as any).variations)
+        && (item as any).variations.some((g: any) => !!g?.required_selection || (g?.min_selection || 0) > 0);
+      const hasLoadedVariationGroups = Object.keys(groupedVariations || {}).length > 0;
+
+      if (!hasLoadedVariationGroups && itemHasRequiredVariations) {
+        showToast("error", "Required options for this item failed to load. Please go back and reopen this item or try again later.");
+        return;
+      }
+
+      setPlacingOrder(true);
 
       // Validate required selections, min_selection, and max_selection
       for (const [groupName, group] of Object.entries<any>(groupedVariations)) {
@@ -289,6 +363,13 @@ const MenuItemDetails = () => {
         const maxSelection = group.max_selection || 1;
         const requiredSelection = group.required_selection || false;
         
+        // If a group is marked as required but has no options, prevent ordering
+        if (requiredSelection && (!Array.isArray(group.variations) || group.variations.length === 0)) {
+          setPlacingOrder(false);
+          showToast("error", `Required options for "${groupName}" are currently unavailable. Please try again later.`);
+          return;
+        }
+
         // Check required selection
         if (requiredSelection && selectionsInGroup.length === 0) {
           setPlacingOrder(false);
@@ -382,9 +463,7 @@ const MenuItemDetails = () => {
       }
 
       showToast("success", inCart ? "Item added to cart!" : "Order placed successfully!");
-      if (inCart) {
-        navigation.navigate("Cart");
-      } else {
+      if (!inCart) {
         // Redirect directly to the newly created order details
         (navigation as any).navigate("Orders", { screen: "View Order", params: { orderId } });
       }
@@ -398,7 +477,18 @@ const MenuItemDetails = () => {
 
   return (
     <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
-      <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: 120 }}>
+      <ScrollView
+        style={styles.container}
+        contentContainerStyle={{ paddingBottom: 120 }}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor="#A40C2D"
+            colors={["#A40C2D"]}
+          />
+        }
+      >
         {/* Item Header */}
         <Image source={{ uri: item.image_url }} style={styles.image} />
         <Text style={styles.title}>{item.item_name}</Text>
@@ -455,7 +545,7 @@ const MenuItemDetails = () => {
                 styles.diningOptionText,
                 diningOption === 'dine-in' && styles.diningOptionTextSelected
               ]}>
-                🍽️ Dine In
+                <Ionicons name="restaurant-outline" size={14} color={diningOption === 'dine-in' ? "#A40C2D" : "#666"} style={styles.inlineIcon} /> Dine In
               </Text>
             </TouchableOpacity>
             <TouchableOpacity
@@ -469,7 +559,7 @@ const MenuItemDetails = () => {
                 styles.diningOptionText,
                 diningOption === 'take-out' && styles.diningOptionTextSelected
               ]}>
-                📦 Take Out
+                <Ionicons name="cube-outline" size={14} color={diningOption === 'take-out' ? "#A40C2D" : "#666"} style={styles.inlineIcon} /> Take Out
               </Text>
             </TouchableOpacity>
           </View>
@@ -480,7 +570,7 @@ const MenuItemDetails = () => {
           <Text style={styles.paymentMethodTitle}>Payment Method</Text>
           {!availablePaymentMethods.gcash && !availablePaymentMethods.onCounter ? (
             <Text style={styles.noPaymentMethodsText}>
-              ⚠️ No payment methods are currently available for this concession.
+              No payment methods are currently available for this concession.
             </Text>
           ) : (
             <>
@@ -516,7 +606,7 @@ const MenuItemDetails = () => {
                       styles.paymentMethodText,
                       paymentMethod === 'on-counter' && styles.paymentMethodTextSelected
                     ]}>
-                      💰 On-Counter
+                      <Ionicons name="cash-outline" size={14} color={paymentMethod === 'on-counter' ? "#A40C2D" : "#666"} style={styles.inlineIcon} /> On-Counter
                     </Text>
                   </TouchableOpacity>
                 )}
@@ -682,7 +772,7 @@ const MenuItemDetails = () => {
               <View style={styles.ratingRow}>
                 {[1,2,3,4,5].map((n) => (
                   <TouchableOpacity key={n} onPress={() => setFeedbackRating(n)}>
-                    <Text style={[styles.star, feedbackRating >= n && styles.starActive]}>★</Text>
+                    <Text style={[styles.star, feedbackRating >= n && styles.starActive]}>*</Text>
                   </TouchableOpacity>
                 ))}
               </View>
@@ -729,6 +819,7 @@ const MenuItemDetails = () => {
                         : `${fb.first_name} ${fb.last_name}`}
                     </Text>
                     <Text style={styles.feedbackRating}>⭐ {fb.rating}</Text>
+                    {/* Star icon text kept simple without emoji */}
                   </View>
                 </View>
                 {fb.comment && <Text style={styles.feedbackComment}>{fb.comment}</Text>}
@@ -778,6 +869,11 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: "500",
     color: "#666",
+  },
+  inlineIcon: {
+    width: 14,
+    height: 14,
+    marginRight: 6,
   },
   diningOptionTextSelected: {
     color: "#A40C2D",

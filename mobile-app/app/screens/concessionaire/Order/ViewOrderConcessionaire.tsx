@@ -13,6 +13,7 @@ import {
   RefreshControl,
 } from "react-native";
 import { useRoute, useNavigation } from "@react-navigation/native";
+import { Ionicons } from "@expo/vector-icons";
 import api from "../../../libs/apiCall";
 import { useToast } from "../../../contexts/ToastContext";
 
@@ -317,7 +318,9 @@ const ViewOrderConcessionaire = () => {
       
       {/* Order Status & Basic Info */}
       <View style={styles.sectionCard}>
-        <Text style={styles.sectionTitle}>📋 Order Details</Text>
+        <Text style={styles.sectionTitle}>
+          <Ionicons name="clipboard-outline" size={16} color="#A40C2D" style={styles.inlineIcon} /> Order Details
+        </Text>
         <View style={styles.infoSection}>
           <Text style={styles.infoLabel}>Status:</Text>
           <Text style={[styles.status, styles.statusText]}>{order.order_status}</Text>
@@ -330,7 +333,7 @@ const ViewOrderConcessionaire = () => {
           <View style={styles.infoSection}>
             <Text style={styles.infoLabel}>Scheduled for:</Text>
             <Text style={[styles.infoValue, styles.scheduleTime]}>
-              📅 {formatManila(order.schedule_time)}
+              <Ionicons name="time-outline" size={14} color="#28a745" style={styles.inlineIcon} /> {formatManila(order.schedule_time)}
             </Text>
           </View>
         )}
@@ -344,7 +347,9 @@ const ViewOrderConcessionaire = () => {
 
       {/* Pricing Information */}
       <View style={styles.sectionCard}>
-        <Text style={styles.sectionTitle}>💰 Pricing</Text>
+        <Text style={styles.sectionTitle}>
+          <Ionicons name="pricetag-outline" size={16} color="#A40C2D" style={styles.inlineIcon} /> Pricing
+        </Text>
         {order.updated_total_price !== null &&
         order.updated_total_price !== undefined &&
         !Number.isNaN(Number(order.updated_total_price)) &&
@@ -382,14 +387,18 @@ const ViewOrderConcessionaire = () => {
 
       {/* Payment Information */}
       <View style={styles.sectionCard}>
-        <Text style={styles.sectionTitle}>💳 Payment</Text>
+        <Text style={styles.sectionTitle}>
+          <Ionicons name="card-outline" size={16} color="#A40C2D" style={styles.inlineIcon} /> Payment
+        </Text>
         <View style={styles.infoSection}>
           <Text style={styles.infoLabel}>Payment Method:</Text>
           <View style={styles.paymentMethodDisplay}>
             {order.payment_method === "gcash" ? (
               <Text style={styles.infoValue}>GCash</Text>
             ) : (
-              <Text style={styles.infoValue}>💰 On-Counter</Text>
+              <Text style={styles.infoValue}>
+                <Ionicons name="cash-outline" size={14} color="#666" style={styles.inlineIcon} /> On-Counter
+              </Text>
             )}
           </View>
         </View>
@@ -410,7 +419,9 @@ const ViewOrderConcessionaire = () => {
       {/* Decline Reason (if applicable) */}
       {order.order_status === "declined" && order.decline_reason && (
         <View style={[styles.sectionCard, styles.declineCard]}>
-          <Text style={styles.sectionTitle}>❌ Decline Information</Text>
+          <Text style={styles.sectionTitle}>
+            <Ionicons name="close-circle-outline" size={16} color="#dc3545" style={styles.inlineIcon} /> Decline Information
+          </Text>
           <View style={styles.infoSection}>
             <Text style={styles.infoLabel}>Reason:</Text>
             <Text style={[styles.infoValue, styles.declineReason]}>{order.decline_reason}</Text>
@@ -420,7 +431,9 @@ const ViewOrderConcessionaire = () => {
 
       {/* Order Items */}
       <View style={styles.sectionCard}>
-        <Text style={styles.sectionTitle}>🛒 Order Items</Text>
+        <Text style={styles.sectionTitle}>
+          <Ionicons name="cart-outline" size={16} color="#A40C2D" style={styles.inlineIcon} /> Order Items
+        </Text>
       <FlatList
         data={order.items || []}
         keyExtractor={(item) => item.id.toString()}
@@ -429,7 +442,13 @@ const ViewOrderConcessionaire = () => {
             <Text style={styles.itemName}>{Number(item.quantity ?? 1)} x {item.item_name}</Text>
             <Text style={styles.infoLabel}>Dining Option:</Text>
             <Text style={styles.infoValue}>
-              {item.dining_option === "take-out" ? "📦 Take-out" : "🍽️ Dine-in"}
+              <Ionicons
+                name={item.dining_option === "take-out" ? "cube-outline" : "restaurant-outline"}
+                size={14}
+                color="#666"
+                style={styles.inlineIcon}
+              />
+              {item.dining_option === "take-out" ? "Take-out" : "Dine-in"}
             </Text>
             <Text>₱{Number(item.total_price).toFixed(2)}</Text>
             {item.note && <Text style={styles.note}>Note: {item.note}</Text>}
@@ -691,6 +710,9 @@ const styles = StyleSheet.create({
   customerEmail: {
     fontSize: 14,
     color: "#666",
+  },
+  inlineIcon: {
+    marginRight: 6,
   },
   header: { fontSize: 20, fontWeight: "bold", marginBottom: 15, color: "#A40C2D" },
   infoSection: { 

@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { View, Text, FlatList, StyleSheet, ActivityIndicator, Button, TouchableOpacity, Platform, ScrollView, Modal } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 import DateTimePicker from '@react-native-community/datetimepicker';
 import useStore from "../../../store";
 import api from "../../../libs/apiCall";
@@ -235,7 +236,9 @@ const renderItem = ({ item }: any) => {
         style={styles.removeBtn}
         disabled={isUpdating}
       >
-        <Text style={styles.removeBtnText}>🗑️ Remove</Text>
+        <Text style={styles.removeBtnText}>
+          <Ionicons name="trash-outline" size={14} color="#ff4444" /> Remove
+        </Text>
       </TouchableOpacity>
     </View>
   );
@@ -266,7 +269,7 @@ const renderItem = ({ item }: any) => {
         </View>
       ) : cartItems.length === 0 ? (
         <View style={styles.emptyContainer}>
-          <Text style={styles.emptyIcon}>🛒</Text>
+          <Ionicons name="cart-outline" size={64} color="#d1d5db" />
           <Text style={styles.emptyText}>Your cart is empty</Text>
           <Text style={styles.emptySubtext}>Add items from the menu to get started</Text>
         </View>
@@ -294,7 +297,7 @@ const renderItem = ({ item }: any) => {
                 onPress={() => setShowDatePicker(true)}
               >
                 <Text style={[styles.scheduleBtnText, showDatePicker && styles.activeScheduleBtnText]}>
-                  📅 Select Date
+                  <Ionicons name="calendar-outline" size={14} color={showDatePicker ? "#fff" : "#A40C2D"} /> Select Date
                 </Text>
               </TouchableOpacity>
               <TouchableOpacity 
@@ -302,7 +305,7 @@ const renderItem = ({ item }: any) => {
                 onPress={() => setShowTimePicker(true)}
               >
                 <Text style={[styles.scheduleBtnText, showTimePicker && styles.activeScheduleBtnText]}>
-                  🕐 Select Time
+                  <Ionicons name="time-outline" size={14} color={showTimePicker ? "#fff" : "#A40C2D"} /> Select Time
                 </Text>
               </TouchableOpacity>
             </View>
@@ -310,7 +313,7 @@ const renderItem = ({ item }: any) => {
             {scheduleTime && (
               <View style={styles.scheduledTimeContainer}>
                 <Text style={styles.scheduledTimeText}>
-                  📅 Scheduled for: {scheduleTime.toLocaleString()}
+                  <Ionicons name="calendar-outline" size={14} color="#28a745" /> Scheduled for: {scheduleTime.toLocaleString()}
                 </Text>
                 <TouchableOpacity onPress={clearScheduleTime} style={styles.clearScheduleBtn}>
                   <Text style={styles.clearScheduleText}>Clear</Text>
@@ -325,7 +328,7 @@ const renderItem = ({ item }: any) => {
             activeOpacity={0.8}
           >
             <Text style={styles.checkoutBtnText}>
-              {scheduleTime ? "📅 Schedule Order" : "🛍️ Place Order"}
+              <Ionicons name={scheduleTime ? "calendar-outline" : "bag-check-outline"} size={16} color="#fff" /> {scheduleTime ? "Schedule Order" : "Place Order"}
             </Text>
             <Text style={styles.checkoutBtnAmount}>₱{totalAmount.toFixed(2)}</Text>
           </TouchableOpacity>
@@ -434,6 +437,11 @@ const styles = StyleSheet.create({
   },
   emptyIcon: {
     fontSize: 64,
+    marginBottom: 16,
+  },
+  emptyIconImage: {
+    width: 64,
+    height: 64,
     marginBottom: 16,
   },
   emptyText: { 
@@ -635,6 +643,11 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: "500",
     color: "#A40C2D",
+  },
+  inlineIcon: {
+    width: 14,
+    height: 14,
+    marginRight: 6,
   },
   activeScheduleBtn: {
     backgroundColor: "#A40C2D",

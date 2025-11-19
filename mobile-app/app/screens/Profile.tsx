@@ -15,6 +15,7 @@ import useStore from "../store";
 import { z } from "zod";
 import * as ImagePicker from "expo-image-picker";
 import { useToast } from "../contexts/ToastContext";
+import { Ionicons } from "@expo/vector-icons";
 
 
 // ✅ Zod schemas
@@ -256,12 +257,12 @@ const Profile = () => {
               />
             ) : (
               <View style={styles.imagePlaceholder}>
-                <Text style={styles.imagePlaceholderText}>👤</Text>
+                <Ionicons name="person-circle-outline" size={40} color="#9ca3af" />
                 <Text style={styles.imagePlaceholderLabel}>Tap to add photo</Text>
               </View>
             )}
             <View style={styles.cameraIcon}>
-              <Text style={styles.cameraIconText}>📷</Text>
+              <Ionicons name="camera-outline" size={18} color="#fff" />
             </View>
           </TouchableOpacity>
           
@@ -302,7 +303,15 @@ const Profile = () => {
         {/* Profile Information Card */}
         {activeTab === "profile" && (
           <View style={styles.infoCard}>
-            <Text style={styles.cardTitle}>👤 Personal Information</Text>
+            <Text style={styles.cardTitle}>
+              <Ionicons
+                name="person-circle-outline"
+                size={18}
+                color="#A40C2D"
+                style={styles.inlineIcon}
+              />
+              Personal Information
+            </Text>
             
             <View style={styles.inputGroup}>
               <Text style={styles.label}>First Name</Text>
@@ -335,7 +344,15 @@ const Profile = () => {
         {/* Contact Information Card */}
         {activeTab === "contact" && (
           <View style={styles.infoCard}>
-            <Text style={styles.cardTitle}>📞 Contact Information</Text>
+            <Text style={styles.cardTitle}>
+              <Ionicons
+                name="call-outline"
+                size={18}
+                color="#A40C2D"
+                style={styles.inlineIcon}
+              />
+              Contact Information
+            </Text>
 
             <View style={styles.inputGroup}>
               <Text style={styles.label}>Email Address</Text>
@@ -389,7 +406,15 @@ const Profile = () => {
         {/* Security Card */}
         {activeTab === "password" && (
           <View style={styles.infoCard}>
-            <Text style={styles.cardTitle}>🔒 Security</Text>
+            <Text style={styles.cardTitle}>
+              <Ionicons
+                name="lock-closed-outline"
+                size={18}
+                color="#A40C2D"
+                style={styles.inlineIcon}
+              />
+              Security
+            </Text>
 
             <View style={styles.inputGroup}>
               <Text style={styles.label}>Current Password</Text>
@@ -550,6 +575,11 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
+  placeholderIcon: {
+    width: 40,
+    height: 40,
+    marginBottom: 4,
+  },
   imagePlaceholderText: {
     fontSize: 40,
     marginBottom: 4,
@@ -574,6 +604,10 @@ const styles = StyleSheet.create({
   },
   cameraIconText: {
     fontSize: 14,
+  },
+  cameraIconImage: {
+    width: 18,
+    height: 18,
   },
   userName: {
     fontSize: 24,
@@ -646,6 +680,11 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     color: "#1f2937",
     marginBottom: 20,
+  },
+  inlineIcon: {
+    width: 16,
+    height: 16,
+    marginRight: 6,
   },
   inputGroup: {
     marginBottom: 20,
