@@ -2,6 +2,7 @@
 import * as Notifications from 'expo-notifications';
 import * as Device from 'expo-device';
 import { Platform } from 'react-native';
+import React from 'react';
 
 // Configure how notifications are handled when the app is in the foreground
 Notifications.setNotificationHandler({
@@ -87,4 +88,7 @@ export const setBadgeCount = async (count) => {
   await Notifications.setBadgeCountAsync(count);
 };
 
+// Default export to satisfy Expo Router when it scans this file under the app directory
+const NotificationServiceScreen = () => null;
+export default NotificationServiceScreen;
 

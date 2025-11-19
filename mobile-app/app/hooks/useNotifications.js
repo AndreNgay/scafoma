@@ -28,16 +28,12 @@ export const useNotifications = () => {
         const unreadNotifications = notifications.filter(n => !n.is_read);
         const unreadCount = unreadNotifications.length;
 
-        console.log(`Polling: ${unreadCount} unread notifications, last count: ${lastNotificationCount}`);
-
         // If there are new unread notifications, trigger local notification
         if (unreadCount > lastNotificationCount) {
           const newCount = unreadCount - lastNotificationCount;
           const newNotifications = unreadNotifications.slice(0, newCount);
-          console.log(`Found ${newCount} new notifications`);
-          
+
           for (const notif of newNotifications) {
-            console.log(`Showing notification: ${notif.message}`);
             await scheduleLocalNotification(
               notif.notification_type,
               notif.message
@@ -58,13 +54,12 @@ export const useNotifications = () => {
     pollingInterval.current = setInterval(pollForNotifications, 30000); // Poll every 30 seconds
 
     // Listen for notifications received while app is in foreground
-    notificationListener.current = addNotificationListener((notification) => {
-      console.log('Notification received:', notification);
+    notificationListener.current = addNotificationListener(() => {
+      // No-op; side effects handled elsewhere if needed
     });
 
     // Listen for when user taps on notification
-    responseListener.current = addNotificationResponseListener((response) => {
-      console.log('Notification tapped:', response);
+    responseListener.current = addNotificationResponseListener(() => {
       // You can navigate to specific screen based on notification
     });
 
@@ -84,3 +79,6 @@ export const useNotifications = () => {
   return null;
 };
 
+// Default export to satisfy Expo Router when it scans this file under the app directory
+const UseNotificationsScreen = () => null;
+export default UseNotificationsScreen;

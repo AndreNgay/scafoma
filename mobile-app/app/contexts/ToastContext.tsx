@@ -115,3 +115,6 @@ const styles = StyleSheet.create({
     fontSize: 13,
   },
 });
+
+const ToastContextScreen: React.FC = () => null;
+export default ToastContextScreen;
