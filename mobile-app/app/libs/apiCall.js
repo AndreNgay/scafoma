@@ -3,9 +3,9 @@ import axios from "axios";
 import useStore from "../store";
 
 const api = axios.create({
-  baseURL: "http://192.168.42.23:5000/api-v1",
-  timeout: 20000,
-});
+	baseURL: 'http://192.168.100.35:5000/api-v1',
+	timeout: 20000,
+})
 
 
 // Set token automatically from store
