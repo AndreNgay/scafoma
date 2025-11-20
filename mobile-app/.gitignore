@@ -37,4 +37,9 @@ yarn-error.*
 # typescript
 *.tsbuildinfo
 
+# instructions
+.github
+.github/instructions
+.github/instructions/CopilotRules.instructions.md
+
 app-example
