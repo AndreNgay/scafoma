@@ -14,6 +14,7 @@ import { NativeStackScreenProps } from "@react-navigation/native-stack";
 import useStore from "../../store";
 import api from "../../libs/apiCall"; // axios instance
 import { useToast } from "../../contexts/ToastContext";
+import { getPasswordInputProps } from "../../constants/passwordInput";
 
 const LoginSchema = z.object({
   email: z.string().email({ message: "Invalid email address" }),
@@ -86,10 +87,9 @@ const SignIn: React.FC<Props> = ({ navigation }) => {
           name="password"
           render={({ field: { onChange, value } }) => (
             <TextInput
+              {...getPasswordInputProps()}
               style={styles.input}
               placeholder="Enter your password"
-              secureTextEntry
-              autoCapitalize="none"
               value={value}
               onChangeText={onChange}
             />

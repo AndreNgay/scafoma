@@ -211,7 +211,8 @@ function CustomerTabs() {
             const menuItemsTab = state.routes.find(r => r.name === "Menu Items");
             
             // If we're already on this tab and the stack has multiple screens, reset to root
-            if (menuItemsTab?.state?.index > 0) {
+            const nestedIndex = menuItemsTab?.state?.index ?? 0;
+            if (nestedIndex > 0) {
               e.preventDefault();
               navigation.dispatch(
                 CommonActions.reset({
@@ -354,7 +355,8 @@ function ConcessionaireTabs() {
             const orderListTab = state.routes.find(r => r.name === "Order List");
             
             // If we're already on this tab and the stack has multiple screens, reset to root
-            if (orderListTab?.state?.index > 0) {
+            const nestedIndex = orderListTab?.state?.index ?? 0;
+            if (nestedIndex > 0) {
               e.preventDefault();
               navigation.dispatch(
                 CommonActions.reset({
@@ -390,7 +392,8 @@ function ConcessionaireTabs() {
             const menuTab = state.routes.find(r => r.name === "Menu");
             
             // If we're already on this tab and the stack has multiple screens, reset to root
-            if (menuTab?.state?.index > 0) {
+            const nestedIndex = menuTab?.state?.index ?? 0;
+            if (nestedIndex > 0) {
               e.preventDefault();
               navigation.dispatch(
                 CommonActions.reset({
@@ -426,7 +429,8 @@ function ConcessionaireTabs() {
             const concessionTab = state.routes.find(r => r.name === "Concession");
             
             // If we're already on this tab and the stack has multiple screens, reset to root
-            if (concessionTab?.state?.index > 0) {
+            const nestedIndex = concessionTab?.state?.index ?? 0;
+            if (nestedIndex > 0) {
               e.preventDefault();
               navigation.dispatch(
                 CommonActions.reset({

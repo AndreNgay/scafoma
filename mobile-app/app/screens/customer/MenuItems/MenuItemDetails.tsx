@@ -18,6 +18,7 @@ import useStore from "../../../store";
 import api from "../../../libs/apiCall";
 import { useToast } from "../../../contexts/ToastContext";
 import { Ionicons } from "@expo/vector-icons";
+import ImagePreviewModal from "../../../components/ImagePreviewModal";
 
 // Import icons
 const GCashIcon = require("../../../../assets/images/gcash-icon.png");
@@ -44,6 +45,7 @@ const MenuItemDetails = () => {
   const [feedbackComment, setFeedbackComment] = useState<string>("");
   const [submittingFeedback, setSubmittingFeedback] = useState<boolean>(false);
   const [refreshing, setRefreshing] = useState<boolean>(false);
+  const [previewImage, setPreviewImage] = useState<string | null>(null);
   const user = useStore.getState().user;
   const { showToast } = useToast();
 
@@ -490,7 +492,9 @@ const MenuItemDetails = () => {
         }
       >
         {/* Item Header */}
-        <Image source={{ uri: item.image_url }} style={styles.image} />
+        <TouchableOpacity activeOpacity={0.85} onPress={() => setPreviewImage(item.image_url || null)}>
+          <Image source={{ uri: item.image_url }} style={styles.image} />
+        </TouchableOpacity>
         <Text style={styles.title}>{item.item_name}</Text>
 
         {/* Cafeteria + Concession */}
@@ -683,11 +687,16 @@ const MenuItemDetails = () => {
                     disabled={showQuantityControls}
                   >
                     {variation.image_url && (
-                      <Image 
-                        source={{ uri: variation.image_url }} 
-                        style={styles.variationImage}
-                        resizeMode="cover"
-                      />
+                      <TouchableOpacity 
+                        activeOpacity={0.85} 
+                        onPress={() => setPreviewImage(variation.image_url || null)}
+                      >
+                        <Image 
+                          source={{ uri: variation.image_url }} 
+                          style={styles.variationImage}
+                          resizeMode="cover"
+                        />
+                      </TouchableOpacity>
                     )}
                     <View style={styles.variationTextContainer}>
                       <Text style={styles.variationName}>{variation.variation_name}</Text>
@@ -829,6 +838,13 @@ const MenuItemDetails = () => {
           )}
         </View>
       </ScrollView>
+      
+      <ImagePreviewModal
+        visible={!!previewImage}
+        imageUrl={previewImage}
+        title={item.item_name}
+        onClose={() => setPreviewImage(null)}
+      />
     </KeyboardAvoidingView>
   );
 };

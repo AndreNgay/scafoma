@@ -7,6 +7,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useNavigation } from "@react-navigation/native";
 import api from "../../libs/apiCall";
 import useStore from "../../store";
+import { getPasswordInputProps } from "../../constants/passwordInput";
 
 const RegisterSchema = z
   .object({
@@ -14,7 +15,7 @@ const RegisterSchema = z
     last_name: z.string().min(2, { message: "Last name must be at least 2 characters" }),
     email: z.string().email({ message: "Invalid email address" }),
     password: z.string().min(6, { message: "Password must be at least 6 characters long" }),
-    confirm_password: z.string({ required_error: "Please confirm your password" }),
+    confirm_password: z.string().min(1, { message: "Please confirm your password" }),
   })
   .refine((data) => data.password === data.confirm_password, {
     message: "Passwords do not match",
@@ -129,9 +130,12 @@ const SignUp = () => {
         name="password"
         render={({ field: { onChange, value } }) => (
           <TextInput
+            {...getPasswordInputProps({
+              textContentType: "newPassword",
+              autoComplete: "password-new",
+            })}
             style={styles.input}
             placeholder="Password"
-            secureTextEntry
             value={value}
             onChangeText={onChange}
             editable={!isLoading}
@@ -146,9 +150,12 @@ const SignUp = () => {
         name="confirm_password"
         render={({ field: { onChange, value } }) => (
           <TextInput
+            {...getPasswordInputProps({
+              textContentType: "newPassword",
+              autoComplete: "password-new",
+            })}
             style={styles.input}
             placeholder="Confirm Password"
-            secureTextEntry
             value={value}
             onChangeText={onChange}
             editable={!isLoading}

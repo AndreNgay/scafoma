@@ -16,6 +16,7 @@ import { useRoute, useNavigation } from "@react-navigation/native";
 import { Ionicons } from "@expo/vector-icons";
 import api from "../../../libs/apiCall";
 import { useToast } from "../../../contexts/ToastContext";
+import ImagePreviewModal from "../../../components/ImagePreviewModal";
 
 const ViewOrderConcessionaire = () => {
   const route = useRoute<any>();
@@ -33,7 +34,7 @@ const ViewOrderConcessionaire = () => {
   const [adjustedTotal, setAdjustedTotal] = useState<string>("");
   const [priceReason, setPriceReason] = useState<string>("");
   const [customPriceReason, setCustomPriceReason] = useState<string>("");
-  const [gcashModalVisible, setGcashModalVisible] = useState(false);
+  const [previewSource, setPreviewSource] = useState<string | null>(null);
   const { showToast } = useToast();
 
   // Format dates with Asia/Manila timezone
@@ -407,7 +408,7 @@ const ViewOrderConcessionaire = () => {
             {order.gcash_screenshot && (
               <View style={styles.paymentProofSection}>
                 <Text style={styles.infoLabel}>GCash Screenshot:</Text>
-                <TouchableOpacity onPress={() => setGcashModalVisible(true)}>
+                <TouchableOpacity onPress={() => setPreviewSource(order.gcash_screenshot)}>
                   <Image source={{ uri: order.gcash_screenshot }} style={styles.paymentProof} />
                 </TouchableOpacity>
               </View>
@@ -472,27 +473,12 @@ const ViewOrderConcessionaire = () => {
 
       {renderStatusButtons()}
 
-      <Modal
-        visible={gcashModalVisible}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setGcashModalVisible(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <TouchableOpacity
-            style={styles.fullImageContainer}
-            activeOpacity={1}
-            onPress={() => setGcashModalVisible(false)}
-          >
-            {order.gcash_screenshot && (
-              <Image
-                source={{ uri: order.gcash_screenshot }}
-                style={styles.paymentProof}
-              />
-            )}
-          </TouchableOpacity>
-        </View>
-      </Modal>
+      <ImagePreviewModal
+        visible={!!previewSource}
+        imageUrl={previewSource}
+        title="GCash screenshot"
+        onClose={() => setPreviewSource(null)}
+      />
 
       {/* Accept Order Modal (optional price adjustment) */}
       <Modal visible={acceptModalVisible} animationType="slide" transparent={true}>

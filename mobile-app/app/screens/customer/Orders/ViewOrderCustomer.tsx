@@ -12,13 +12,14 @@ import {
   BackHandler,
   Modal,
   RefreshControl,
+  Clipboard,
 } from "react-native";
 import { useRoute, useNavigation, useFocusEffect } from "@react-navigation/native";
 import * as ImagePicker from "expo-image-picker";
-import { Clipboard } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import api from "../../../libs/apiCall";
 import { useToast } from "../../../contexts/ToastContext";
+import ImagePreviewModal from "../../../components/ImagePreviewModal";
 
 // Import icons
 const GCashIcon = require("../../../../assets/images/gcash-icon.png");
@@ -35,7 +36,7 @@ const ViewOrderCustomer = () => {
   const [cancelling, setCancelling] = useState(false);
   const [updatingPayment, setUpdatingPayment] = useState(false);
   const [cancelConfirmVisible, setCancelConfirmVisible] = useState(false);
-  const [paymentProofModalVisible, setPaymentProofModalVisible] = useState(false);
+  const [previewSource, setPreviewSource] = useState<string | null>(null);
   const { showToast } = useToast();
 
   const copyGcashNumber = async () => {
@@ -498,7 +499,7 @@ const ViewOrderCustomer = () => {
             </Text>
             {order.payment_proof ? (
               <View>
-                <TouchableOpacity onPress={() => setPaymentProofModalVisible(true)}>
+                <TouchableOpacity onPress={() => setPreviewSource(order.payment_proof || null)}>
                   <Image source={{ uri: order.payment_proof }} style={styles.paymentProof} />
                 </TouchableOpacity>
                 <Text style={styles.uploadedIndicator}>
@@ -612,27 +613,12 @@ const ViewOrderCustomer = () => {
         </View>
       )}
 
-      <Modal
-        transparent
-        visible={paymentProofModalVisible}
-        animationType="fade"
-        onRequestClose={() => setPaymentProofModalVisible(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <TouchableOpacity
-            style={styles.fullImageContainer}
-            activeOpacity={1}
-            onPress={() => setPaymentProofModalVisible(false)}
-          >
-            {order.payment_proof && (
-              <Image
-                source={{ uri: order.payment_proof }}
-                style={styles.paymentProof}
-              />
-            )}
-          </TouchableOpacity>
-        </View>
-      </Modal>
+      <ImagePreviewModal
+        visible={!!previewSource}
+        imageUrl={previewSource}
+        title="Payment screenshot"
+        onClose={() => setPreviewSource(null)}
+      />
 
       <Modal
         transparent

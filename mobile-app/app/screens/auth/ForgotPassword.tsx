@@ -9,6 +9,7 @@ import {
 } from "react-native";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { useToast } from "../../contexts/ToastContext";
+import { getPasswordInputProps } from "../../constants/passwordInput";
 
 type Props = NativeStackScreenProps<any, "ForgotPassword">;
 
@@ -124,16 +125,22 @@ const ForgotPassword: React.FC<Props> = ({ navigation }) => {
         {step === "reset" && (
           <>
             <TextInput
+              {...getPasswordInputProps({
+                textContentType: "newPassword",
+                autoComplete: "password-new",
+              })}
               style={styles.input}
               placeholder="New Password"
-              secureTextEntry
               value={newPassword}
               onChangeText={setNewPassword}
             />
             <TextInput
+              {...getPasswordInputProps({
+                textContentType: "newPassword",
+                autoComplete: "password-new",
+              })}
               style={styles.input}
               placeholder="Confirm Password"
-              secureTextEntry
               value={confirmPassword}
               onChangeText={setConfirmPassword}
             />

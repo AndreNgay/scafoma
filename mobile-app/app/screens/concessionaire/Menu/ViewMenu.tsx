@@ -16,6 +16,7 @@ import {
 import { useRoute } from "@react-navigation/native";
 import api from "../../../libs/apiCall";
 import { useToast } from "../../../contexts/ToastContext";
+import ImagePreviewModal from "../../../components/ImagePreviewModal";
 
 type Variation = { name: string; price: string | number; image_url?: string; max_amount?: number; id?: number | string };
 type VariationGroup = {
@@ -38,6 +39,7 @@ const ViewMenu: React.FC = () => {
   const [quantity, setQuantity] = useState<number>(1);
   const [selectedVariations, setSelectedVariations] = useState<SelectedVariation[]>([]);
   const [variationQuantities, setVariationQuantities] = useState<Record<string, number>>({});
+  const [previewImage, setPreviewImage] = useState<string | null>(null);
   const { showToast } = useToast();
 
   // Fetch feedbacks
@@ -213,7 +215,12 @@ const ViewMenu: React.FC = () => {
     <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: 120 }}>
       {/* Item Details */}
       {menuItem.image_url && (
-        <Image source={{ uri: menuItem.image_url }} style={styles.image} />
+        <TouchableOpacity
+          activeOpacity={0.9}
+          onPress={() => setPreviewImage(menuItem.image_url)}
+        >
+          <Image source={{ uri: menuItem.image_url }} style={styles.image} />
+        </TouchableOpacity>
       )}
       <Text style={styles.title}>{menuItem.item_name}</Text>
 
@@ -301,7 +308,12 @@ const ViewMenu: React.FC = () => {
                         disabled={showQty}
                       >
                         {variation.image_url ? (
-                          <Image source={{ uri: variation.image_url }} style={styles.variationImage} />
+                          <TouchableOpacity
+                            activeOpacity={0.9}
+                            onPress={() => setPreviewImage(variation.image_url || null)}
+                          >
+                            <Image source={{ uri: variation.image_url }} style={styles.variationImage} />
+                          </TouchableOpacity>
                         ) : null}
                         <View style={{ flex: 1 }}>
                           <Text style={styles.variationName}>{variation.name}</Text>
@@ -377,6 +389,12 @@ const ViewMenu: React.FC = () => {
           ))
         )}
       </View>
+      <ImagePreviewModal
+        visible={!!previewImage}
+        imageUrl={previewImage}
+        title={menuItem.item_name}
+        onClose={() => setPreviewImage(null)}
+      />
     </ScrollView>
     </KeyboardAvoidingView>
   );

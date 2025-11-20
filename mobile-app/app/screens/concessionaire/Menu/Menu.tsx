@@ -18,6 +18,7 @@ import { Ionicons } from "@expo/vector-icons";
 import useStore from "../../../store";
 import api from "../../../libs/apiCall";
 import { useToast } from "../../../contexts/ToastContext";
+import ImagePreviewModal from "../../../components/ImagePreviewModal";
 
 type Variation = {
   label: string;
@@ -52,6 +53,7 @@ const Menu = () => {
   const [selectedItem, setSelectedItem] = useState<MenuItem | null>(null); // item with open overflow
   const [deleteLoading, setDeleteLoading] = useState(false);
   const [availabilityLoadingId, setAvailabilityLoadingId] = useState<number | null>(null);
+  const [previewImage, setPreviewImage] = useState<string | null>(null);
 
   const fetchMenuItems = async (pageNum = 1, replace = false) => {
     try {
@@ -244,11 +246,16 @@ const Menu = () => {
               activeOpacity={0.9}
             >
               {(!imageError[item.id] && item.image_url) ? (
-                <Image
-                  source={{ uri: item.image_url }}
-                  style={styles.image}
-                  onError={() => setImageError((prev) => ({ ...prev, [item.id]: true }))}
-                />
+                <TouchableOpacity
+                  activeOpacity={0.85}
+                  onPress={() => setPreviewImage(item.image_url || null)}
+                >
+                  <Image
+                    source={{ uri: item.image_url }}
+                    style={styles.image}
+                    onError={() => setImageError((prev) => ({ ...prev, [item.id]: true }))}
+                  />
+                </TouchableOpacity>
               ) : (
                 <View style={styles.placeholder} />
               )}
@@ -409,6 +416,12 @@ const Menu = () => {
         <Ionicons name="add" size={22} color="#fff" />
         <Text style={styles.floatingAddButtonText}>New menu item</Text>
       </TouchableOpacity>
+      <ImagePreviewModal
+        visible={!!previewImage}
+        imageUrl={previewImage}
+        title="Menu image"
+        onClose={() => setPreviewImage(null)}
+      />
     </View>
   );
 };

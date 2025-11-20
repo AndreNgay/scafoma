@@ -17,6 +17,7 @@ import * as ImagePicker from "expo-image-picker";
 import { z } from "zod";
 import api from "../../../libs/apiCall";
 import { useToast } from "../../../contexts/ToastContext";
+import { sanitizeCurrencyInput, normalizeCurrencyValue } from "../../../utils/currency";
 
 type Variation = { name: string; price: string; max_amount?: number; image?: any; image_url?: string; available?: boolean };
 type VariationGroup = {
@@ -29,7 +30,7 @@ type VariationGroup = {
 
 const AddMenu: React.FC = () => {
   const [itemName, setItemName] = useState("");
-  const [price, setPrice] = useState("");
+  const [price, setPrice] = useState("0");
   const [category, setCategory] = useState(""); // ✅ text input now
   const [availability, setAvailability] = useState(false);
   const [image, setImage] = useState<any>(null);
@@ -44,6 +45,14 @@ const AddMenu: React.FC = () => {
   const [importItemsLoading, setImportItemsLoading] = useState(false);
   const [importSourceItems, setImportSourceItems] = useState<any[]>([]);
   const [importFromItemLoading, setImportFromItemLoading] = useState(false);
+
+  const handlePriceChange = (value: string) => {
+    setPrice(sanitizeCurrencyInput(value));
+  };
+
+  const ensurePriceFallback = () => {
+    setPrice((prev) => normalizeCurrencyValue(prev));
+  };
 
   // Load existing categories for this concessionaire to show as quick-select chips
   useEffect(() => {
@@ -355,11 +364,6 @@ const AddMenu: React.FC = () => {
       return;
     }
 
-    if (!price.trim()) {
-      showToast("error", "Please enter a base price.");
-      return;
-    }
-
     // Validate variation groups
     for (const group of variationGroups) {
       try {
@@ -390,8 +394,9 @@ const AddMenu: React.FC = () => {
     }
 
     const formData = new FormData();
+    const normalizedPrice = normalizeCurrencyValue(price);
     formData.append("item_name", itemName.trim());
-    formData.append("price", price.trim());
+    formData.append("price", normalizedPrice);
     formData.append("category", category.trim()); // ✅ send typed category
     formData.append("availability", availability ? "true" : "false");
     
@@ -493,92 +498,112 @@ const AddMenu: React.FC = () => {
       style={styles.container}
       contentContainerStyle={{ paddingBottom: 120 }}
     >
-      <Text style={styles.label}>Item Name *</Text>
-      <TextInput
-        style={styles.input}
-        value={itemName}
-        onChangeText={setItemName}
-      />
-
-      {/* Price */}
-      <View style={styles.labelRow}>
-        <Text style={styles.label}>Base Price</Text>
-      </View>
-      <TextInput
-        style={styles.input}
-        value={price}
-        keyboardType="numeric"
-        onChangeText={setPrice}
-      />
-
-      {/* Image */}
-      <Text style={styles.label}>Image</Text>
-      <TouchableOpacity style={styles.imagePicker} onPress={pickImage}>
-        {image ? (
-          <Image source={{ uri: image.uri }} style={styles.previewImage} />
-        ) : (
-          <Text style={{ color: "#555" }}>Pick an image</Text>
-        )}
-      </TouchableOpacity>
-
-      {/* ✅ Category now a text input */}
-      <Text style={styles.label}>Category</Text>
-      <TextInput
-        style={styles.input}
-        placeholder="e.g. Beverage, Snack, Meal..."
-        value={category}
-        onChangeText={setCategory}
-      />
-      {existingCategories.length > 0 && (
-        <View style={styles.categoryChipsContainer}>
-          {existingCategories.map((cat) => (
-            <TouchableOpacity
-              key={cat}
-              style={[
-                styles.categoryChip,
-                category === cat && styles.categoryChipSelected,
-              ]}
-              onPress={() => setCategory(cat)}
-            >
-              <Text
-                style={[
-                  styles.categoryChipText,
-                  category === cat && styles.categoryChipTextSelected,
-                ]}
-              >
-                {cat}
-              </Text>
-            </TouchableOpacity>
-          ))}
+      <View style={styles.sectionCard}>
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>General Details</Text>
+          <Text style={styles.sectionHint}>* Required</Text>
         </View>
-      )}
 
-      {/* Availability */}
-      <View style={styles.labelRow}>
-        <Text style={styles.label}>Availability</Text>
-      </View>
-      <View style={styles.toggleRow}>
-        <Switch
-          value={availability}
-          onValueChange={setAvailability}
-          trackColor={{ false: "#ccc", true: "#A40C2D" }}
-          thumbColor="#fff"
+        <Text style={styles.label}>
+          Item Name <Text style={styles.required}>*</Text>
+        </Text>
+        <TextInput
+          style={styles.input}
+          value={itemName}
+          onChangeText={setItemName}
+          placeholder="Enter menu item name"
         />
-      </View>
 
-      {/* Variations */}
-      <View style={styles.labelRow}>
-        <Text style={[styles.label, { marginTop: 18 }]}>Variations</Text>
-        <TouchableOpacity
-          style={styles.importButton}
-          onPress={openImportModal}
-        >
-          <Text style={styles.importButtonText}>Import from item</Text>
+        <Text style={styles.label}>
+          Base Price <Text style={styles.required}>*</Text>
+        </Text>
+        <View style={styles.currencyInputWrapper}>
+          <Text style={styles.currencyPrefix}>₱</Text>
+          <TextInput
+            style={styles.currencyInput}
+            value={price}
+            keyboardType="numeric"
+            onChangeText={handlePriceChange}
+            onBlur={ensurePriceFallback}
+            placeholder="0.00"
+          />
+        </View>
+        <Text style={styles.helperText}>
+          Leaving this blank automatically sets the price to ₱0.00.
+        </Text>
+
+        <Text style={styles.label}>Image</Text>
+        <TouchableOpacity style={styles.imagePicker} onPress={pickImage}>
+          {image ? (
+            <Image source={{ uri: image.uri }} style={styles.previewImage} />
+          ) : (
+            <Text style={{ color: "#555" }}>Pick an image</Text>
+          )}
         </TouchableOpacity>
+
+        <Text style={styles.label}>Category</Text>
+        <TextInput
+          style={styles.input}
+          placeholder="e.g. Beverage, Snack, Meal..."
+          value={category}
+          onChangeText={setCategory}
+        />
+        {existingCategories.length > 0 && (
+          <View style={styles.categoryChipsContainer}>
+            {existingCategories.map((cat) => (
+              <TouchableOpacity
+                key={cat}
+                style={[
+                  styles.categoryChip,
+                  category === cat && styles.categoryChipSelected,
+                ]}
+                onPress={() => setCategory(cat)}
+              >
+                <Text
+                  style={[
+                    styles.categoryChipText,
+                    category === cat && styles.categoryChipTextSelected,
+                  ]}
+                >
+                  {cat}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        )}
+
+        <View style={[styles.labelRow, { marginTop: 18 }]}>
+          <Text style={styles.label}>Availability</Text>
+        </View>
+        <View style={styles.toggleRow}>
+          <Switch
+            value={availability}
+            onValueChange={setAvailability}
+            trackColor={{ false: "#ccc", true: "#A40C2D" }}
+            thumbColor="#fff"
+          />
+          <Text style={styles.helperText}>
+            Toggle off to temporarily hide this menu item.
+          </Text>
+        </View>
       </View>
 
-      {variationGroups.map((group, gIndex) => (
-        <View key={gIndex} style={styles.groupBox}>
+      <View style={styles.sectionCard}>
+        <View style={styles.labelRow}>
+          <Text style={styles.sectionTitle}>Variations</Text>
+          <TouchableOpacity
+            style={styles.importButton}
+            onPress={openImportModal}
+          >
+            <Text style={styles.importButtonText}>Import from item</Text>
+          </TouchableOpacity>
+        </View>
+        <Text style={[styles.helperText, { marginBottom: 12 }]}>
+          Optional: Add variation groups for sizes, add-ons, or combos.
+        </Text>
+
+        {variationGroups.map((group, gIndex) => (
+          <View key={gIndex} style={styles.groupBox}>
           <TextInput
             style={styles.input}
             placeholder="Group label (e.g. Size)"
@@ -762,11 +787,12 @@ const AddMenu: React.FC = () => {
             </TouchableOpacity>
           </View>
         </View>
-      ))}
+        ))}
 
-      <TouchableOpacity style={styles.buttonOutline} onPress={addVariationGroup}>
-        <Text style={styles.buttonOutlineText}>+ Add Variation Group</Text>
-      </TouchableOpacity>
+        <TouchableOpacity style={styles.buttonOutline} onPress={addVariationGroup}>
+          <Text style={styles.buttonOutlineText}>+ Add Variation Group</Text>
+        </TouchableOpacity>
+      </View>
 
       <TouchableOpacity
         style={styles.button}
@@ -868,6 +894,60 @@ const styles = StyleSheet.create({
     marginTop: 6,
     backgroundColor: "#fff",
   },
+  sectionCard: {
+    backgroundColor: "#fff",
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: "#eee",
+    shadowColor: "#000",
+    shadowOpacity: 0.03,
+    shadowOffset: { width: 0, height: 1 },
+    shadowRadius: 3,
+    elevation: 1,
+  },
+  sectionHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 12,
+  },
+  sectionTitle: {
+    fontSize: 16,
+    fontWeight: "600",
+  },
+  sectionHint: {
+    fontSize: 12,
+    color: "#888",
+  },
+  required: {
+    color: "#A40C2D",
+  },
+  currencyInputWrapper: {
+    flexDirection: "row",
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: "#ccc",
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    marginTop: 6,
+  },
+  currencyPrefix: {
+    fontSize: 16,
+    fontWeight: "600",
+    marginRight: 6,
+  },
+  currencyInput: {
+    flex: 1,
+    fontSize: 16,
+    paddingVertical: 10,
+  },
+  helperText: {
+    fontSize: 12,
+    color: "#777",
+    marginTop: 6,
+  },
   imagePicker: {
     borderWidth: 1,
     borderColor: "#ccc",
@@ -885,7 +965,7 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   importButton: {
-    marginTop: 18,
+    marginTop: 0,
     paddingHorizontal: 10,
     paddingVertical: 6,
     borderRadius: 16,

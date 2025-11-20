@@ -17,6 +17,10 @@ import * as ImagePicker from "expo-image-picker";
 import { z } from "zod";
 import api from "../../../libs/apiCall";
 import { useToast } from "../../../contexts/ToastContext";
+import {
+  sanitizeCurrencyInput,
+  normalizeCurrencyValue,
+} from "../../../utils/currency";
 
 type Variation = { 
   name: string; 
@@ -41,7 +45,10 @@ const EditMenu: React.FC = () => {
   const navigation = useNavigation<any>();
 
   const [itemName, setItemName] = useState(menuItem?.item_name || "");
-  const [price, setPrice] = useState(menuItem?.price?.toString() || "");
+  const initialPrice = normalizeCurrencyValue(
+    menuItem?.price != null ? String(menuItem.price) : "0"
+  );
+  const [price, setPrice] = useState(initialPrice);
   const [category, setCategory] = useState(menuItem?.category || "");
   const [availability, setAvailability] = useState(
     menuItem?.availability !== undefined ? menuItem.availability : true
@@ -59,6 +66,14 @@ const EditMenu: React.FC = () => {
   const [importItemsLoading, setImportItemsLoading] = useState(false);
   const [importSourceItems, setImportSourceItems] = useState<any[]>([]);
   const [importFromItemLoading, setImportFromItemLoading] = useState(false);
+
+  const handlePriceChange = (value: string) => {
+    setPrice(sanitizeCurrencyInput(value));
+  };
+
+  const ensurePriceFallback = () => {
+    setPrice((prev) => normalizeCurrencyValue(prev));
+  };
 
   // Tooltips removed
 
@@ -419,11 +434,6 @@ const EditMenu: React.FC = () => {
       return;
     }
 
-    if (!price.trim()) {
-      showToast("error", "Please enter a base price.");
-      return;
-    }
-
     // Validate variation groups
     for (const group of variationGroups) {
       try {
@@ -453,9 +463,11 @@ const EditMenu: React.FC = () => {
       }
     }
 
+    const normalizedPrice = normalizeCurrencyValue(price);
+
     const formData = new FormData();
     formData.append("item_name", itemName.trim());
-    formData.append("price", price.trim());
+    formData.append("price", normalizedPrice);
     formData.append("category", category.trim());
     formData.append("availability", availability ? "true" : "false");
     formData.append("variations", JSON.stringify(variationGroups));
@@ -549,288 +561,309 @@ const EditMenu: React.FC = () => {
       style={styles.container}
       contentContainerStyle={{ paddingBottom: 120 }}
     >
-      <Text style={styles.label}>Item Name *</Text>
-      <TextInput
-        style={styles.input}
-        value={itemName}
-        onChangeText={setItemName}
-      />
-
-      {/* Price */}
-      <View style={styles.labelRow}>
-        <Text style={styles.label}>Base Price</Text>
-      </View>
-      <TextInput
-        style={styles.input}
-        value={price}
-        keyboardType="numeric"
-        onChangeText={setPrice}
-      />
-
-      {/* Image */}
-      <Text style={styles.label}>Image</Text>
-      <TouchableOpacity style={styles.imagePicker} onPress={pickImage}>
-        {image ? (
-          <Image source={{ uri: image.uri }} style={styles.previewImage} />
-        ) : (
-          <Text style={{ color: "#555" }}>Pick an image</Text>
-        )}
-      </TouchableOpacity>
-
-      {/* Category */}
-      <Text style={styles.label}>Category</Text>
-      <TextInput
-        style={styles.input}
-        placeholder="e.g. Beverage, Snack, Meal..."
-        value={category}
-        onChangeText={setCategory}
-      />
-      {existingCategories.length > 0 && (
-        <View style={styles.categoryChipsContainer}>
-          {existingCategories.map((cat) => (
-            <TouchableOpacity
-              key={cat}
-              style={[
-                styles.categoryChip,
-                category === cat && styles.categoryChipSelected,
-              ]}
-              onPress={() => setCategory(cat)}
-            >
-              <Text
-                style={[
-                  styles.categoryChipText,
-                  category === cat && styles.categoryChipTextSelected,
-                ]}
-              >
-                {cat}
-              </Text>
-            </TouchableOpacity>
-          ))}
+      <View style={styles.sectionCard}>
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>General Details</Text>
+          <Text style={styles.sectionHint}>* Required</Text>
         </View>
-      )}
 
-      {/* Availability */}
-      <View style={styles.labelRow}>
-        <Text style={styles.label}>Availability</Text>
-      </View>
-      <View style={styles.toggleRow}>
-        <Switch
-          value={availability}
-          onValueChange={setAvailability}
-          trackColor={{ false: "#ccc", true: "#A40C2D" }}
-          thumbColor="#fff"
+        <Text style={styles.label}>
+          Item Name <Text style={styles.required}>*</Text>
+        </Text>
+        <TextInput
+          style={styles.input}
+          value={itemName}
+          onChangeText={setItemName}
+          placeholder="Enter menu item name"
         />
-      </View>
 
-      {/* Variations */}
-      <View style={styles.labelRow}>
-        <Text style={[styles.label, { marginTop: 18 }]}>Variations</Text>
-        <TouchableOpacity
-          style={styles.importButton}
-          onPress={openImportModal}
-          disabled={variationGroupsLoading}
-        >
-          <Text style={styles.importButtonText}>Import from item</Text>
-        </TouchableOpacity>
-      </View>
-
-      {variationGroupsLoading && variationGroups.length === 0 ? (
-        <View style={styles.variationLoadingRow}>
-          <ActivityIndicator size="small" color="#A40C2D" />
-          <Text style={styles.variationLoadingText}>Loading options...</Text>
-        </View>
-      ) : null}
-
-      {variationGroups.map((group, gIndex) => (
-        <View key={gIndex} style={styles.groupBox}>
+        <Text style={styles.label}>
+          Base Price <Text style={styles.required}>*</Text>
+        </Text>
+        <View style={styles.currencyInputWrapper}>
+          <Text style={styles.currencyPrefix}>₱</Text>
           <TextInput
-            style={styles.input}
-            placeholder="Group label (e.g. Size)"
-            value={group.label}
-            onChangeText={(t) => updateGroupLabel(gIndex, t)}
+            style={styles.currencyInput}
+            value={price}
+            keyboardType="numeric"
+            onChangeText={handlePriceChange}
+            onBlur={ensurePriceFallback}
+            placeholder="0.00"
           />
+        </View>
+        <Text style={styles.helperText}>
+          Leaving this blank automatically sets the price to ₱0.00.
+        </Text>
 
-          {/* Group Options */}
-          {/* Required Selection removed; derived by min_selection > 0 */}
+        <Text style={styles.label}>Image</Text>
+        <TouchableOpacity style={styles.imagePicker} onPress={pickImage}>
+          {image ? (
+            <Image source={{ uri: image.uri }} style={styles.previewImage} />
+          ) : (
+            <Text style={{ color: "#555" }}>Pick an image</Text>
+          )}
+        </TouchableOpacity>
 
-          {/* Min Selection */}
-          <View style={styles.selectionRow}>
-            <View style={styles.selectionLabelContainer}>
-              <Text style={styles.label}>Min Selection</Text>
-            </View>
-            <TouchableOpacity
-              style={styles.maxSelectionButton}
-              onPress={() => decrementMinSelection(gIndex)}
-            >
-              <Text style={styles.maxSelectionButtonText}>−</Text>
-            </TouchableOpacity>
-            <TextInput
-              style={styles.selectionInput}
-              keyboardType="numeric"
-              value={group.min_selection?.toString() || "0"}
-              onChangeText={(t) => updateMinSelection(gIndex, t)}
-            />
-            <TouchableOpacity
-              style={styles.maxSelectionButton}
-              onPress={() => incrementMinSelection(gIndex)}
-            >
-              <Text style={styles.maxSelectionButtonText}>+</Text>
-            </TouchableOpacity>
-          </View>
-
-          {/* Max Selection */}
-          <View style={styles.selectionRow}>
-            <View style={styles.selectionLabelContainer}>
-              <Text style={styles.label}>Max Selection</Text>
-            </View>
-            <TouchableOpacity
-              style={styles.maxSelectionButton}
-              onPress={() => decrementMaxSelection(gIndex)}
-            >
-              <Text style={styles.maxSelectionButtonText}>−</Text>
-            </TouchableOpacity>
-            <TextInput
-              style={styles.selectionInput}
-              keyboardType="numeric"
-              value={group.max_selection?.toString() || "1"}
-              onChangeText={(t) => updateMaxSelection(gIndex, t)}
-            />
-            <TouchableOpacity
-              style={styles.maxSelectionButton}
-              onPress={() => incrementMaxSelection(gIndex)}
-            >
-              <Text style={styles.maxSelectionButtonText}>+</Text>
-            </TouchableOpacity>
-          </View>
-          <Text style={styles.maxSelectionHint}>
-            Max: {group.variations.filter(v => v.available !== false).length || 0} (based on number of available variations)
-          </Text>
-
-          {/* Variations */}
-          {group.variations.map((v, vIndex) => (
-            <View key={vIndex} style={styles.variationCard}>
+        <Text style={styles.label}>Category</Text>
+        <TextInput
+          style={styles.input}
+          placeholder="e.g. Beverage, Snack, Meal..."
+          value={category}
+          onChangeText={setCategory}
+        />
+        {existingCategories.length > 0 && (
+          <View style={styles.categoryChipsContainer}>
+            {existingCategories.map((cat) => (
               <TouchableOpacity
-                style={styles.removeVariationIcon}
-                onPress={() => removeVariation(gIndex, vIndex)}
+                key={cat}
+                style={[
+                  styles.categoryChip,
+                  category === cat && styles.categoryChipSelected,
+                ]}
+                onPress={() => setCategory(cat)}
               >
-                <Text style={styles.removeVariationButtonText}>✕</Text>
+                <Text
+                  style={[
+                    styles.categoryChipText,
+                    category === cat && styles.categoryChipTextSelected,
+                  ]}
+                >
+                  {cat}
+                </Text>
               </TouchableOpacity>
+            ))}
+          </View>
+        )}
 
-              <View style={styles.variationRow}>
-                <View>
-                  <Text style={styles.smallLabel}>Image</Text>
-                  <TouchableOpacity
-                    style={styles.variationImageButton}
-                    onPress={() => pickVariationImage(gIndex, vIndex)}
-                  >
-                    {(v.image || v.image_url) ? (
-                      <Image
-                        source={{ uri: v.image?.uri || v.image_url }}
-                        style={styles.variationImagePreview}
-                      />
-                    ) : (
-                      <View style={styles.variationImagePlaceholder}>
-                        <Text style={styles.variationImagePlaceholderText}>📷</Text>
-                      </View>
-                    )}
-                  </TouchableOpacity>
-                </View>
+        <View style={[styles.labelRow, { marginTop: 18 }]}>
+          <Text style={styles.label}>Availability</Text>
+        </View>
+        <View style={styles.toggleRow}>
+          <Switch
+            value={availability}
+            onValueChange={setAvailability}
+            trackColor={{ false: "#ccc", true: "#A40C2D" }}
+            thumbColor="#fff"
+          />
+          <Text style={styles.helperText}>
+            Toggle off to temporarily hide this menu item.
+          </Text>
+        </View>
+      </View>
 
-                <View style={styles.variationDivider} />
+      <View style={styles.sectionCard}>
+        <View style={styles.labelRow}>
+          <Text style={styles.sectionTitle}>Variations</Text>
+          <TouchableOpacity
+            style={styles.importButton}
+            onPress={openImportModal}
+            disabled={variationGroupsLoading}
+          >
+            <Text style={styles.importButtonText}>Import from item</Text>
+          </TouchableOpacity>
+        </View>
+        <Text style={[styles.helperText, { marginBottom: 12 }]}>
+          Optional: Add variation groups for sizes, add-ons, or combos.
+        </Text>
 
-                <View style={styles.variationFields}>
-                  <View style={styles.variationRowLine}>
-                    <View style={styles.fieldColWide}>
-                      <Text style={styles.smallLabel}>Name</Text>
-                      <TextInput
-                        style={[styles.input, styles.variationNameInput]}
-                        placeholder="Name"
-                        value={v.name}
-                        onChangeText={(t) => updateVariation(gIndex, vIndex, "name", t)}
-                      />
-                    </View>
-                    <View style={styles.fieldColNarrow}>
-                      <Text style={styles.smallLabel}>Price</Text>
-                      <TextInput
-                        style={[styles.input, styles.variationPriceInput, { width: 110 }]}
-                        placeholder="Price"
-                        keyboardType="numeric"
-                        value={v.price}
-                        onChangeText={(t) => updateVariation(gIndex, vIndex, "price", t)}
-                      />
-                    </View>
+        {variationGroupsLoading && variationGroups.length === 0 ? (
+          <View style={styles.variationLoadingRow}>
+            <ActivityIndicator size="small" color="#A40C2D" />
+            <Text style={styles.variationLoadingText}>Loading options...</Text>
+          </View>
+        ) : null}
+
+        {variationGroups.map((group, gIndex) => (
+          <View key={gIndex} style={styles.groupBox}>
+            <TextInput
+              style={styles.input}
+              placeholder="Group label (e.g. Size)"
+              value={group.label}
+              onChangeText={(t) => updateGroupLabel(gIndex, t)}
+            />
+
+            {/* Group Options */}
+            {/* Required Selection removed; derived by min_selection > 0 */}
+
+            {/* Min Selection */}
+            <View style={styles.selectionRow}>
+              <View style={styles.selectionLabelContainer}>
+                <Text style={styles.label}>Min Selection</Text>
+              </View>
+              <TouchableOpacity
+                style={styles.maxSelectionButton}
+                onPress={() => decrementMinSelection(gIndex)}
+              >
+                <Text style={styles.maxSelectionButtonText}>−</Text>
+              </TouchableOpacity>
+              <TextInput
+                style={styles.selectionInput}
+                keyboardType="numeric"
+                value={group.min_selection?.toString() || "0"}
+                onChangeText={(t) => updateMinSelection(gIndex, t)}
+              />
+              <TouchableOpacity
+                style={styles.maxSelectionButton}
+                onPress={() => incrementMinSelection(gIndex)}
+              >
+                <Text style={styles.maxSelectionButtonText}>+</Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* Max Selection */}
+            <View style={styles.selectionRow}>
+              <View style={styles.selectionLabelContainer}>
+                <Text style={styles.label}>Max Selection</Text>
+              </View>
+              <TouchableOpacity
+                style={styles.maxSelectionButton}
+                onPress={() => decrementMaxSelection(gIndex)}
+              >
+                <Text style={styles.maxSelectionButtonText}>−</Text>
+              </TouchableOpacity>
+              <TextInput
+                style={styles.selectionInput}
+                keyboardType="numeric"
+                value={group.max_selection?.toString() || "1"}
+                onChangeText={(t) => updateMaxSelection(gIndex, t)}
+              />
+              <TouchableOpacity
+                style={styles.maxSelectionButton}
+                onPress={() => incrementMaxSelection(gIndex)}
+              >
+                <Text style={styles.maxSelectionButtonText}>+</Text>
+              </TouchableOpacity>
+            </View>
+            <Text style={styles.maxSelectionHint}>
+              Max: {group.variations.filter(v => v.available !== false).length || 0} (based on number of available variations)
+            </Text>
+
+            {/* Variations */}
+            {group.variations.map((v, vIndex) => (
+              <View key={vIndex} style={styles.variationCard}>
+                <TouchableOpacity
+                  style={styles.removeVariationIcon}
+                  onPress={() => removeVariation(gIndex, vIndex)}
+                >
+                  <Text style={styles.removeVariationButtonText}>✕</Text>
+                </TouchableOpacity>
+
+                <View style={styles.variationRow}>
+                  <View>
+                    <Text style={styles.smallLabel}>Image</Text>
+                    <TouchableOpacity
+                      style={styles.variationImageButton}
+                      onPress={() => pickVariationImage(gIndex, vIndex)}
+                    >
+                      {(v.image || v.image_url) ? (
+                        <Image
+                          source={{ uri: v.image?.uri || v.image_url }}
+                          style={styles.variationImagePreview}
+                        />
+                      ) : (
+                        <View style={styles.variationImagePlaceholder}>
+                          <Text style={styles.variationImagePlaceholderText}>📷</Text>
+                        </View>
+                      )}
+                    </TouchableOpacity>
                   </View>
 
-                  <View style={styles.variationRowLine}>
-                    <View style={[styles.availableRow, { flex: 1 }]}>
-                      <Text style={styles.smallLabel}>Available</Text>
-                      <Switch
-                        value={v.available !== false}
-                        onValueChange={(val) => {
-                          const updated = [...variationGroups];
-                          const group = updated[gIndex];
+                  <View style={styles.variationDivider} />
 
-                          const prevAvailable = group.variations.filter(
-                            (v2) => v2.available !== false
-                          ).length;
-
-                          group.variations[vIndex].available = val;
-
-                          const nextAvailable = group.variations.filter(
-                            (v2) => v2.available !== false
-                          ).length;
-
-                          if (group.max_selection === prevAvailable) {
-                            group.max_selection = nextAvailable;
-                            if (group.min_selection > group.max_selection) {
-                              group.min_selection = group.max_selection;
-                            }
-                          }
-
-                          setVariationGroups(updated);
-                        }}
-                        trackColor={{ false: "#ccc", true: "#A40C2D" }}
-                        thumbColor="#fff"
-                      />
+                  <View style={styles.variationFields}>
+                    <View style={styles.variationRowLine}>
+                      <View style={styles.fieldColWide}>
+                        <Text style={styles.smallLabel}>Name</Text>
+                        <TextInput
+                          style={[styles.input, styles.variationNameInput]}
+                          placeholder="Name"
+                          value={v.name}
+                          onChangeText={(t) => updateVariation(gIndex, vIndex, "name", t)}
+                        />
+                      </View>
+                      <View style={styles.fieldColNarrow}>
+                        <Text style={styles.smallLabel}>Price</Text>
+                        <TextInput
+                          style={[styles.input, styles.variationPriceInput, { width: 110 }]}
+                          placeholder="Price"
+                          keyboardType="numeric"
+                          value={v.price}
+                          onChangeText={(t) => updateVariation(gIndex, vIndex, "price", t)}
+                        />
+                      </View>
                     </View>
-                    <View style={styles.fieldColTiny}>
-                      <Text style={styles.smallLabel}>Max Quantity</Text>
-                      <TextInput
-                        style={[styles.input, styles.variationMaxAmountInput]}
-                        placeholder="Max"
-                        keyboardType="numeric"
-                        value={v.max_amount?.toString() || ""}
-                        onChangeText={(t) => updateVariation(gIndex, vIndex, "max_amount", t)}
-                      />
+
+                    <View style={styles.variationRowLine}>
+                      <View style={[styles.availableRow, { flex: 1 }]}>
+                        <Text style={styles.smallLabel}>Available</Text>
+                        <Switch
+                          value={v.available !== false}
+                          onValueChange={(val) => {
+                            const updated = [...variationGroups];
+                            const group = updated[gIndex];
+
+                            const prevAvailable = group.variations.filter(
+                              (v2) => v2.available !== false
+                            ).length;
+
+                            group.variations[vIndex].available = val;
+
+                            const nextAvailable = group.variations.filter(
+                              (v2) => v2.available !== false
+                            ).length;
+
+                            if (group.max_selection === prevAvailable) {
+                              group.max_selection = nextAvailable;
+                              if (group.min_selection > group.max_selection) {
+                                group.min_selection = group.max_selection;
+                              }
+                            }
+
+                            setVariationGroups(updated);
+                          }}
+                          trackColor={{ false: "#ccc", true: "#A40C2D" }}
+                          thumbColor="#fff"
+                        />
+                      </View>
+                      <View style={styles.fieldColTiny}>
+                        <Text style={styles.smallLabel}>Max Quantity</Text>
+                        <TextInput
+                          style={[styles.input, styles.variationMaxAmountInput]}
+                          placeholder="Max"
+                          keyboardType="numeric"
+                          value={v.max_amount?.toString() || ""}
+                          onChangeText={(t) => updateVariation(gIndex, vIndex, "max_amount", t)}
+                        />
+                      </View>
                     </View>
                   </View>
                 </View>
               </View>
+            ))}
+
+            <View
+              style={{ flexDirection: "row", justifyContent: "space-between" }}
+            >
+              <TouchableOpacity
+                style={styles.smallButton}
+                onPress={() => addVariation(gIndex)}
+              >
+                <Text style={styles.smallButtonText}>+ Add Variation</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.removeGroupButton}
+                onPress={() => removeVariationGroup(gIndex)}
+              >
+                <Text style={styles.removeGroupButtonText}>Remove Group</Text>
+              </TouchableOpacity>
             </View>
-          ))}
-
-          <View
-            style={{ flexDirection: "row", justifyContent: "space-between" }}
-          >
-            <TouchableOpacity
-              style={styles.smallButton}
-              onPress={() => addVariation(gIndex)}
-            >
-              <Text style={styles.smallButtonText}>+ Add Variation</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.removeGroupButton}
-              onPress={() => removeVariationGroup(gIndex)}
-            >
-              <Text style={styles.removeGroupButtonText}>Remove Group</Text>
-            </TouchableOpacity>
           </View>
-        </View>
-      ))}
+        ))}
 
-      <TouchableOpacity style={styles.buttonOutline} onPress={addVariationGroup}>
-        <Text style={styles.buttonOutlineText}>+ Add Variation Group</Text>
-      </TouchableOpacity>
+        <TouchableOpacity style={styles.buttonOutline} onPress={addVariationGroup}>
+          <Text style={styles.buttonOutlineText}>+ Add Variation Group</Text>
+        </TouchableOpacity>
+      </View>
 
       <TouchableOpacity
         style={styles.button}
@@ -932,6 +965,60 @@ const styles = StyleSheet.create({
     marginTop: 6,
     backgroundColor: "#fff",
   },
+  sectionCard: {
+    backgroundColor: "#fff",
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: "#eee",
+    shadowColor: "#000",
+    shadowOpacity: 0.03,
+    shadowOffset: { width: 0, height: 1 },
+    shadowRadius: 3,
+    elevation: 1,
+  },
+  sectionHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 12,
+  },
+  sectionTitle: {
+    fontSize: 16,
+    fontWeight: "600",
+  },
+  sectionHint: {
+    fontSize: 12,
+    color: "#888",
+  },
+  required: {
+    color: "#A40C2D",
+  },
+  currencyInputWrapper: {
+    flexDirection: "row",
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: "#ccc",
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    marginTop: 6,
+  },
+  currencyPrefix: {
+    fontSize: 16,
+    fontWeight: "600",
+    marginRight: 6,
+  },
+  currencyInput: {
+    flex: 1,
+    fontSize: 16,
+    paddingVertical: 10,
+  },
+  helperText: {
+    fontSize: 12,
+    color: "#777",
+    marginTop: 6,
+  },
   imagePicker: {
     borderWidth: 1,
     borderColor: "#ccc",
@@ -957,6 +1044,19 @@ const styles = StyleSheet.create({
   variationLoadingText: {
     fontSize: 12,
     color: "#666",
+  },
+  importButton: {
+    marginTop: 0,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: "#A40C2D",
+  },
+  importButtonText: {
+    fontSize: 12,
+    color: "#A40C2D",
+    fontWeight: "600",
   },
   groupBox: {
     borderWidth: 1,

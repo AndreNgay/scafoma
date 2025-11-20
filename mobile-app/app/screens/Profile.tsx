@@ -16,6 +16,7 @@ import { z } from "zod";
 import * as ImagePicker from "expo-image-picker";
 import { useToast } from "../contexts/ToastContext";
 import { Ionicons } from "@expo/vector-icons";
+import { getPasswordInputProps } from "../constants/passwordInput";
 
 
 // ✅ Zod schemas
@@ -419,8 +420,8 @@ const Profile = () => {
             <View style={styles.inputGroup}>
               <Text style={styles.label}>Current Password</Text>
               <TextInput
+                {...getPasswordInputProps()}
                 style={styles.input}
-                secureTextEntry
                 value={passwords.currentPassword}
                 onChangeText={(t) =>
                   setPasswords({ ...passwords, currentPassword: t })
@@ -435,8 +436,11 @@ const Profile = () => {
             <View style={styles.inputGroup}>
               <Text style={styles.label}>New Password</Text>
               <TextInput
+                {...getPasswordInputProps({
+                  textContentType: "newPassword",
+                  autoComplete: "password-new",
+                })}
                 style={styles.input}
-                secureTextEntry
                 value={passwords.newPassword}
                 onChangeText={(t) =>
                   setPasswords({ ...passwords, newPassword: t })
@@ -451,8 +455,11 @@ const Profile = () => {
             <View style={styles.inputGroup}>
               <Text style={styles.label}>Confirm New Password</Text>
               <TextInput
+                {...getPasswordInputProps({
+                  textContentType: "newPassword",
+                  autoComplete: "password-new",
+                })}
                 style={styles.input}
-                secureTextEntry
                 value={passwords.confirmPassword}
                 onChangeText={(t) =>
                   setPasswords({ ...passwords, confirmPassword: t })
