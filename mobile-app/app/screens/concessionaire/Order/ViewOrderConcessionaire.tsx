@@ -33,6 +33,9 @@ const ViewOrderConcessionaire = () => {
 	const [itemsToToggle, setItemsToToggle] = useState<Record<number, boolean>>(
 		{}
 	)
+	const [variationsToToggle, setVariationsToToggle] = useState<
+		Record<number, boolean>
+	>({})
 	const [acceptModalVisible, setAcceptModalVisible] = useState(false)
 	const [adjustedTotal, setAdjustedTotal] = useState<string>('')
 	const [priceReason, setPriceReason] = useState<string>('')
@@ -190,10 +193,53 @@ const ViewOrderConcessionaire = () => {
 			}
 		}
 
-		// Build decline reason with toggled items info
+		// If "Unavailable options/variations" is selected, update variation availability
+		const toggledUnavailableVariations: string[] = []
+		if (selectedReason === 'Unavailable options/variations') {
+			try {
+				const variationsToUpdate = Object.entries(variationsToToggle).filter(
+					([_, shouldToggle]) => shouldToggle
+				)
+
+				for (const [variationIdStr, _] of variationsToUpdate) {
+					const variationId = parseInt(variationIdStr)
+
+					// Update variation availability to false
+					await api.put(`/item-variation/${variationId}/availability`, {
+						available: false,
+					})
+
+					// Find variation name for notification
+					let variationName = ''
+					for (const item of order?.items || []) {
+						for (const v of item.variations || []) {
+							if (v.variation_id === variationId) {
+								variationName = `${v.group_name}: ${v.variation_name}`
+								break
+							}
+						}
+						if (variationName) break
+					}
+					if (variationName) {
+						toggledUnavailableVariations.push(variationName)
+					}
+				}
+			} catch (error) {
+				console.error('Error updating variation availability:', error)
+				showToast('error', 'Failed to update variation availability')
+				return
+			}
+		}
+
+		// Build decline reason with toggled items/variations info
 		let finalReason = reason
 		if (toggledUnavailableItems.length > 0) {
 			finalReason += `\n\nItems marked as unavailable: ${toggledUnavailableItems.join(
+				', '
+			)}`
+		}
+		if (toggledUnavailableVariations.length > 0) {
+			finalReason += `\n\nVariations marked as unavailable: ${toggledUnavailableVariations.join(
 				', '
 			)}`
 		}
@@ -203,6 +249,7 @@ const ViewOrderConcessionaire = () => {
 		setSelectedReason('')
 		setCustomReason('')
 		setItemsToToggle({})
+		setVariationsToToggle({})
 	}
 
 	// Cancel decline
@@ -211,6 +258,7 @@ const ViewOrderConcessionaire = () => {
 		setSelectedReason('')
 		setCustomReason('')
 		setItemsToToggle({})
+		setVariationsToToggle({})
 	}
 
 	const openAcceptModal = () => {
@@ -728,7 +776,9 @@ const ViewOrderConcessionaire = () => {
 				animationType="slide"
 				transparent={true}>
 				<View style={styles.modalOverlay}>
-					<ScrollView style={styles.modalContainer}>
+					<ScrollView
+						style={styles.modalContainer}
+						contentContainerStyle={{ paddingBottom: 20 }}>
 						<Text style={styles.modalHeader}>Decline Order</Text>
 						<Text style={styles.modalSubtitle}>
 							Please provide a reason for declining this order:
@@ -805,14 +855,247 @@ const ViewOrderConcessionaire = () => {
 														styles.toggleButtonTextActive,
 												]}>
 												{itemsToToggle[item.id]
-													? 'Will Mark Unavailable'
-													: 'Keep Available'}
+													? 'Mark Unavailable'
+													: 'Available'}
 											</Text>
 										</TouchableOpacity>
 									</View>
 								))}
 							</View>
 						)}
+
+						{/* Variation Availability Toggles for "Unavailable options/variations" */}
+						{selectedReason === 'Unavailable options/variations' &&
+							order?.items && (
+								<View style={styles.itemToggleContainer}>
+									<Text style={styles.reasonLabel}>
+										Mark variations as unavailable:
+									</Text>
+									<Text style={styles.itemToggleSubtext}>
+										Selected variations will be marked unavailable in your menu
+									</Text>
+
+									{(() => {
+										// Group variations by item
+										const itemsWithVariations: Array<{
+											itemId: number
+											itemName: string
+											variations: Array<{
+												variationId: number
+												groupName: string
+												variationName: string
+											}>
+										}> = []
+
+										console.log('Order Items:', JSON.stringify(order.items))
+										// Collect unique items with their variations
+										const processedItems = new Set<number>()
+										for (const orderItem of order.items) {
+											if (
+												!processedItems.has(orderItem.item_id) &&
+												orderItem.variations &&
+												orderItem.variations.length > 0
+											) {
+												processedItems.add(orderItem.item_id)
+												const variations: Array<{
+													variationId: number
+													groupName: string
+													variationName: string
+												}> = []
+
+												// Collect all unique variations for this item from all order items
+												const seenVariations = new Set<number>()
+												for (const oi of order.items) {
+													if (oi.item_id === orderItem.item_id) {
+														for (const v of oi.variations || []) {
+															if (!seenVariations.has(v.id)) {
+																seenVariations.add(v.id)
+																variations.push({
+																	variationId: v.id,
+																	groupName: v.variation_group_name,
+																	variationName: v.variation_name,
+																})
+															}
+														}
+													}
+												}
+												itemsWithVariations.push({
+													itemId: orderItem.item_id,
+													itemName: orderItem.item_name,
+													variations,
+												})
+											}
+										}
+
+										if (itemsWithVariations.length === 0) {
+											return (
+												<Text
+													style={[
+														styles.itemToggleSubtext,
+														{ fontStyle: 'italic', marginTop: 10 },
+													]}>
+													No variations in this order to toggle
+												</Text>
+											)
+										}
+
+										// Group variations by group name for each item
+										return itemsWithVariations.map((item, itemIndex) => {
+											const groupedVariations = new Map<
+												string,
+												Array<{ variationId: number; variationName: string }>
+											>()
+
+											for (const v of item.variations) {
+												if (!groupedVariations.has(v.groupName)) {
+													groupedVariations.set(v.groupName, [])
+												}
+												groupedVariations.get(v.groupName)!.push({
+													variationId: v.variationId,
+													variationName: v.variationName,
+												})
+											}
+											console.log(
+												'itemsWithVariations:',
+												JSON.stringify(itemsWithVariations)
+											)
+
+											console.log(
+												'Grouped Variations:',
+												JSON.stringify(groupedVariations)
+											)
+
+											return (
+												<View
+													key={`${item.itemId}-${itemIndex}`}
+													style={{
+														marginTop: 15,
+														paddingTop: 15,
+														borderTopWidth: 1,
+														borderTopColor: '#e0e0e0',
+													}}>
+													<Text
+														style={{
+															fontSize: 15,
+															fontWeight: '600',
+															color: '#A40C2D',
+															marginBottom: 10,
+														}}>
+														{item.itemName}
+													</Text>
+
+													{Array.from(groupedVariations.entries()).map(
+														([groupName, variations], groupIndex) => (
+															<View
+																key={`${item.itemId}-${groupName}-${groupIndex}`}
+																style={{ marginBottom: 12 }}>
+																<View
+																	style={{
+																		flexDirection: 'row',
+																		alignItems: 'center',
+																		marginBottom: 6,
+																	}}>
+																	<Text
+																		style={{
+																			fontSize: 14,
+																			fontWeight: '600',
+																			color: '#555',
+																			flex: 1,
+																		}}>
+																		{groupName}
+																	</Text>
+																	<TouchableOpacity
+																		style={[
+																			styles.toggleButton,
+																			{
+																				paddingHorizontal: 8,
+																				paddingVertical: 6,
+																			},
+																			variations.every(
+																				(v) => variationsToToggle[v.variationId]
+																			) && styles.toggleButtonActive,
+																		]}
+																		onPress={() => {
+																			const allSelected = variations.every(
+																				(v) => variationsToToggle[v.variationId]
+																			)
+																			const newState = { ...variationsToToggle }
+																			for (const v of variations) {
+																				newState[v.variationId] = !allSelected
+																			}
+																			setVariationsToToggle(newState)
+																		}}>
+																		<Text
+																			style={[
+																				styles.toggleButtonText,
+																				{ fontSize: 11 },
+																				variations.every(
+																					(v) =>
+																						variationsToToggle[v.variationId]
+																				) && styles.toggleButtonTextActive,
+																			]}>
+																			Toggle All
+																		</Text>
+																	</TouchableOpacity>
+																</View>
+
+																{variations.map((v, vIndex) => (
+																	<View
+																		key={`${item.itemId}-${groupName}-${groupIndex}-${v.variationId}-${vIndex}`}
+																		style={{
+																			flexDirection: 'row',
+																			justifyContent: 'space-between',
+																			alignItems: 'center',
+																			paddingVertical: 8,
+																			paddingLeft: 15,
+																		}}>
+																		<Text
+																			style={{
+																				fontSize: 13,
+																				color: '#333',
+																				flex: 1,
+																			}}>
+																			• {v.variationName}
+																		</Text>
+																		<TouchableOpacity
+																			style={[
+																				styles.toggleButton,
+																				{
+																					paddingHorizontal: 8,
+																					paddingVertical: 6,
+																				},
+																				variationsToToggle[v.variationId] &&
+																					styles.toggleButtonActive,
+																			]}
+																			onPress={() => {
+																				setVariationsToToggle((prev) => ({
+																					...prev,
+																					[v.variationId]: !prev[v.variationId],
+																				}))
+																			}}>
+																			<Text
+																				style={[
+																					styles.toggleButtonText,
+																					{ fontSize: 11 },
+																					variationsToToggle[v.variationId] &&
+																						styles.toggleButtonTextActive,
+																				]}>
+																				{variationsToToggle[v.variationId]
+																					? 'Mark Unavailable'
+																					: 'Available'}
+																			</Text>
+																		</TouchableOpacity>
+																	</View>
+																))}
+															</View>
+														)
+													)}
+												</View>
+											)
+										})
+									})()}
+								</View>
+							)}
 
 						{/* Custom Reason Input */}
 						{selectedReason === 'custom' && (
@@ -854,7 +1137,7 @@ const ViewOrderConcessionaire = () => {
 
 const styles = StyleSheet.create({
 	container: { flex: 1, backgroundColor: '#fff' },
-	contentContainer: { padding: 15, paddingBottom: 160 },
+	contentContainer: { padding: 15, paddingBottom: 100 },
 	customerSection: {
 		flexDirection: 'row',
 		alignItems: 'center',
