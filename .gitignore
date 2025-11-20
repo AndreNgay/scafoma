@@ -1,0 +1,3 @@
+# Repo-level ignores
+# Ignore the local Copilot instruction file so it is not committed
+.github/instructions/CopilotRules.instructions.md
