@@ -14,7 +14,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { useNavigation } from '@react-navigation/native'
 import api from '../../libs/apiCall'
 import useStore from '../../store'
-import { getPasswordInputProps } from '../../constants/passwordInput'
+import { getPasswordInputProps, preventPaste } from "../../constants/passwordInput";
 
 const RegisterSchema = z
 	.object({

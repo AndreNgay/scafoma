@@ -16,7 +16,7 @@ import { z } from 'zod'
 import * as ImagePicker from 'expo-image-picker'
 import { useToast } from '../contexts/ToastContext'
 import { Ionicons } from '@expo/vector-icons'
-import { getPasswordInputProps } from '../constants/passwordInput'
+import { getPasswordInputProps, preventPaste } from '../constants/passwordInput'
 
 // ✅ Zod schemas
 const profileSchema = z.object({
@@ -440,15 +440,15 @@ const Profile = () => {
 
 						<View style={styles.inputGroup}>
 							<Text style={styles.label}>Current Password</Text>
-							<TextInput
-								{...getPasswordInputProps()}
-								style={styles.input}
-								value={passwords.currentPassword}
-								onChangeText={(t) =>
-									setPasswords({ ...passwords, currentPassword: t })
-								}
-								placeholder="Enter current password"
-							/>
+						<TextInput
+							{...getPasswordInputProps()}
+							style={styles.input}
+							value={passwords.currentPassword}
+							onChangeText={(t) =>
+								setPasswords({ ...passwords, currentPassword: preventPaste(t, passwords.currentPassword) })
+							}
+							placeholder="Enter current password"
+						/>
 							{errors.currentPassword && (
 								<Text style={styles.error}>{errors.currentPassword}</Text>
 							)}
@@ -456,18 +456,18 @@ const Profile = () => {
 
 						<View style={styles.inputGroup}>
 							<Text style={styles.label}>New Password</Text>
-							<TextInput
-								{...getPasswordInputProps({
-									textContentType: 'newPassword',
-									autoComplete: 'password-new',
-								})}
-								style={styles.input}
-								value={passwords.newPassword}
-								onChangeText={(t) =>
-									setPasswords({ ...passwords, newPassword: t })
-								}
-								placeholder="Enter new password"
-							/>
+						<TextInput
+							{...getPasswordInputProps({
+								textContentType: 'newPassword',
+								autoComplete: 'password-new',
+							})}
+							style={styles.input}
+							value={passwords.newPassword}
+							onChangeText={(t) =>
+								setPasswords({ ...passwords, newPassword: preventPaste(t, passwords.newPassword) })
+							}
+							placeholder="Enter new password"
+						/>
 							{errors.newPassword && (
 								<Text style={styles.error}>{errors.newPassword}</Text>
 							)}
@@ -475,18 +475,18 @@ const Profile = () => {
 
 						<View style={styles.inputGroup}>
 							<Text style={styles.label}>Confirm New Password</Text>
-							<TextInput
-								{...getPasswordInputProps({
-									textContentType: 'newPassword',
-									autoComplete: 'password-new',
-								})}
-								style={styles.input}
-								value={passwords.confirmPassword}
-								onChangeText={(t) =>
-									setPasswords({ ...passwords, confirmPassword: t })
-								}
-								placeholder="Confirm new password"
-							/>
+						<TextInput
+							{...getPasswordInputProps({
+								textContentType: 'newPassword',
+								autoComplete: 'password-new',
+							})}
+							style={styles.input}
+							value={passwords.confirmPassword}
+							onChangeText={(t) =>
+								setPasswords({ ...passwords, confirmPassword: preventPaste(t, passwords.confirmPassword) })
+							}
+							placeholder="Confirm new password"
+						/>
 							{errors.confirmPassword && (
 								<Text style={styles.error}>{errors.confirmPassword}</Text>
 							)}
