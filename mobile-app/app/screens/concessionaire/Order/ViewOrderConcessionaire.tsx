@@ -997,9 +997,13 @@ const ViewOrderConcessionaire = () => {
 																			}
 																			setVariationsToToggle(newState)
 																		}}
-																		color={variations.every(
-																			(v) => variationsToToggle[v.variationId]
-																		) ? '#A40C2D' : undefined}
+																		color={
+																			variations.every(
+																				(v) => variationsToToggle[v.variationId]
+																			)
+																				? '#A40C2D'
+																				: undefined
+																		}
 																		style={styles.checkbox}
 																	/>
 																	<Text
@@ -1024,14 +1028,21 @@ const ViewOrderConcessionaire = () => {
 																			paddingLeft: 15,
 																		}}>
 																		<Checkbox
-																			value={variationsToToggle[v.variationId] || false}
+																			value={
+																				variationsToToggle[v.variationId] ||
+																				false
+																			}
 																			onValueChange={(value: boolean) => {
 																				setVariationsToToggle((prev) => ({
 																					...prev,
 																					[v.variationId]: value,
 																				}))
 																			}}
-																			color={variationsToToggle[v.variationId] ? '#A40C2D' : undefined}
+																			color={
+																				variationsToToggle[v.variationId]
+																					? '#A40C2D'
+																					: undefined
+																			}
 																			style={styles.checkbox}
 																		/>
 																		<Text
@@ -1058,9 +1069,7 @@ const ViewOrderConcessionaire = () => {
 						{/* Close Concession Button for "Concession is closed or about to close" */}
 						{selectedReason === 'Concession is closed or about to close' && (
 							<View style={styles.itemToggleContainer}>
-								<Text style={styles.reasonLabel}>
-									Close your concession:
-								</Text>
+								<Text style={styles.reasonLabel}>Close your concession:</Text>
 								<Text style={styles.itemToggleSubtext}>
 									This will close your concession and prevent new orders
 								</Text>
@@ -1073,9 +1082,12 @@ const ViewOrderConcessionaire = () => {
 									onPress={async () => {
 										try {
 											setClosingConcession(true)
-											await api.put(`/concession/${order.concession_id}/status`, {
-												status: 'closed',
-											})
+											await api.put(
+												`/concession/${order.concession_id}/status`,
+												{
+													status: 'closed',
+												}
+											)
 											showToast('success', 'Concession closed successfully')
 										} catch (error) {
 											console.error('Error closing concession:', error)
