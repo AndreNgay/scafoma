@@ -221,3 +221,32 @@ export const updateMyConcession = async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 };
+
+// Update concession status (open/closed)
+export const updateConcessionStatus = async (req, res) => {
+  const { status } = req.body;
+  const { id } = req.params;
+
+  try {
+    const result = await pool.query(
+      `UPDATE tblconcession 
+       SET status = $1, updated_at = NOW()
+       WHERE id = $2
+       RETURNING *`,
+      [status, id]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ message: "Concession not found" });
+    }
+
+    res.json({
+      status: "success",
+      message: `Concession ${status === 'open' ? 'opened' : 'closed'} successfully`,
+      data: result.rows[0],
+    });
+  } catch (err) {
+    console.error("Error updating concession status:", err);
+    res.status(500).json({ error: err.message });
+  }
+};

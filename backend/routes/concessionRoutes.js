@@ -7,6 +7,7 @@ import {
   updateConcession,
   deleteConcession,
   updateMyConcession,
+  updateConcessionStatus,
 } from "../controllers/concessionController.js";
 import authMiddleware from "../middleware/authMiddleware.js";
 import multer from "multer";
@@ -24,8 +25,9 @@ router.get("/:id", getConcessionById);
 router.get("/", authMiddleware, getConcessionById);
 router.put("/me", authMiddleware, upload.single("image"), updateMyConcession);
 
-// Create/Delete
+// Create/Update/Delete
 router.post("/", createConcession);
+router.put("/:id/status", updateConcessionStatus);
 router.put("/:id", updateConcession);
 router.delete("/:id", deleteConcession);
 

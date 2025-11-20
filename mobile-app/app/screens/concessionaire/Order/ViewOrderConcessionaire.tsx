@@ -14,6 +14,7 @@ import {
 } from 'react-native'
 import { useRoute, useNavigation } from '@react-navigation/native'
 import { Ionicons } from '@expo/vector-icons'
+import Checkbox from 'expo-checkbox'
 import api from '../../../libs/apiCall'
 import { useToast } from '../../../contexts/ToastContext'
 import ImagePreviewModal from '../../../components/ImagePreviewModal'
@@ -41,6 +42,7 @@ const ViewOrderConcessionaire = () => {
 	const [priceReason, setPriceReason] = useState<string>('')
 	const [customPriceReason, setCustomPriceReason] = useState<string>('')
 	const [previewSource, setPreviewSource] = useState<string | null>(null)
+	const [closingConcession, setClosingConcession] = useState(false)
 	const { showToast } = useToast()
 
 	// Format dates with Asia/Manila timezone
@@ -836,29 +838,18 @@ const ViewOrderConcessionaire = () => {
 									<View
 										key={item.id}
 										style={styles.itemToggleRow}>
-										<Text style={styles.itemToggleName}>{item.name}</Text>
-										<TouchableOpacity
-											style={[
-												styles.toggleButton,
-												itemsToToggle[item.id] && styles.toggleButtonActive,
-											]}
-											onPress={() => {
+										<Checkbox
+											value={itemsToToggle[item.id] || false}
+											onValueChange={(value: boolean) => {
 												setItemsToToggle((prev) => ({
 													...prev,
-													[item.id]: !prev[item.id],
+													[item.id]: value,
 												}))
-											}}>
-											<Text
-												style={[
-													styles.toggleButtonText,
-													itemsToToggle[item.id] &&
-														styles.toggleButtonTextActive,
-												]}>
-												{itemsToToggle[item.id]
-													? 'Mark Unavailable'
-													: 'Available'}
-											</Text>
-										</TouchableOpacity>
+											}}
+											color={itemsToToggle[item.id] ? '#A40C2D' : undefined}
+											style={styles.checkbox}
+										/>
+										<Text style={styles.itemToggleName}>{item.name}</Text>
 									</View>
 								))}
 							</View>
@@ -995,48 +986,32 @@ const ViewOrderConcessionaire = () => {
 																		alignItems: 'center',
 																		marginBottom: 6,
 																	}}>
+																	<Checkbox
+																		value={variations.every(
+																			(v) => variationsToToggle[v.variationId]
+																		)}
+																		onValueChange={(value: boolean) => {
+																			const newState = { ...variationsToToggle }
+																			for (const v of variations) {
+																				newState[v.variationId] = value
+																			}
+																			setVariationsToToggle(newState)
+																		}}
+																		color={variations.every(
+																			(v) => variationsToToggle[v.variationId]
+																		) ? '#A40C2D' : undefined}
+																		style={styles.checkbox}
+																	/>
 																	<Text
 																		style={{
 																			fontSize: 14,
 																			fontWeight: '600',
 																			color: '#555',
+																			marginLeft: 10,
 																			flex: 1,
 																		}}>
-																		{groupName}
+																		{groupName} (Select All)
 																	</Text>
-																	<TouchableOpacity
-																		style={[
-																			styles.toggleButton,
-																			{
-																				paddingHorizontal: 8,
-																				paddingVertical: 6,
-																			},
-																			variations.every(
-																				(v) => variationsToToggle[v.variationId]
-																			) && styles.toggleButtonActive,
-																		]}
-																		onPress={() => {
-																			const allSelected = variations.every(
-																				(v) => variationsToToggle[v.variationId]
-																			)
-																			const newState = { ...variationsToToggle }
-																			for (const v of variations) {
-																				newState[v.variationId] = !allSelected
-																			}
-																			setVariationsToToggle(newState)
-																		}}>
-																		<Text
-																			style={[
-																				styles.toggleButtonText,
-																				{ fontSize: 11 },
-																				variations.every(
-																					(v) =>
-																						variationsToToggle[v.variationId]
-																				) && styles.toggleButtonTextActive,
-																			]}>
-																			Toggle All
-																		</Text>
-																	</TouchableOpacity>
 																</View>
 
 																{variations.map((v, vIndex) => (
@@ -1044,47 +1019,30 @@ const ViewOrderConcessionaire = () => {
 																		key={`${item.itemId}-${groupName}-${groupIndex}-${v.variationId}-${vIndex}`}
 																		style={{
 																			flexDirection: 'row',
-																			justifyContent: 'space-between',
 																			alignItems: 'center',
 																			paddingVertical: 8,
 																			paddingLeft: 15,
 																		}}>
+																		<Checkbox
+																			value={variationsToToggle[v.variationId] || false}
+																			onValueChange={(value: boolean) => {
+																				setVariationsToToggle((prev) => ({
+																					...prev,
+																					[v.variationId]: value,
+																				}))
+																			}}
+																			color={variationsToToggle[v.variationId] ? '#A40C2D' : undefined}
+																			style={styles.checkbox}
+																		/>
 																		<Text
 																			style={{
 																				fontSize: 13,
 																				color: '#333',
+																				marginLeft: 10,
 																				flex: 1,
 																			}}>
-																			• {v.variationName}
+																			{v.variationName}
 																		</Text>
-																		<TouchableOpacity
-																			style={[
-																				styles.toggleButton,
-																				{
-																					paddingHorizontal: 8,
-																					paddingVertical: 6,
-																				},
-																				variationsToToggle[v.variationId] &&
-																					styles.toggleButtonActive,
-																			]}
-																			onPress={() => {
-																				setVariationsToToggle((prev) => ({
-																					...prev,
-																					[v.variationId]: !prev[v.variationId],
-																				}))
-																			}}>
-																			<Text
-																				style={[
-																					styles.toggleButtonText,
-																					{ fontSize: 11 },
-																					variationsToToggle[v.variationId] &&
-																						styles.toggleButtonTextActive,
-																				]}>
-																				{variationsToToggle[v.variationId]
-																					? 'Mark Unavailable'
-																					: 'Available'}
-																			</Text>
-																		</TouchableOpacity>
 																	</View>
 																))}
 															</View>
@@ -1096,6 +1054,43 @@ const ViewOrderConcessionaire = () => {
 									})()}
 								</View>
 							)}
+
+						{/* Close Concession Button for "Concession is closed or about to close" */}
+						{selectedReason === 'Concession is closed or about to close' && (
+							<View style={styles.itemToggleContainer}>
+								<Text style={styles.reasonLabel}>
+									Close your concession:
+								</Text>
+								<Text style={styles.itemToggleSubtext}>
+									This will close your concession and prevent new orders
+								</Text>
+								<TouchableOpacity
+									style={[
+										styles.submitDeclineBtn,
+										{ marginTop: 10 },
+										closingConcession && { opacity: 0.6 },
+									]}
+									onPress={async () => {
+										try {
+											setClosingConcession(true)
+											await api.put(`/concession/${order.concession_id}/status`, {
+												status: 'closed',
+											})
+											showToast('success', 'Concession closed successfully')
+										} catch (error) {
+											console.error('Error closing concession:', error)
+											showToast('error', 'Failed to close concession')
+										} finally {
+											setClosingConcession(false)
+										}
+									}}
+									disabled={closingConcession}>
+									<Text style={styles.submitDeclineText}>
+										{closingConcession ? 'Closing...' : 'Close Concession Now'}
+									</Text>
+								</TouchableOpacity>
+							</View>
+						)}
 
 						{/* Custom Reason Input */}
 						{selectedReason === 'custom' && (
@@ -1352,6 +1347,9 @@ const styles = StyleSheet.create({
 	},
 	toggleButtonTextActive: {
 		color: '#fff',
+	},
+	checkbox: {
+		marginRight: 10,
 	},
 	customReasonContainer: {
 		marginTop: 10,
