@@ -153,11 +153,14 @@ const Cart = ({ navigation }: any) => {
 	const confirmRemoveGroupProceed = async () => {
 		if (!groupToRemove) return
 		setRemoveGroupModalVisible(false)
-		
+
 		try {
 			// Delete the entire order (which removes all items in that concession)
 			await api.delete(`/order/${groupToRemove.orderId}`)
-			showToast('success', `Removed all items from ${groupToRemove.concessionName}`)
+			showToast(
+				'success',
+				`Removed all items from ${groupToRemove.concessionName}`
+			)
 			await fetchCart()
 		} catch (err) {
 			console.error('Error removing group:', err)
@@ -424,9 +427,15 @@ const Cart = ({ navigation }: any) => {
 										</Text>
 									</View>
 									<TouchableOpacity
-										onPress={() => confirmRemoveGroup(group.orderId, group.concessionName)}
+										onPress={() =>
+											confirmRemoveGroup(group.orderId, group.concessionName)
+										}
 										style={styles.removeGroupBtn}>
-										<Ionicons name="trash-outline" size={18} color="#ff4444" />
+										<Ionicons
+											name="trash-outline"
+											size={18}
+											color="#ff4444"
+										/>
 									</TouchableOpacity>
 								</View>
 							</View>
