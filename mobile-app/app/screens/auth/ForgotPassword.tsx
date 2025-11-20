@@ -9,7 +9,10 @@ import {
 } from 'react-native'
 import { NativeStackScreenProps } from '@react-navigation/native-stack'
 import { useToast } from '../../contexts/ToastContext'
-import { getPasswordInputProps, preventPaste } from "../../constants/passwordInput";
+import {
+	getPasswordInputProps,
+	preventPaste,
+} from '../../constants/passwordInput'
 
 type Props = NativeStackScreenProps<any, 'ForgotPassword'>
 
@@ -134,16 +137,18 @@ const ForgotPassword: React.FC<Props> = ({ navigation }) => {
 							value={newPassword}
 							onChangeText={setNewPassword}
 						/>
-					<TextInput
-						{...getPasswordInputProps({
-							textContentType: 'newPassword',
-							autoComplete: 'password-new',
-						})}
-						style={styles.input}
-						placeholder="Confirm Password"
-						value={confirmPassword}
-						onChangeText={(text) => setConfirmPassword(preventPaste(text, confirmPassword))}
-					/>
+						<TextInput
+							{...getPasswordInputProps({
+								textContentType: 'newPassword',
+								autoComplete: 'password-new',
+							})}
+							style={styles.input}
+							placeholder="Confirm Password"
+							value={confirmPassword}
+							onChangeText={(text) =>
+								setConfirmPassword(preventPaste(text, confirmPassword))
+							}
+						/>
 						<TouchableOpacity
 							style={[styles.button, loading && styles.buttonDisabled]}
 							onPress={handleChangePassword}

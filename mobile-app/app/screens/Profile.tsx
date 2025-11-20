@@ -440,15 +440,18 @@ const Profile = () => {
 
 						<View style={styles.inputGroup}>
 							<Text style={styles.label}>Current Password</Text>
-						<TextInput
-							{...getPasswordInputProps()}
-							style={styles.input}
-							value={passwords.currentPassword}
-							onChangeText={(t) =>
-								setPasswords({ ...passwords, currentPassword: preventPaste(t, passwords.currentPassword) })
-							}
-							placeholder="Enter current password"
-						/>
+							<TextInput
+								{...getPasswordInputProps()}
+								style={styles.input}
+								value={passwords.currentPassword}
+								onChangeText={(t) =>
+									setPasswords({
+										...passwords,
+										currentPassword: preventPaste(t, passwords.currentPassword),
+									})
+								}
+								placeholder="Enter current password"
+							/>
 							{errors.currentPassword && (
 								<Text style={styles.error}>{errors.currentPassword}</Text>
 							)}
@@ -456,18 +459,21 @@ const Profile = () => {
 
 						<View style={styles.inputGroup}>
 							<Text style={styles.label}>New Password</Text>
-						<TextInput
-							{...getPasswordInputProps({
-								textContentType: 'newPassword',
-								autoComplete: 'password-new',
-							})}
-							style={styles.input}
-							value={passwords.newPassword}
-							onChangeText={(t) =>
-								setPasswords({ ...passwords, newPassword: preventPaste(t, passwords.newPassword) })
-							}
-							placeholder="Enter new password"
-						/>
+							<TextInput
+								{...getPasswordInputProps({
+									textContentType: 'newPassword',
+									autoComplete: 'password-new',
+								})}
+								style={styles.input}
+								value={passwords.newPassword}
+								onChangeText={(t) =>
+									setPasswords({
+										...passwords,
+										newPassword: preventPaste(t, passwords.newPassword),
+									})
+								}
+								placeholder="Enter new password"
+							/>
 							{errors.newPassword && (
 								<Text style={styles.error}>{errors.newPassword}</Text>
 							)}
@@ -475,18 +481,21 @@ const Profile = () => {
 
 						<View style={styles.inputGroup}>
 							<Text style={styles.label}>Confirm New Password</Text>
-						<TextInput
-							{...getPasswordInputProps({
-								textContentType: 'newPassword',
-								autoComplete: 'password-new',
-							})}
-							style={styles.input}
-							value={passwords.confirmPassword}
-							onChangeText={(t) =>
-								setPasswords({ ...passwords, confirmPassword: preventPaste(t, passwords.confirmPassword) })
-							}
-							placeholder="Confirm new password"
-						/>
+							<TextInput
+								{...getPasswordInputProps({
+									textContentType: 'newPassword',
+									autoComplete: 'password-new',
+								})}
+								style={styles.input}
+								value={passwords.confirmPassword}
+								onChangeText={(t) =>
+									setPasswords({
+										...passwords,
+										confirmPassword: preventPaste(t, passwords.confirmPassword),
+									})
+								}
+								placeholder="Confirm new password"
+							/>
 							{errors.confirmPassword && (
 								<Text style={styles.error}>{errors.confirmPassword}</Text>
 							)}
