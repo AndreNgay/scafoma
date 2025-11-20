@@ -33,3 +33,5 @@ export const preventPaste = (newValue: string, oldValue: string): string => {
 	}
 	return newValue // Allow normal typing
 }
+
+export default {}

@@ -799,3 +799,31 @@ export const deleteMenuItem = async (req, res) => {
     client.release();
   }
 };
+
+// =========================
+// Update menu item availability only
+// =========================
+export const updateMenuItemAvailability = async (req, res) => {
+  const { id } = req.params;
+  const { available } = req.body;
+
+  if (typeof available !== 'boolean') {
+    return res.status(400).json({ error: "availability must be a boolean" });
+  }
+
+  try {
+    const result = await pool.query(
+      `UPDATE tblmenuitem SET available = $1, updated_at = NOW() WHERE id = $2 RETURNING *`,
+      [available, id]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: "Menu item not found" });
+    }
+
+    res.json({ message: "Item availability updated", item: result.rows[0] });
+  } catch (err) {
+    console.error("Error updating menu item availability:", err);
+    res.status(500).json({ error: "Failed to update availability" });
+  }
+};

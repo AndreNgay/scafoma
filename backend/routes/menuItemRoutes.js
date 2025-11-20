@@ -7,6 +7,7 @@ import {
   updateMenuItem,
   deleteMenuItem,
   getMenuItemsByAdmin,
+  updateMenuItemAvailability,
   upload,
 } from "../controllers/menuItemController.js";
 import authMiddleware from "../middleware/authMiddleware.js";
@@ -25,6 +26,9 @@ router.post("/", authMiddleware, upload.single("image"), addMenuItem);
 
 // Update (multipart/form-data; optional 'image' field to replace existing image)
 router.put("/:id", authMiddleware, upload.single("image"), updateMenuItem);
+
+// Update availability only
+router.put("/:id/availability", updateMenuItemAvailability);
 
 // Delete
 router.delete("/:id", authMiddleware, deleteMenuItem);

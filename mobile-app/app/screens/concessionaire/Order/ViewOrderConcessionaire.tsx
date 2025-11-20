@@ -30,6 +30,9 @@ const ViewOrderConcessionaire = () => {
 	const [declineModalVisible, setDeclineModalVisible] = useState(false)
 	const [selectedReason, setSelectedReason] = useState<string>('')
 	const [customReason, setCustomReason] = useState<string>('')
+	const [itemsToToggle, setItemsToToggle] = useState<Record<number, boolean>>(
+		{}
+	)
 	const [acceptModalVisible, setAcceptModalVisible] = useState(false)
 	const [adjustedTotal, setAdjustedTotal] = useState<string>('')
 	const [priceReason, setPriceReason] = useState<string>('')
@@ -159,10 +162,47 @@ const ViewOrderConcessionaire = () => {
 
 		const reason =
 			selectedReason === 'custom' ? customReason.trim() : selectedReason
-		await updateStatus('declined', reason)
+
+		// If "Item not available" is selected, update item availability
+		const toggledUnavailableItems: string[] = []
+		if (selectedReason === 'Item not available') {
+			try {
+				const itemsToUpdate = Object.entries(itemsToToggle).filter(
+					([_, shouldToggle]) => shouldToggle
+				)
+
+				for (const [itemIdStr, _] of itemsToUpdate) {
+					const itemId = parseInt(itemIdStr)
+					const item = order?.items?.find((i: any) => i.item_id === itemId)
+
+					if (item) {
+						// Update availability to false
+						await api.put(`/menu-item/${itemId}/availability`, {
+							available: false,
+						})
+						toggledUnavailableItems.push(item.item_name)
+					}
+				}
+			} catch (error) {
+				console.error('Error updating item availability:', error)
+				showToast('error', 'Failed to update item availability')
+				return
+			}
+		}
+
+		// Build decline reason with toggled items info
+		let finalReason = reason
+		if (toggledUnavailableItems.length > 0) {
+			finalReason += `\n\nItems marked as unavailable: ${toggledUnavailableItems.join(
+				', '
+			)}`
+		}
+
+		await updateStatus('declined', finalReason)
 		setDeclineModalVisible(false)
 		setSelectedReason('')
 		setCustomReason('')
+		setItemsToToggle({})
 	}
 
 	// Cancel decline
@@ -170,6 +210,7 @@ const ViewOrderConcessionaire = () => {
 		setDeclineModalVisible(false)
 		setSelectedReason('')
 		setCustomReason('')
+		setItemsToToggle({})
 	}
 
 	const openAcceptModal = () => {
@@ -687,7 +728,7 @@ const ViewOrderConcessionaire = () => {
 				animationType="slide"
 				transparent={true}>
 				<View style={styles.modalOverlay}>
-					<View style={styles.modalContainer}>
+					<ScrollView style={styles.modalContainer}>
 						<Text style={styles.modalHeader}>Decline Order</Text>
 						<Text style={styles.modalSubtitle}>
 							Please provide a reason for declining this order:
@@ -697,7 +738,7 @@ const ViewOrderConcessionaire = () => {
 						<Text style={styles.reasonLabel}>Select a reason:</Text>
 						{[
 							'Item not available',
-							'Insufficient ingredients',
+							'Unavailable options/variations',
 							'Concession is closed or about to close',
 							'Order too large to fulfill',
 							'Other (specify below)',
@@ -723,6 +764,55 @@ const ViewOrderConcessionaire = () => {
 								</Text>
 							</TouchableOpacity>
 						))}
+
+						{/* Item Availability Toggles for "Item not available" */}
+						{selectedReason === 'Item not available' && order?.items && (
+							<View style={styles.itemToggleContainer}>
+								<Text style={styles.reasonLabel}>
+									Mark items as unavailable:
+								</Text>
+								<Text style={styles.itemToggleSubtext}>
+									Selected items will be marked unavailable in your menu
+								</Text>
+								{/* Get unique items from order */}
+								{Array.from(
+									new Map(
+										order.items.map((item: any) => [
+											item.item_id,
+											{ id: item.item_id, name: item.item_name },
+										])
+									).values()
+								).map((item: any) => (
+									<View
+										key={item.id}
+										style={styles.itemToggleRow}>
+										<Text style={styles.itemToggleName}>{item.name}</Text>
+										<TouchableOpacity
+											style={[
+												styles.toggleButton,
+												itemsToToggle[item.id] && styles.toggleButtonActive,
+											]}
+											onPress={() => {
+												setItemsToToggle((prev) => ({
+													...prev,
+													[item.id]: !prev[item.id],
+												}))
+											}}>
+											<Text
+												style={[
+													styles.toggleButtonText,
+													itemsToToggle[item.id] &&
+														styles.toggleButtonTextActive,
+												]}>
+												{itemsToToggle[item.id]
+													? 'Will Mark Unavailable'
+													: 'Keep Available'}
+											</Text>
+										</TouchableOpacity>
+									</View>
+								))}
+							</View>
+						)}
 
 						{/* Custom Reason Input */}
 						{selectedReason === 'custom' && (
@@ -755,7 +845,7 @@ const ViewOrderConcessionaire = () => {
 								</Text>
 							</TouchableOpacity>
 						</View>
-					</View>
+					</ScrollView>
 				</View>
 			</Modal>
 		</ScrollView>
@@ -932,6 +1022,53 @@ const styles = StyleSheet.create({
 	selectedReasonText: {
 		color: '#fff',
 		fontWeight: '600',
+	},
+	itemToggleContainer: {
+		marginTop: 15,
+		backgroundColor: '#f8f9fa',
+		padding: 12,
+		borderRadius: 8,
+		borderWidth: 1,
+		borderColor: '#e0e0e0',
+	},
+	itemToggleSubtext: {
+		fontSize: 12,
+		color: '#666',
+		marginBottom: 12,
+	},
+	itemToggleRow: {
+		flexDirection: 'row',
+		justifyContent: 'space-between',
+		alignItems: 'center',
+		paddingVertical: 10,
+		borderBottomWidth: 1,
+		borderBottomColor: '#e8e8e8',
+	},
+	itemToggleName: {
+		fontSize: 14,
+		fontWeight: '500',
+		color: '#333',
+		flex: 1,
+	},
+	toggleButton: {
+		paddingHorizontal: 12,
+		paddingVertical: 8,
+		borderRadius: 6,
+		backgroundColor: '#fff',
+		borderWidth: 1,
+		borderColor: '#ddd',
+	},
+	toggleButtonActive: {
+		backgroundColor: '#dc3545',
+		borderColor: '#dc3545',
+	},
+	toggleButtonText: {
+		fontSize: 12,
+		fontWeight: '600',
+		color: '#333',
+	},
+	toggleButtonTextActive: {
+		color: '#fff',
 	},
 	customReasonContainer: {
 		marginTop: 10,

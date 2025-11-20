@@ -1,31 +1,40 @@
-import { pool } from "../libs/database.js";
-import multer from "multer";
-import { notifyNewOrder, notifyOrderStatusChange, notifyOrderCancelledForConcessionaire } from "../services/notificationService.js";
+import { pool } from '../libs/database.js'
+import multer from 'multer'
+import {
+	notifyNewOrder,
+	notifyOrderStatusChange,
+	notifyOrderCancelledForConcessionaire,
+} from '../services/notificationService.js'
 
-const storage = multer.memoryStorage();
-export const upload = multer({ storage });
+const storage = multer.memoryStorage()
+export const upload = multer({ storage })
 
 // Helper: convert BYTEA image to base64 data URL
-const makeImageDataUrl = (imageBuffer, mime = "jpeg") => {
-  if (!imageBuffer) return null;
-  const base64 = Buffer.from(imageBuffer).toString("base64");
-  return `data:image/${mime};base64,${base64}`;
-};
+const makeImageDataUrl = (imageBuffer, mime = 'jpeg') => {
+	if (!imageBuffer) return null
+	const base64 = Buffer.from(imageBuffer).toString('base64')
+	return `data:image/${mime};base64,${base64}`
+}
 
 export const getOrdersByConcessionaireId = async (req, res) => {
-  const { id } = req.params; // concessionaire_id
-  const { page = 1, limit = 10, segment } = req.query;
+	const { id } = req.params // concessionaire_id
+	const { page = 1, limit = 10, segment } = req.query
 
-  try {
-    const offset = (page - 1) * limit;
+	try {
+		const offset = (page - 1) * limit
 
-    const activeStatuses = ["pending", "accepted", "ready-for-pickup", "ready for pickup"]; // handle both spellings
-    const historyStatuses = ["completed", "declined", "cancelled"];
-    const isActiveSegment = segment === 'active';
+		const activeStatuses = [
+			'pending',
+			'accepted',
+			'ready-for-pickup',
+			'ready for pickup',
+		] // handle both spellings
+		const historyStatuses = ['completed', 'declined', 'cancelled']
+		const isActiveSegment = segment === 'active'
 
-    if (isActiveSegment) {
-      const activeRes = await pool.query(
-        `SELECT o.*, 
+		if (isActiveSegment) {
+			const activeRes = await pool.query(
+				`SELECT o.*, 
                 u.first_name, u.last_name, u.email, u.profile_image,
                 c.concession_name,
                 (
@@ -47,26 +56,26 @@ export const getOrdersByConcessionaireId = async (req, res) => {
          WHERE c.concessionaire_id = $1
            AND LOWER(o.order_status) = ANY($2)
          ORDER BY o.created_at DESC`,
-        [id, activeStatuses.map(s => s.toLowerCase())]
-      );
+				[id, activeStatuses.map((s) => s.toLowerCase())]
+			)
 
-      const orders = activeRes.rows.map((order) => ({
-        ...order,
-        profile_image: makeImageDataUrl(order.profile_image),
-      }));
+			const orders = activeRes.rows.map((order) => ({
+				...order,
+				profile_image: makeImageDataUrl(order.profile_image),
+			}))
 
-      return res.status(200).json({
-        page: 1,
-        limit: Number(limit),
-        total: orders.length,
-        totalPages: 1,
-        data: orders,
-      });
-    }
+			return res.status(200).json({
+				page: 1,
+				limit: Number(limit),
+				total: orders.length,
+				totalPages: 1,
+				data: orders,
+			})
+		}
 
-    // Default: history segment paginated
-    const histRes = await pool.query(
-      `SELECT o.*, 
+		// Default: history segment paginated
+		const histRes = await pool.query(
+			`SELECT o.*, 
               u.first_name, u.last_name, u.email, u.profile_image,
               c.concession_name,
               (
@@ -89,66 +98,66 @@ export const getOrdersByConcessionaireId = async (req, res) => {
          AND LOWER(o.order_status) = ANY($2)
        ORDER BY o.created_at DESC
        LIMIT $3 OFFSET $4`,
-      [id, historyStatuses.map(s => s.toLowerCase()), limit, offset]
-    );
+			[id, historyStatuses.map((s) => s.toLowerCase()), limit, offset]
+		)
 
-    const countResult = await pool.query(
-      `SELECT COUNT(*) AS total
+		const countResult = await pool.query(
+			`SELECT COUNT(*) AS total
        FROM tblorder o
        JOIN tblconcession c ON o.concession_id = c.id
        WHERE c.concessionaire_id = $1
          AND LOWER(o.order_status) = ANY($2)`,
-      [id, historyStatuses.map(s => s.toLowerCase())]
-    );
+			[id, historyStatuses.map((s) => s.toLowerCase())]
+		)
 
-    const orders = histRes.rows.map((order) => ({
-      ...order,
-      profile_image: makeImageDataUrl(order.profile_image),
-    }));
+		const orders = histRes.rows.map((order) => ({
+			...order,
+			profile_image: makeImageDataUrl(order.profile_image),
+		}))
 
-    const totalOrders = parseInt(countResult.rows[0].total, 10);
+		const totalOrders = parseInt(countResult.rows[0].total, 10)
 
-    return res.status(200).json({
-      page: Number(page),
-      limit: Number(limit),
-      total: totalOrders,
-      totalPages: Math.ceil(totalOrders / limit),
-      data: orders,
-    });
-  } catch (error) {
-    console.error("Error fetching orders:", error);
-    return res.status(500).json({ message: "Server error while fetching orders" });
-  }
-};
-
-
+		return res.status(200).json({
+			page: Number(page),
+			limit: Number(limit),
+			total: totalOrders,
+			totalPages: Math.ceil(totalOrders / limit),
+			data: orders,
+		})
+	} catch (error) {
+		console.error('Error fetching orders:', error)
+		return res
+			.status(500)
+			.json({ message: 'Server error while fetching orders' })
+	}
+}
 
 // ==========================
 // Get orders for a customer
 // Supports segment=active|history similar to concessionaire API
 // ==========================
 export const getOrdersByCustomerId = async (req, res) => {
-  const { id } = req.params;
-  const { page = 1, limit = 10, segment } = req.query;
+	const { id } = req.params
+	const { page = 1, limit = 10, segment } = req.query
 
-  try {
-    const offset = (page - 1) * limit;
+	try {
+		const offset = (page - 1) * limit
 
-    const activeStatuses = [
-      "pending",
-      "accepted",
-      "ready-for-pickup",
-      "ready for pickup", // handle both spellings
-    ];
-    const historyStatuses = ["completed", "declined", "cancelled"];
+		const activeStatuses = [
+			'pending',
+			'accepted',
+			'ready-for-pickup',
+			'ready for pickup', // handle both spellings
+		]
+		const historyStatuses = ['completed', 'declined', 'cancelled']
 
-    const isActiveSegment = segment === "active";
-    const isHistorySegment = segment === "history";
+		const isActiveSegment = segment === 'active'
+		const isHistorySegment = segment === 'history'
 
-    // Active segment: return all ongoing orders without pagination
-    if (isActiveSegment) {
-      const result = await pool.query(
-        `SELECT o.*, 
+		// Active segment: return all ongoing orders without pagination
+		if (isActiveSegment) {
+			const result = await pool.query(
+				`SELECT o.*, 
                 o.payment_method,
                 c.concession_name, 
                 caf.cafeteria_name,
@@ -174,27 +183,27 @@ export const getOrdersByCustomerId = async (req, res) => {
            AND o.in_cart = FALSE
            AND LOWER(o.order_status) = ANY($2)
          ORDER BY o.created_at DESC`,
-        [id, activeStatuses.map((s) => s.toLowerCase())]
-      );
+				[id, activeStatuses.map((s) => s.toLowerCase())]
+			)
 
-      const orders = result.rows.map((order) => {
-        order.payment_proof = makeImageDataUrl(order.gcash_screenshot);
-        return order;
-      });
+			const orders = result.rows.map((order) => {
+				order.payment_proof = makeImageDataUrl(order.gcash_screenshot)
+				return order
+			})
 
-      return res.status(200).json({
-        page: 1,
-        limit: Number(limit),
-        total: orders.length,
-        totalPages: 1,
-        data: orders,
-      });
-    }
+			return res.status(200).json({
+				page: 1,
+				limit: Number(limit),
+				total: orders.length,
+				totalPages: 1,
+				data: orders,
+			})
+		}
 
-    // History segment: paginated completed/declined/cancelled orders
-    if (isHistorySegment) {
-      const result = await pool.query(
-        `SELECT o.*, 
+		// History segment: paginated completed/declined/cancelled orders
+		if (isHistorySegment) {
+			const result = await pool.query(
+				`SELECT o.*, 
                 o.payment_method,
                 c.concession_name, 
                 caf.cafeteria_name,
@@ -221,37 +230,37 @@ export const getOrdersByCustomerId = async (req, res) => {
            AND LOWER(o.order_status) = ANY($2)
          ORDER BY o.created_at DESC
          LIMIT $3 OFFSET $4`,
-        [id, historyStatuses.map((s) => s.toLowerCase()), limit, offset]
-      );
+				[id, historyStatuses.map((s) => s.toLowerCase()), limit, offset]
+			)
 
-      const orders = result.rows.map((order) => {
-        order.payment_proof = makeImageDataUrl(order.gcash_screenshot);
-        return order;
-      });
+			const orders = result.rows.map((order) => {
+				order.payment_proof = makeImageDataUrl(order.gcash_screenshot)
+				return order
+			})
 
-      const countResult = await pool.query(
-        `SELECT COUNT(*) AS total
+			const countResult = await pool.query(
+				`SELECT COUNT(*) AS total
          FROM tblorder o
          WHERE o.customer_id = $1
            AND o.in_cart = FALSE
            AND LOWER(o.order_status) = ANY($2)`,
-        [id, historyStatuses.map((s) => s.toLowerCase())]
-      );
+				[id, historyStatuses.map((s) => s.toLowerCase())]
+			)
 
-      const totalOrders = parseInt(countResult.rows[0].total, 10);
+			const totalOrders = parseInt(countResult.rows[0].total, 10)
 
-      return res.status(200).json({
-        page: Number(page),
-        limit: Number(limit),
-        total: totalOrders,
-        totalPages: Math.ceil(totalOrders / limit),
-        data: orders,
-      });
-    }
+			return res.status(200).json({
+				page: Number(page),
+				limit: Number(limit),
+				total: totalOrders,
+				totalPages: Math.ceil(totalOrders / limit),
+				data: orders,
+			})
+		}
 
-    // Default behaviour (no segment): keep existing implementation for backwards compatibility
-    const result = await pool.query(
-      `SELECT o.*, 
+		// Default behaviour (no segment): keep existing implementation for backwards compatibility
+		const result = await pool.query(
+			`SELECT o.*, 
               o.payment_method,
               c.concession_name, 
               caf.cafeteria_name,
@@ -277,46 +286,45 @@ export const getOrdersByCustomerId = async (req, res) => {
          AND o.in_cart = FALSE   -- ✅ only checked-out orders
        ORDER BY o.created_at DESC
        LIMIT $2 OFFSET $3`,
-      [id, limit, offset]
-    );
+			[id, limit, offset]
+		)
 
-    const orders = result.rows.map((order) => {
-      order.payment_proof = makeImageDataUrl(order.gcash_screenshot);
-      return order;
-    });
+		const orders = result.rows.map((order) => {
+			order.payment_proof = makeImageDataUrl(order.gcash_screenshot)
+			return order
+		})
 
-    // Get total count for frontend pagination
-    const countResult = await pool.query(
-      `SELECT COUNT(*) AS total
+		// Get total count for frontend pagination
+		const countResult = await pool.query(
+			`SELECT COUNT(*) AS total
        FROM tblorder o
        WHERE o.customer_id = $1
          AND o.in_cart = FALSE`,
-      [id]
-    );
+			[id]
+		)
 
-    const totalOrders = parseInt(countResult.rows[0].total, 10);
+		const totalOrders = parseInt(countResult.rows[0].total, 10)
 
-    return res.status(200).json({
-      page: Number(page),
-      limit: Number(limit),
-      total: totalOrders,
-      totalPages: Math.ceil(totalOrders / limit),
-      data: orders,
-    });
-  } catch (err) {
-    console.error("Error fetching customer orders:", err);
-    res.status(500).json({ error: "Failed to fetch customer orders" });
-  }
-};
-
+		return res.status(200).json({
+			page: Number(page),
+			limit: Number(limit),
+			total: totalOrders,
+			totalPages: Math.ceil(totalOrders / limit),
+			data: orders,
+		})
+	} catch (err) {
+		console.error('Error fetching customer orders:', err)
+		res.status(500).json({ error: 'Failed to fetch customer orders' })
+	}
+}
 
 export const getOrderById = async (req, res) => {
-  const { id } = req.params; // order ID
+	const { id } = req.params // order ID
 
-  try {
-    // Get main order info with customer and concession details, including payment flags
-    const orderResult = await pool.query(
-      `SELECT o.*, 
+	try {
+		// Get main order info with customer and concession details, including payment flags
+		const orderResult = await pool.query(
+			`SELECT o.*, 
               customer.first_name AS customer_first_name, 
               customer.last_name AS customer_last_name, 
               customer.email AS customer_email, 
@@ -347,178 +355,174 @@ export const getOrderById = async (req, res) => {
        JOIN tbluser concessionaire ON c.concessionaire_id = concessionaire.id
        JOIN tblcafeteria caf ON c.cafeteria_id = caf.id
        WHERE o.id = $1`,
-      [id]
-    );
+			[id]
+		)
 
-    if (orderResult.rowCount === 0) {
-      return res.status(404).json({ error: "Order not found" });
-    }
+		if (orderResult.rowCount === 0) {
+			return res.status(404).json({ error: 'Order not found' })
+		}
 
-    const order = orderResult.rows[0];
+		const order = orderResult.rows[0]
 
-    // Convert images to base64
-    order.customer_profile_image = makeImageDataUrl(order.customer_profile_image);
-    order.concessionaire_profile_image_url = makeImageDataUrl(order.concessionaire_profile_image);
-    order.concession_image_url = makeImageDataUrl(order.concession_image);
-    order.gcash_screenshot = makeImageDataUrl(order.gcash_screenshot);
-    order.payment_proof = order.gcash_screenshot || null;
+		// Convert images to base64
+		order.customer_profile_image = makeImageDataUrl(
+			order.customer_profile_image
+		)
+		order.concessionaire_profile_image_url = makeImageDataUrl(
+			order.concessionaire_profile_image
+		)
+		order.concession_image_url = makeImageDataUrl(order.concession_image)
+		order.gcash_screenshot = makeImageDataUrl(order.gcash_screenshot)
+		order.payment_proof = order.gcash_screenshot || null
 
-    // Clean up raw buffers not needed on frontend
-    delete order.concession_image;
-    delete order.concessionaire_profile_image;
+		// Clean up raw buffers not needed on frontend
+		delete order.concession_image
+		delete order.concessionaire_profile_image
 
-    // Get order items
-    const itemsResult = await pool.query(
-      `SELECT od.*, m.item_name, m.price AS base_price
+		// Get order items
+		const itemsResult = await pool.query(
+			`SELECT od.*, m.item_name, m.price AS base_price
        FROM tblorderdetail od
        JOIN tblmenuitem m ON od.item_id = m.id
        WHERE od.order_id = $1`,
-      [id]
-    );
+			[id]
+		)
 
-    const items = itemsResult.rows;
+		const items = itemsResult.rows
 
-    // For each item, get variations with quantities (supports new quantity column)
-    for (let item of items) {
-      const variationsResult = await pool.query(
-        `SELECT iv.id, iv.variation_name, iv.additional_price, ivg.variation_group_name,
+		// For each item, get variations with quantities (supports new quantity column)
+		for (let item of items) {
+			const variationsResult = await pool.query(
+				`SELECT iv.id, iv.variation_name, iv.additional_price, ivg.variation_group_name,
                 SUM(COALESCE(oiv.quantity, 1))::int AS quantity
          FROM tblorderitemvariation oiv
          JOIN tblitemvariation iv ON oiv.variation_id = iv.id
          JOIN tblitemvariationgroup ivg ON iv.item_variation_group_id = ivg.id
          WHERE oiv.order_detail_id = $1
          GROUP BY iv.id, iv.variation_name, iv.additional_price, ivg.variation_group_name`,
-        [item.id]
-      );
-      item.variations = variationsResult.rows;
-    }
+				[item.id]
+			)
+			item.variations = variationsResult.rows
+		}
 
-    order.items = items;
+		order.items = items
 
-    res.json(order);
-  } catch (err) {
-    console.error("Error fetching order by ID:", err);
-    res.status(500).json({ error: "Failed to fetch order" });
-  }
-};
-
-
+		res.json(order)
+	} catch (err) {
+		console.error('Error fetching order by ID:', err)
+		res.status(500).json({ error: 'Failed to fetch order' })
+	}
+}
 
 // ==========================
 // Update order status
 // ==========================
 export const updateOrderStatus = async (req, res) => {
-  const { id } = req.params;
-  const {
-    order_status,
-    decline_reason,
-    updated_total_price,
-    price_change_reason,
-  } = req.body;
+	const { id } = req.params
+	const {
+		order_status,
+		decline_reason,
+		updated_total_price,
+		price_change_reason,
+	} = req.body
 
-  try {
-    let query, params;
+	try {
+		let query, params
 
-    if (order_status === 'declined' && decline_reason) {
-      // Update with decline reason
-      query = `UPDATE tblorder 
+		if (order_status === 'declined' && decline_reason) {
+			// Update with decline reason
+			query = `UPDATE tblorder 
                SET order_status = $1, decline_reason = $2, updated_at = NOW()
-               WHERE id = $3 RETURNING *`;
-      params = [order_status, decline_reason, id];
-    } else {
-      // Optional price adjustment when accepting an order
-      const hasUpdatedTotalRaw =
-        updated_total_price !== undefined &&
-        updated_total_price !== null &&
-        updated_total_price !== '';
-      const updatedTotal = hasUpdatedTotalRaw
-        ? Number(updated_total_price)
-        : null;
+               WHERE id = $3 RETURNING *`
+			params = [order_status, decline_reason, id]
+		} else {
+			// Optional price adjustment when accepting an order
+			const hasUpdatedTotalRaw =
+				updated_total_price !== undefined &&
+				updated_total_price !== null &&
+				updated_total_price !== ''
+			const updatedTotal = hasUpdatedTotalRaw
+				? Number(updated_total_price)
+				: null
 
-      if (
-        order_status === 'accepted' &&
-        updatedTotal !== null &&
-        !Number.isNaN(updatedTotal)
-      ) {
-        query = `UPDATE tblorder 
+			if (
+				order_status === 'accepted' &&
+				updatedTotal !== null &&
+				!Number.isNaN(updatedTotal)
+			) {
+				query = `UPDATE tblorder 
                  SET order_status = $1,
                      updated_total_price = $2,
                      price_change_reason = $3,
                      updated_at = NOW()
-                 WHERE id = $4 RETURNING *`;
-        params = [
-          order_status,
-          updatedTotal,
-          price_change_reason || null,
-          id,
-        ];
-      } else {
-        // Update without decline reason or price change
-        query = `UPDATE tblorder 
+                 WHERE id = $4 RETURNING *`
+				params = [order_status, updatedTotal, price_change_reason || null, id]
+			} else {
+				// Update without decline reason or price change
+				query = `UPDATE tblorder 
                  SET order_status = $1, updated_at = NOW()
-                 WHERE id = $2 RETURNING *`;
-        params = [order_status, id];
-      }
-    }
+                 WHERE id = $2 RETURNING *`
+				params = [order_status, id]
+			}
+		}
 
-    const result = await pool.query(query, params);
-    if (result.rowCount === 0)
-      return res.status(404).json({ error: "Order not found" });
+		const result = await pool.query(query, params)
+		if (result.rowCount === 0)
+			return res.status(404).json({ error: 'Order not found' })
 
-    const order = result.rows[0];
+		const order = result.rows[0]
 
-    // Send notification to customer about order status change
-    try {
-      const concessionResult = await pool.query(
-        `SELECT c.concession_name FROM tblconcession c WHERE c.id = $1`,
-        [order.concession_id]
-      );
-      const concessionName =
-        concessionResult.rows[0]?.concession_name || '';
+		// Send notification to customer about order status change
+		try {
+			const concessionResult = await pool.query(
+				`SELECT c.concession_name FROM tblconcession c WHERE c.id = $1`,
+				[order.concession_id]
+			)
+			const concessionName = concessionResult.rows[0]?.concession_name || ''
 
-      let oldTotal = null;
-      let newTotal = null;
-      let priceReason = '';
+			let oldTotal = null
+			let newTotal = null
+			let priceReason = ''
 
-      if (
-        order_status === 'accepted' &&
-        order.updated_total_price !== null &&
-        order.updated_total_price !== undefined &&
-        !Number.isNaN(Number(order.updated_total_price)) &&
-        !Number.isNaN(Number(order.total_price)) &&
-        Number(order.updated_total_price) !== Number(order.total_price)
-      ) {
-        oldTotal = order.total_price;
-        newTotal = order.updated_total_price;
-        priceReason = order.price_change_reason || '';
-      }
+			if (
+				order_status === 'accepted' &&
+				order.updated_total_price !== null &&
+				order.updated_total_price !== undefined &&
+				!Number.isNaN(Number(order.updated_total_price)) &&
+				!Number.isNaN(Number(order.total_price)) &&
+				Number(order.updated_total_price) !== Number(order.total_price)
+			) {
+				oldTotal = order.total_price
+				newTotal = order.updated_total_price
+				priceReason = order.price_change_reason || ''
+			}
 
-      await notifyOrderStatusChange(
-        order.id,
-        order.customer_id,
-        order_status,
-        concessionName,
-        decline_reason,
-        oldTotal,
-        newTotal,
-        priceReason
-      );
-    } catch (notifErr) {
-      console.error("Error creating order status notification:", notifErr);
-      // Don't fail the status update if notification fails
-    }
+			await notifyOrderStatusChange(
+				order.id,
+				order.customer_id,
+				order_status,
+				concessionName,
+				decline_reason,
+				oldTotal,
+				newTotal,
+				priceReason
+			)
+		} catch (notifErr) {
+			console.error('Error creating order status notification:', notifErr)
+			// Don't fail the status update if notification fails
+		}
 
-    res.json(order);
-  } catch (err) {
-    console.error("Error updating order status:", err);
-    res.status(500).json({ error: "Failed to update order status" });
-  }
-};
+		res.json(order)
+	} catch (err) {
+		console.error('Error updating order status:', err)
+		res.status(500).json({ error: 'Failed to update order status' })
+	}
+}
 
 export const updateOrderTotal = async (req, res) => {
-  const { id } = req.params; // order_id
-  try {
-    const query = `
+	const { id } = req.params // order_id
+	try {
+		const query = `
       UPDATE tblorder
       SET total_price = (
         SELECT COALESCE(SUM(od.total_price), 0)
@@ -528,228 +532,262 @@ export const updateOrderTotal = async (req, res) => {
       updated_at = NOW()
       WHERE id = $1
       RETURNING *;
-    `;
-    const result = await pool.query(query, [id]);
-    res.json(result.rows[0]);
-  } catch (err) {
-    console.error("Error updating order total:", err);
-    res.status(500).json({ error: "Failed to update order total" });
-  }
-};
-
+    `
+		const result = await pool.query(query, [id])
+		res.json(result.rows[0])
+	} catch (err) {
+		console.error('Error updating order total:', err)
+		res.status(500).json({ error: 'Failed to update order total' })
+	}
+}
 
 // ==========================
 // Upload GCASH payment proof
 // ==========================
 export const updatePaymentProof = async (req, res) => {
-  const { id } = req.params;
-  const file = req.file;
+	const { id } = req.params
+	const file = req.file
 
-  if (!file) return res.status(400).json({ error: "No file uploaded" });
+	if (!file) return res.status(400).json({ error: 'No file uploaded' })
 
-  try {
-    // First check if the order exists and whether payment proof can be uploaded/updated
-    const orderCheck = await pool.query(
-      `SELECT order_status, gcash_screenshot FROM tblorder WHERE id = $1`,
-      [id]
-    );
-    
-    if (orderCheck.rowCount === 0) {
-      return res.status(404).json({ error: "Order not found" });
-    }
-    
-    const orderStatus = orderCheck.rows[0].order_status;
+	try {
+		// First check if the order exists and whether payment proof can be uploaded/updated
+		const orderCheck = await pool.query(
+			`SELECT order_status, gcash_screenshot FROM tblorder WHERE id = $1`,
+			[id]
+		)
 
-    // Once an order is completed, the payment proof should no longer be changed
-    if (orderStatus === "completed") {
-      return res.status(400).json({
-        error: "Payment proof can no longer be changed because the order is completed",
-        currentStatus: orderStatus,
-      });
-    }
+		if (orderCheck.rowCount === 0) {
+			return res.status(404).json({ error: 'Order not found' })
+		}
 
-    // For other states, keep the rule that upload is only allowed
-    // after the order has been accepted or is ready for pickup
-    if (orderStatus !== "accepted" && orderStatus !== "ready for pickup") {
-      return res.status(400).json({ 
-        error: "Payment proof can only be uploaded after the order has been accepted or is ready for pickup",
-        currentStatus: orderStatus
-      });
-    }
+		const orderStatus = orderCheck.rows[0].order_status
 
-    const result = await pool.query(
-      `UPDATE tblorder 
+		// Once an order is completed, the payment proof should no longer be changed
+		if (orderStatus === 'completed') {
+			return res.status(400).json({
+				error:
+					'Payment proof can no longer be changed because the order is completed',
+				currentStatus: orderStatus,
+			})
+		}
+
+		// For other states, keep the rule that upload is only allowed
+		// after the order has been accepted or is ready for pickup
+		if (orderStatus !== 'accepted' && orderStatus !== 'ready for pickup') {
+			return res.status(400).json({
+				error:
+					'Payment proof can only be uploaded after the order has been accepted or is ready for pickup',
+				currentStatus: orderStatus,
+			})
+		}
+
+		const result = await pool.query(
+			`UPDATE tblorder 
        SET gcash_screenshot = $1, updated_at = NOW()
        WHERE id = $2 RETURNING *`,
-      [file.buffer, id]
-    );
+			[file.buffer, id]
+		)
 
-    const order = result.rows[0];
-    // Convert gcash_screenshot to base64 for frontend
-    order.payment_proof = makeImageDataUrl(order.gcash_screenshot);
+		const order = result.rows[0]
+		// Convert gcash_screenshot to base64 for frontend
+		order.payment_proof = makeImageDataUrl(order.gcash_screenshot)
 
-    res.json(order);
-  } catch (err) {
-    console.error("Error uploading payment proof:", err);
-    res.status(500).json({ error: "Failed to upload payment proof" });
-  }
-};
-
+		res.json(order)
+	} catch (err) {
+		console.error('Error uploading payment proof:', err)
+		res.status(500).json({ error: 'Failed to upload payment proof' })
+	}
+}
 
 export const updatePaymentMethod = async (req, res) => {
-  const { id } = req.params;
-  const { payment_method } = req.body;
-  try {
-    const result = await pool.query(
-      `UPDATE tblorder
+	const { id } = req.params
+	const { payment_method } = req.body
+	try {
+		const result = await pool.query(
+			`UPDATE tblorder
        SET payment_method = $1, updated_at = NOW()
        WHERE id = $2
        RETURNING *`,
-      [payment_method, id]
-    );
-    if (result.rowCount === 0) return res.status(404).json({ error: "Order not found" });
-    res.json(result.rows[0]);
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "Failed to update payment method" });
-  }
-};
+			[payment_method, id]
+		)
+		if (result.rowCount === 0)
+			return res.status(404).json({ error: 'Order not found' })
+		res.json(result.rows[0])
+	} catch (err) {
+		console.error(err)
+		res.status(500).json({ error: 'Failed to update payment method' })
+	}
+}
 
 // ==========================
 // Add a new order
 // ==========================
 export const addOrder = async (req, res) => {
-  const { customer_id, concession_id, dining_option, status, total_price, in_cart, payment_method } = req.body;
-  try {
-    if (in_cart) {
-      const existing = await pool.query(
-        `SELECT * FROM tblorder WHERE customer_id=$1 AND concession_id=$2 AND in_cart=TRUE LIMIT 1`,
-        [customer_id, concession_id]
-      );
-      if (existing.rows.length > 0) return res.status(200).json(existing.rows[0]);
-    }
+	const {
+		customer_id,
+		concession_id,
+		dining_option,
+		status,
+		total_price,
+		in_cart,
+		payment_method,
+	} = req.body
+	try {
+		if (in_cart) {
+			const existing = await pool.query(
+				`SELECT * FROM tblorder WHERE customer_id=$1 AND concession_id=$2 AND in_cart=TRUE LIMIT 1`,
+				[customer_id, concession_id]
+			)
+			if (existing.rows.length > 0)
+				return res.status(200).json(existing.rows[0])
+		}
 
-    const result = await pool.query(
-      `INSERT INTO tblorder (customer_id, concession_id, order_status, total_price, in_cart, payment_method)
+		const result = await pool.query(
+			`INSERT INTO tblorder (customer_id, concession_id, order_status, total_price, in_cart, payment_method)
        VALUES ($1,$2,COALESCE($3, 'pending'),$4,$5,$6) RETURNING *`,
-      [customer_id, concession_id, status, total_price, in_cart ?? false, payment_method]
-    );
-    res.status(201).json(result.rows[0]);
-  } catch (err) {
-    console.error("Error adding order:", err);
-    res.status(500).json({ error: "Failed to add order" });
-  }
-};
+			[
+				customer_id,
+				concession_id,
+				status,
+				total_price,
+				in_cart ?? false,
+				payment_method,
+			]
+		)
+		res.status(201).json(result.rows[0])
+	} catch (err) {
+		console.error('Error adding order:', err)
+		res.status(500).json({ error: 'Failed to add order' })
+	}
+}
 
 // Notify concessionaire for a given order (used for direct orders created from MenuItemDetails)
 export const notifyConcessionaireForOrder = async (req, res) => {
-  const { id } = req.params; // order_id
-  try {
-    // Load order and concessionaire
-    const orderRes = await pool.query(`SELECT customer_id, concession_id FROM tblorder WHERE id = $1`, [id]);
-    if (orderRes.rowCount === 0) return res.status(404).json({ error: "Order not found" });
-    const order = orderRes.rows[0];
+	const { id } = req.params // order_id
+	try {
+		// Load order and concessionaire
+		const orderRes = await pool.query(
+			`SELECT customer_id, concession_id FROM tblorder WHERE id = $1`,
+			[id]
+		)
+		if (orderRes.rowCount === 0)
+			return res.status(404).json({ error: 'Order not found' })
+		const order = orderRes.rows[0]
 
-    const consRes = await pool.query(`SELECT concessionaire_id FROM tblconcession WHERE id = $1`, [order.concession_id]);
-    if (consRes.rowCount === 0) return res.status(400).json({ error: "Concession not found for order" });
-    const concessionaireId = consRes.rows[0].concessionaire_id;
+		const consRes = await pool.query(
+			`SELECT concessionaire_id FROM tblconcession WHERE id = $1`,
+			[order.concession_id]
+		)
+		if (consRes.rowCount === 0)
+			return res.status(400).json({ error: 'Concession not found for order' })
+		const concessionaireId = consRes.rows[0].concessionaire_id
 
-    // Get customer name
-    const custRes = await pool.query(`SELECT first_name, last_name FROM tbluser WHERE id = $1`, [order.customer_id]);
-    const customer = custRes.rows[0] || { first_name: '', last_name: '' };
-    const customerName = `${customer.first_name || ''} ${customer.last_name || ''}`.trim();
+		// Get customer name
+		const custRes = await pool.query(
+			`SELECT first_name, last_name FROM tbluser WHERE id = $1`,
+			[order.customer_id]
+		)
+		const customer = custRes.rows[0] || { first_name: '', last_name: '' }
+		const customerName = `${customer.first_name || ''} ${
+			customer.last_name || ''
+		}`.trim()
 
-    // Item count
-    const itemCountRes = await pool.query(`SELECT COUNT(*) AS count FROM tblorderdetail WHERE order_id = $1`, [id]);
-    const itemCount = parseInt(itemCountRes.rows[0]?.count || '0', 10);
+		// Item count
+		const itemCountRes = await pool.query(
+			`SELECT COUNT(*) AS count FROM tblorderdetail WHERE order_id = $1`,
+			[id]
+		)
+		const itemCount = parseInt(itemCountRes.rows[0]?.count || '0', 10)
 
-    await notifyNewOrder(Number(id), concessionaireId, customerName, itemCount);
-    res.json({ success: true });
-  } catch (err) {
-    console.error("Error notifying concessionaire for order:", err);
-    res.status(500).json({ error: "Failed to notify concessionaire" });
-  }
-};
-
-
+		await notifyNewOrder(Number(id), concessionaireId, customerName, itemCount)
+		res.json({ success: true })
+	} catch (err) {
+		console.error('Error notifying concessionaire for order:', err)
+		res.status(500).json({ error: 'Failed to notify concessionaire' })
+	}
+}
 
 // ==========================
 // Clean up invalid cart items (unavailable items or items from closed concessions)
 // ==========================
 export const cleanupInvalidCartItems = async (customerId) => {
-  try {
-    // First, get all cart items with their availability and concession status
-    const checkQuery = `
+	try {
+		// First, get all cart items with their availability and concession status
+		const checkQuery = `
       SELECT od.id AS order_detail_id, od.item_id, m.available, c.status as concession_status
       FROM tblorder o
       JOIN tblorderdetail od ON o.id = od.order_id
       JOIN tblmenuitem m ON od.item_id = m.id
       JOIN tblconcession c ON o.concession_id = c.id
       WHERE o.customer_id = $1 AND o.in_cart = TRUE
-    `;
-    
-    const checkResult = await pool.query(checkQuery, [customerId]);
-    
-    // Find invalid items (unavailable or from closed concessions)
-    const invalidItems = checkResult.rows.filter(row => 
-      !row.available || row.concession_status === 'closed'
-    );
-    
-    if (invalidItems.length > 0) {
-      const invalidOrderDetailIds = invalidItems.map(item => item.order_detail_id);
-      
-      // Delete order item variations for invalid items
-      await pool.query(
-        `DELETE FROM tblorderitemvariation 
+    `
+
+		const checkResult = await pool.query(checkQuery, [customerId])
+
+		// Find invalid items (unavailable or from closed concessions)
+		const invalidItems = checkResult.rows.filter(
+			(row) => !row.available || row.concession_status === 'closed'
+		)
+
+		if (invalidItems.length > 0) {
+			const invalidOrderDetailIds = invalidItems.map(
+				(item) => item.order_detail_id
+			)
+
+			// Delete order item variations for invalid items
+			await pool.query(
+				`DELETE FROM tblorderitemvariation 
          WHERE order_detail_id = ANY($1::int[])`,
-        [invalidOrderDetailIds]
-      );
-      
-      // Delete order details for invalid items
-      await pool.query(
-        `DELETE FROM tblorderdetail 
+				[invalidOrderDetailIds]
+			)
+
+			// Delete order details for invalid items
+			await pool.query(
+				`DELETE FROM tblorderdetail 
          WHERE id = ANY($1::int[])`,
-        [invalidOrderDetailIds]
-      );
-      
-      // Check if any orders are now empty and delete them
-      const emptyOrdersQuery = `
+				[invalidOrderDetailIds]
+			)
+
+			// Check if any orders are now empty and delete them
+			const emptyOrdersQuery = `
         SELECT o.id as order_id
         FROM tblorder o
         LEFT JOIN tblorderdetail od ON o.id = od.order_id
         WHERE o.customer_id = $1 AND o.in_cart = TRUE AND od.id IS NULL
-      `;
-      
-      const emptyOrdersResult = await pool.query(emptyOrdersQuery, [customerId]);
-      
-      if (emptyOrdersResult.rows.length > 0) {
-        const emptyOrderIds = emptyOrdersResult.rows.map(row => row.order_id);
-        await pool.query(
-          `DELETE FROM tblorder WHERE id = ANY($1::int[])`,
-          [emptyOrderIds]
-        );
-      }
-      
-      console.log(`Cleaned up ${invalidItems.length} invalid cart items for customer ${customerId}`);
-    }
-    
-    return invalidItems.length;
-  } catch (err) {
-    console.error("Error cleaning up invalid cart items:", err);
-    return 0;
-  }
-};
+      `
+
+			const emptyOrdersResult = await pool.query(emptyOrdersQuery, [customerId])
+
+			if (emptyOrdersResult.rows.length > 0) {
+				const emptyOrderIds = emptyOrdersResult.rows.map((row) => row.order_id)
+				await pool.query(`DELETE FROM tblorder WHERE id = ANY($1::int[])`, [
+					emptyOrderIds,
+				])
+			}
+
+			console.log(
+				`Cleaned up ${invalidItems.length} invalid cart items for customer ${customerId}`
+			)
+		}
+
+		return invalidItems.length
+	} catch (err) {
+		console.error('Error cleaning up invalid cart items:', err)
+		return 0
+	}
+}
 
 // ==========================
 // Get items in cart for a customer
 // ==========================
 export const getCartByCustomerId = async (req, res) => {
-  const { id } = req.params; // customer_id
-  try {
-    // First, clean up any invalid cart items
-    await cleanupInvalidCartItems(id);
-    
-    const query = `
+	const { id } = req.params // customer_id
+	try {
+		// First, clean up any invalid cart items
+		await cleanupInvalidCartItems(id)
+
+		const query = `
       SELECT o.id AS order_id,
              o.total_price,
              od.dining_option,
@@ -775,191 +813,320 @@ export const getCartByCustomerId = async (req, res) => {
         AND c.status = 'open'
       GROUP BY o.id, od.id, m.item_name, m.price, c.concession_name, caf.cafeteria_name, od.dining_option, m.available, c.status
       ORDER BY o.created_at DESC;
-    `;
-    const result = await pool.query(query, [id]);
-    res.json(result.rows);
-  } catch (err) {
-    console.error("Error fetching cart:", err);
-    res.status(500).json({ error: "Failed to fetch cart" });
-  }
-};
+    `
+		const result = await pool.query(query, [id])
+		res.json(result.rows)
+	} catch (err) {
+		console.error('Error fetching cart:', err)
+		res.status(500).json({ error: 'Failed to fetch cart' })
+	}
+}
 
 // ==========================
 // Checkout (convert cart items to real orders)
 // ==========================
 export const checkoutCart = async (req, res) => {
-  const { id } = req.params; // customer_id
-  const { schedule_time } = req.body; // optional schedule_time from request body
-  
-  try {
-    // First, clean up any invalid cart items before checkout
-    const cleanedCount = await cleanupInvalidCartItems(id);
-    
-    if (cleanedCount > 0) {
-      console.log(`Removed ${cleanedCount} invalid items before checkout for customer ${id}`);
-    }
-    
-    // Validate schedule_time if provided
-    if (schedule_time) {
-      const scheduledDate = new Date(schedule_time);
-      const now = new Date();
-      
-      if (scheduledDate <= now) {
-        return res.status(400).json({ 
-          error: "Schedule time must be in the future" 
-        });
-      }
-    }
-    
-    // Update orders with schedule_time if provided
-    const updateQuery = schedule_time 
-      ? `UPDATE tblorder
+	const { id } = req.params // customer_id
+	const { schedule_time } = req.body // optional schedule_time from request body
+
+	try {
+		// First, clean up any invalid cart items before checkout
+		const cleanedCount = await cleanupInvalidCartItems(id)
+
+		if (cleanedCount > 0) {
+			console.log(
+				`Removed ${cleanedCount} invalid items before checkout for customer ${id}`
+			)
+		}
+
+		// Validate schedule_time if provided
+		if (schedule_time) {
+			const scheduledDate = new Date(schedule_time)
+			const now = new Date()
+
+			if (scheduledDate <= now) {
+				return res.status(400).json({
+					error: 'Schedule time must be in the future',
+				})
+			}
+		}
+
+		// Update orders with schedule_time if provided
+		const updateQuery = schedule_time
+			? `UPDATE tblorder
          SET in_cart = FALSE, order_status = 'pending', schedule_time = $2, updated_at = NOW()
          WHERE customer_id = $1 AND in_cart = TRUE
          RETURNING *`
-      : `UPDATE tblorder
+			: `UPDATE tblorder
          SET in_cart = FALSE, order_status = 'pending', updated_at = NOW()
          WHERE customer_id = $1 AND in_cart = TRUE
-         RETURNING *`;
-    
-    const params = schedule_time ? [id, schedule_time] : [id];
-    const result = await pool.query(updateQuery, params);
+         RETURNING *`
 
-    // Create notifications for concessionaires for each order
-    console.log(`📦 Creating notifications for ${result.rows.length} orders`);
-    
-    for (const order of result.rows) {
-      try {
-        // Get concessionaire_id for this concession
-        const concessionResult = await pool.query(
-          `SELECT c.concessionaire_id, c.concession_name
+		const params = schedule_time ? [id, schedule_time] : [id]
+		const result = await pool.query(updateQuery, params)
+
+		// Create notifications for concessionaires for each order
+		console.log(`📦 Creating notifications for ${result.rows.length} orders`)
+
+		for (const order of result.rows) {
+			try {
+				// Get concessionaire_id for this concession
+				const concessionResult = await pool.query(
+					`SELECT c.concessionaire_id, c.concession_name
            FROM tblconcession c
            WHERE c.id = $1`,
-          [order.concession_id]
-        );
-        
-        // Get customer name
-        const customerResult = await pool.query(
-          `SELECT first_name, last_name FROM tbluser WHERE id = $1`,
-          [id]
-        );
-        
-        if (concessionResult.rows.length > 0 && customerResult.rows.length > 0) {
-          const concessionaireId = concessionResult.rows[0].concessionaire_id;
-          const customer = customerResult.rows[0];
-          const customerName = `${customer.first_name} ${customer.last_name}`;
-          
-          // Get order item count
-          const itemCountResult = await pool.query(
-            `SELECT COUNT(*) as count FROM tblorderdetail WHERE order_id = $1`,
-            [order.id]
-          );
-          const itemCount = parseInt(itemCountResult.rows[0].count);
-          
-          // Create notification for concessionaire
-          await notifyNewOrder(order.id, concessionaireId, customerName, itemCount);
-        }
-      } catch (notifErr) {
-        console.error("Error creating notification:", notifErr);
-        // Don't fail the checkout if notification fails
-      }
-    }
-    
-    console.log('✅ Notification creation complete');
+					[order.concession_id]
+				)
 
-    let message = "Checkout successful";
-    if (schedule_time) {
-      message += ` - Scheduled for ${new Date(schedule_time).toLocaleString()}`;
-    }
+				// Get customer name
+				const customerResult = await pool.query(
+					`SELECT first_name, last_name FROM tbluser WHERE id = $1`,
+					[id]
+				)
 
-    res.json({ 
-      message, 
-      orders: result.rows,
-      cleanedItems: cleanedCount > 0 ? `${cleanedCount} invalid items were removed before checkout` : null
-    });
-  } catch (err) {
-    console.error("Error during checkout:", err);
-    res.status(500).json({ error: "Checkout failed" });
-  }
-};
+				if (
+					concessionResult.rows.length > 0 &&
+					customerResult.rows.length > 0
+				) {
+					const concessionaireId = concessionResult.rows[0].concessionaire_id
+					const customer = customerResult.rows[0]
+					const customerName = `${customer.first_name} ${customer.last_name}`
 
+					// Get order item count
+					const itemCountResult = await pool.query(
+						`SELECT COUNT(*) as count FROM tblorderdetail WHERE order_id = $1`,
+						[order.id]
+					)
+					const itemCount = parseInt(itemCountResult.rows[0].count)
 
+					// Create notification for concessionaire
+					await notifyNewOrder(
+						order.id,
+						concessionaireId,
+						customerName,
+						itemCount
+					)
+				}
+			} catch (notifErr) {
+				console.error('Error creating notification:', notifErr)
+				// Don't fail the checkout if notification fails
+			}
+		}
+
+		console.log('✅ Notification creation complete')
+
+		let message = 'Checkout successful'
+		if (schedule_time) {
+			message += ` - Scheduled for ${new Date(schedule_time).toLocaleString()}`
+		}
+
+		res.json({
+			message,
+			orders: result.rows,
+			cleanedItems:
+				cleanedCount > 0
+					? `${cleanedCount} invalid items were removed before checkout`
+					: null,
+		})
+	} catch (err) {
+		console.error('Error during checkout:', err)
+		res.status(500).json({ error: 'Checkout failed' })
+	}
+}
+
+// ==========================
+// Checkout single order (by order_id)
+// ==========================
+export const checkoutSingleOrder = async (req, res) => {
+	const { order_id, schedule_time } = req.body
+
+	try {
+		// Validate schedule_time if provided
+		if (schedule_time) {
+			const scheduledDate = new Date(schedule_time)
+			const now = new Date()
+
+			if (scheduledDate <= now) {
+				return res.status(400).json({
+					error: 'Schedule time must be in the future',
+				})
+			}
+		}
+
+		// Update single order with schedule_time if provided
+		const updateQuery = schedule_time
+			? `UPDATE tblorder
+         SET in_cart = FALSE, order_status = 'pending', schedule_time = $2, updated_at = NOW()
+         WHERE id = $1 AND in_cart = TRUE
+         RETURNING *`
+			: `UPDATE tblorder
+         SET in_cart = FALSE, order_status = 'pending', updated_at = NOW()
+         WHERE id = $1 AND in_cart = TRUE
+         RETURNING *`
+
+		const params = schedule_time ? [order_id, schedule_time] : [order_id]
+		const result = await pool.query(updateQuery, params)
+
+		if (result.rows.length === 0) {
+			return res
+				.status(404)
+				.json({ error: 'Order not found or already checked out' })
+		}
+
+		const order = result.rows[0]
+
+		// Create notification for concessionaire
+		try {
+			// Get concessionaire_id for this concession
+			const concessionResult = await pool.query(
+				`SELECT c.concessionaire_id, c.concession_name
+         FROM tblconcession c
+         WHERE c.id = $1`,
+				[order.concession_id]
+			)
+
+			// Get customer name
+			const customerResult = await pool.query(
+				`SELECT first_name, last_name FROM tbluser WHERE id = $1`,
+				[order.customer_id]
+			)
+
+			if (concessionResult.rows.length > 0 && customerResult.rows.length > 0) {
+				const concessionaireId = concessionResult.rows[0].concessionaire_id
+				const customer = customerResult.rows[0]
+				const customerName = `${customer.first_name} ${customer.last_name}`
+
+				// Get order item count
+				const itemCountResult = await pool.query(
+					`SELECT COUNT(*) as count FROM tblorderdetail WHERE order_id = $1`,
+					[order.id]
+				)
+				const itemCount = parseInt(itemCountResult.rows[0].count)
+
+				// Create notification for concessionaire
+				await notifyNewOrder(
+					order.id,
+					concessionaireId,
+					customerName,
+					itemCount
+				)
+			}
+		} catch (notifErr) {
+			console.error('Error creating notification:', notifErr)
+			// Don't fail the checkout if notification fails
+		}
+
+		let message = 'Order placed successfully'
+		if (schedule_time) {
+			message += ` - Scheduled for ${new Date(schedule_time).toLocaleString()}`
+		}
+
+		res.json({
+			message,
+			order,
+		})
+	} catch (err) {
+		console.error('Error during checkout:', err)
+		res.status(500).json({ error: 'Checkout failed' })
+	}
+}
 
 // ==========================
 // Delete an order
 // ==========================
 export const deleteOrder = async (req, res) => {
-  const { id } = req.params;
-  try {
-    const result = await pool.query(`DELETE FROM tblorder WHERE id = $1 RETURNING *`, [id]);
-    if (result.rowCount === 0) return res.status(404).json({ error: "Order not found" });
-    res.json({ message: "Order deleted successfully" });
-  } catch (err) {
-    console.error("Error deleting order:", err);
-    res.status(500).json({ error: "Failed to delete order" });
-  }
-};
+	const { id } = req.params
+	try {
+		const result = await pool.query(
+			`DELETE FROM tblorder WHERE id = $1 RETURNING *`,
+			[id]
+		)
+		if (result.rowCount === 0)
+			return res.status(404).json({ error: 'Order not found' })
+		res.json({ message: 'Order deleted successfully' })
+	} catch (err) {
+		console.error('Error deleting order:', err)
+		res.status(500).json({ error: 'Failed to delete order' })
+	}
+}
 
 // ==========================
 // Cancel order (customer only)
 // ==========================
 export const cancelOrder = async (req, res) => {
-  const { id } = req.params;
-  const customerId = req.user.id; // from auth middleware
-  
-  try {
-    // First, check if the order exists and belongs to the customer
-    const orderResult = await pool.query(
-      `SELECT id, order_status, customer_id 
+	const { id } = req.params
+	const customerId = req.user.id // from auth middleware
+
+	try {
+		// First, check if the order exists and belongs to the customer
+		const orderResult = await pool.query(
+			`SELECT id, order_status, customer_id 
        FROM tblorder 
        WHERE id = $1 AND customer_id = $2`,
-      [id, customerId]
-    );
-    
-    if (orderResult.rowCount === 0) {
-      return res.status(404).json({ error: "Order not found or you don't have permission to cancel this order" });
-    }
-    
-    const order = orderResult.rows[0];
-    
-    // Only allow cancellation if order is still pending (not yet accepted)
-    if (order.order_status !== 'pending') {
-      return res.status(400).json({ 
-        error: "Order cannot be cancelled. Only pending orders can be cancelled." 
-      });
-    }
-    
-    // Update order status to cancelled
-    const updateResult = await pool.query(
-      `UPDATE tblorder 
+			[id, customerId]
+		)
+
+		if (orderResult.rowCount === 0) {
+			return res
+				.status(404)
+				.json({
+					error:
+						"Order not found or you don't have permission to cancel this order",
+				})
+		}
+
+		const order = orderResult.rows[0]
+
+		// Only allow cancellation if order is still pending (not yet accepted)
+		if (order.order_status !== 'pending') {
+			return res.status(400).json({
+				error:
+					'Order cannot be cancelled. Only pending orders can be cancelled.',
+			})
+		}
+
+		// Update order status to cancelled
+		const updateResult = await pool.query(
+			`UPDATE tblorder 
        SET order_status = 'cancelled', updated_at = NOW()
        WHERE id = $1`,
-      [id]
-    );
-    
-    // Notify concessionaire about cancellation
-    try {
-      const consResult = await pool.query(
-        `SELECT c.concessionaire_id FROM tblorder o JOIN tblconcession c ON o.concession_id = c.id WHERE o.id = $1`,
-        [id]
-      );
-      const userRes = await pool.query(`SELECT first_name, last_name FROM tbluser WHERE id = $1`, [customerId]);
-      if (consResult.rows.length && userRes.rows.length) {
-        const concessionaireId = consResult.rows[0].concessionaire_id;
-        const customer = userRes.rows[0];
-        const customerName = `${customer.first_name} ${customer.last_name}`.trim();
-        await notifyOrderCancelledForConcessionaire(id, concessionaireId, customerName);
-      }
-    } catch (notifyErr) {
-      console.error("Error notifying concessionaire about cancellation:", notifyErr);
-    }
+			[id]
+		)
 
-    res.json({ 
-      message: "Order cancelled successfully",
-      order: updateResult.rows[0]
-    });
-  } catch (err) {
-    console.error("Error cancelling order:", err);
-    res.status(500).json({ error: "Failed to cancel order" });
-  }
-};
+		// Notify concessionaire about cancellation
+		try {
+			const consResult = await pool.query(
+				`SELECT c.concessionaire_id FROM tblorder o JOIN tblconcession c ON o.concession_id = c.id WHERE o.id = $1`,
+				[id]
+			)
+			const userRes = await pool.query(
+				`SELECT first_name, last_name FROM tbluser WHERE id = $1`,
+				[customerId]
+			)
+			if (consResult.rows.length && userRes.rows.length) {
+				const concessionaireId = consResult.rows[0].concessionaire_id
+				const customer = userRes.rows[0]
+				const customerName =
+					`${customer.first_name} ${customer.last_name}`.trim()
+				await notifyOrderCancelledForConcessionaire(
+					id,
+					concessionaireId,
+					customerName
+				)
+			}
+		} catch (notifyErr) {
+			console.error(
+				'Error notifying concessionaire about cancellation:',
+				notifyErr
+			)
+		}
+
+		res.json({
+			message: 'Order cancelled successfully',
+			order: updateResult.rows[0],
+		})
+	} catch (err) {
+		console.error('Error cancelling order:', err)
+		res.status(500).json({ error: 'Failed to cancel order' })
+	}
+}

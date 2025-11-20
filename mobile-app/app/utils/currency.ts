@@ -39,3 +39,5 @@ export const normalizeCurrencyValue = (value: NumberLike): string => {
 
 	return sanitized.endsWith('.') ? sanitized.slice(0, -1) || '0' : sanitized
 }
+
+export default {}
