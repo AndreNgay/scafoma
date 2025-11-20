@@ -70,6 +70,7 @@ eas build --profile development --platform android
 ```
 
 **What happens:**
+
 - EAS builds the app in the cloud (takes 10-20 minutes)
 - You get a download link for the APK file
 
@@ -88,6 +89,7 @@ npx expo start --dev-client
 ```
 
 **On your phone:**
+
 - Open the installed app (not Expo Go)
 - Scan the QR code or enter the URL
 - App will connect to your dev server
@@ -107,13 +109,16 @@ eas build --profile development --platform ios
 ## Troubleshooting
 
 ### "Not authorized to access project"
+
 - Project leader needs to add you as member in Expo dashboard
 
 ### "Build failed"
+
 - Check `eas.json` is properly configured (already done in this project)
 - Verify your Expo account has access
 
 ### "Push notifications not working"
+
 - Make sure you're using the development build (NOT Expo Go)
 - Check backend is running on accessible URL
 - Verify notification permissions are granted on device
