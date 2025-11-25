@@ -1,5 +1,7 @@
 # Learn more https://docs.github.com/en/get-started/getting-started-with-git/ignoring-files
 
+.gitignore
+
 # dependencies
 node_modules/
 
@@ -32,8 +34,14 @@ yarn-error.*
 
 # local env files
 .env*.local
+.env
 
 # typescript
 *.tsbuildinfo
+
+# instructions
+.github
+.github/instructions
+.github/instructions/CopilotRules.instructions.md
 
 app-example
