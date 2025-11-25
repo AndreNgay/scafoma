@@ -28,12 +28,16 @@ const RegisterSchema = z
 			.string()
 			.min(2, { message: 'Last name must be at least 2 characters' }),
 		email: z.string().email({ message: 'Invalid email address' }),
+		phone: z
+			.string()
+			.min(5, { message: 'Phone number must be at least 5 characters' }),
 		password: z
 			.string()
 			.min(6, { message: 'Password must be at least 6 characters long' }),
 		confirm_password: z
 			.string()
 			.min(1, { message: 'Please confirm your password' }),
+		messenger_link: z.string().optional(),
 	})
 	.refine((data) => data.password === data.confirm_password, {
 		message: 'Passwords do not match',
@@ -44,16 +48,39 @@ type RegisterForm = z.infer<typeof RegisterSchema>
 
 const SignUp = () => {
 	const [isLoading, setLoading] = useState(false)
+	const [step, setStep] = useState<'profile' | 'contact'>('profile')
 	const navigation = useNavigation<any>()
 	const { setCredentials } = useStore((state) => state)
 
 	const {
 		control,
 		handleSubmit,
+		trigger,
 		formState: { errors },
 	} = useForm<RegisterForm>({
 		resolver: zodResolver(RegisterSchema),
+		defaultValues: {
+			first_name: '',
+			last_name: '',
+			email: '',
+			phone: '',
+			password: '',
+			confirm_password: '',
+			messenger_link: '',
+		},
 	})
+
+	const handleNext = async () => {
+		const isValid = await trigger([
+			'first_name',
+			'last_name',
+			'password',
+			'confirm_password',
+		])
+		if (isValid) {
+			setStep('contact')
+		}
+	}
 
 	const onSubmit = async (data: RegisterForm) => {
 		try {
@@ -97,115 +124,173 @@ const SignUp = () => {
 	return (
 		<View style={styles.container}>
 			<Text style={styles.title}>Sign Up</Text>
+			<Text style={styles.sectionTitle}>
+				{step === 'profile' ? 'Profile' : 'Contact'}
+			</Text>
 
-			{/* First Name */}
-			<Controller
-				control={control}
-				name="first_name"
-				render={({ field: { onChange, value } }) => (
-					<TextInput
-						style={styles.input}
-						placeholder="First Name"
-						value={value}
-						onChangeText={onChange}
-						editable={!isLoading}
+			{step === 'profile' && (
+				<>
+					{/* First Name */}
+					<Controller
+						control={control}
+						name="first_name"
+						render={({ field: { onChange, value } }) => (
+							<TextInput
+								style={styles.input}
+								placeholder="First Name"
+								value={value}
+								onChangeText={onChange}
+								editable={!isLoading}
+							/>
+						)}
 					/>
-				)}
-			/>
-			{errors.first_name && (
-				<Text style={styles.error}>{errors.first_name.message}</Text>
+					{errors.first_name && (
+						<Text style={styles.error}>{errors.first_name.message}</Text>
+					)}
+
+					{/* Last Name */}
+					<Controller
+						control={control}
+						name="last_name"
+						render={({ field: { onChange, value } }) => (
+							<TextInput
+								style={styles.input}
+								placeholder="Last Name"
+								value={value}
+								onChangeText={onChange}
+								editable={!isLoading}
+							/>
+						)}
+					/>
+					{errors.last_name && (
+						<Text style={styles.error}>{errors.last_name.message}</Text>
+					)}
+
+					{/* Password */}
+					<Controller
+						control={control}
+						name="password"
+						render={({ field: { onChange, value } }) => (
+							<TextInput
+								{...getPasswordInputProps({
+									textContentType: 'newPassword',
+									autoComplete: 'password-new',
+								})}
+								style={styles.input}
+								placeholder="Password"
+								value={value}
+								onChangeText={onChange}
+								editable={!isLoading}
+							/>
+						)}
+					/>
+					{errors.password && (
+						<Text style={styles.error}>{errors.password.message}</Text>
+					)}
+
+					{/* Confirm Password */}
+					<Controller
+						control={control}
+						name="confirm_password"
+						render={({ field: { onChange, value } }) => (
+							<TextInput
+								{...getPasswordInputProps({
+									textContentType: 'newPassword',
+									autoComplete: 'password-new',
+								})}
+								style={styles.input}
+								placeholder="Confirm Password"
+								value={value}
+								onChangeText={onChange}
+								editable={!isLoading}
+							/>
+						)}
+					/>
+					{errors.confirm_password && (
+						<Text style={styles.error}>{errors.confirm_password.message}</Text>
+					)}
+				</>
 			)}
 
-			{/* Last Name */}
-			<Controller
-				control={control}
-				name="last_name"
-				render={({ field: { onChange, value } }) => (
-					<TextInput
-						style={styles.input}
-						placeholder="Last Name"
-						value={value}
-						onChangeText={onChange}
-						editable={!isLoading}
+			{step === 'contact' && (
+				<>
+					{/* Email */}
+					<Controller
+						control={control}
+						name="email"
+						render={({ field: { onChange, value } }) => (
+							<TextInput
+								style={styles.input}
+								placeholder="Email"
+								keyboardType="email-address"
+								value={value}
+								onChangeText={onChange}
+								editable={!isLoading}
+							/>
+						)}
 					/>
-				)}
-			/>
-			{errors.last_name && (
-				<Text style={styles.error}>{errors.last_name.message}</Text>
-			)}
+					{errors.email && (
+						<Text style={styles.error}>{errors.email.message}</Text>
+					)}
 
-			{/* Email */}
-			<Controller
-				control={control}
-				name="email"
-				render={({ field: { onChange, value } }) => (
-					<TextInput
-						style={styles.input}
-						placeholder="Email"
-						keyboardType="email-address"
-						value={value}
-						onChangeText={onChange}
-						editable={!isLoading}
+					<Controller
+						control={control}
+						name="phone"
+						render={({ field: { onChange, value } }) => (
+							<TextInput
+								style={styles.input}
+								placeholder="Phone Number"
+								keyboardType="phone-pad"
+								value={value}
+								onChangeText={onChange}
+								editable={!isLoading}
+							/>
+						)}
 					/>
-				)}
-			/>
-			{errors.email && <Text style={styles.error}>{errors.email.message}</Text>}
+					{errors.phone && (
+						<Text style={styles.error}>{errors.phone.message}</Text>
+					)}
 
-			{/* Password */}
-			<Controller
-				control={control}
-				name="password"
-				render={({ field: { onChange, value } }) => (
-					<TextInput
-						{...getPasswordInputProps({
-							textContentType: 'newPassword',
-							autoComplete: 'password-new',
-						})}
-						style={styles.input}
-						placeholder="Password"
-						value={value}
-						onChangeText={onChange}
-						editable={!isLoading}
+					<Controller
+						control={control}
+						name="messenger_link"
+						render={({ field: { onChange, value } }) => (
+							<TextInput
+								style={styles.input}
+								placeholder="Messenger/Facebook link (optional)"
+								value={value}
+								onChangeText={onChange}
+								editable={!isLoading}
+							/>
+						)}
 					/>
-				)}
-			/>
-			{errors.password && (
-				<Text style={styles.error}>{errors.password.message}</Text>
-			)}
-
-			{/* Confirm Password */}
-			<Controller
-				control={control}
-				name="confirm_password"
-				render={({ field: { onChange, value } }) => (
-					<TextInput
-						{...getPasswordInputProps({
-							textContentType: 'newPassword',
-							autoComplete: 'password-new',
-						})}
-						style={styles.input}
-						placeholder="Confirm Password"
-						value={value}
-						onChangeText={onChange}
-						editable={!isLoading}
-					/>
-				)}
-			/>
-			{errors.confirm_password && (
-				<Text style={styles.error}>{errors.confirm_password.message}</Text>
+				</>
 			)}
 
 			{/* Submit */}
-			<TouchableOpacity
-				style={[styles.button, isLoading && { opacity: 0.6 }]}
-				onPress={handleSubmit(onSubmit)}
-				disabled={isLoading}>
-				{isLoading ? (
-					<ActivityIndicator color="#fff" />
-				) : (
-					<Text style={styles.buttonText}>Sign Up</Text>
-				)}
-			</TouchableOpacity>
+			{step === 'profile' ? (
+				<TouchableOpacity
+					style={[styles.button, isLoading && { opacity: 0.6 }]}
+					onPress={handleNext}
+					disabled={isLoading}>
+					{isLoading ? (
+						<ActivityIndicator color="#fff" />
+					) : (
+						<Text style={styles.buttonText}>Next</Text>
+					)}
+				</TouchableOpacity>
+			) : (
+				<TouchableOpacity
+					style={[styles.button, isLoading && { opacity: 0.6 }]}
+					onPress={handleSubmit(onSubmit)}
+					disabled={isLoading}>
+					{isLoading ? (
+						<ActivityIndicator color="#fff" />
+					) : (
+						<Text style={styles.buttonText}>Sign Up</Text>
+					)}
+				</TouchableOpacity>
+			)}
 
 			{/* Already Have Account */}
 			<TouchableOpacity onPress={() => navigation.navigate('SignIn')}>
@@ -229,6 +314,12 @@ const styles = StyleSheet.create({
 		fontWeight: 'bold',
 		textAlign: 'center',
 		marginBottom: 20,
+	},
+	sectionTitle: {
+		fontSize: 18,
+		fontWeight: '600',
+		textAlign: 'center',
+		marginBottom: 16,
 	},
 	input: {
 		backgroundColor: '#fff',

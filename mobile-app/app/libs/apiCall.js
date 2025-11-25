@@ -6,7 +6,7 @@ const API_HOST = process.env.EXPO_PUBLIC_API_HOST || 'localhost'
 
 const api = axios.create({
   baseURL: "http://192.168.42.162:5000/api-v1",
-  timeout: 20000,
+  timeout: 60000,
 });
 
 
