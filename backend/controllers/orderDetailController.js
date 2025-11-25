@@ -51,6 +51,37 @@ export const getOrderDetailsById = async (req, res) => {
 export const addOrderDetail = async (req, res) => {
   const { order_id, item_id, quantity, item_price, total_price, note, dining_option } = req.body;
   try {
+    // Validate that the item and its concession are still available
+    const itemCheck = await pool.query(
+      `SELECT mi.item_name, mi.available, c.concession_name, c.status
+       FROM tblmenuitem mi
+       JOIN tblconcession c ON mi.concession_id = c.id
+       WHERE mi.id = $1`,
+      [item_id]
+    );
+
+    if (itemCheck.rowCount === 0) {
+      return res.status(400).json({
+        error: "Item no longer available",
+        message: "This menu item is no longer available. Please refresh the menu and try again.",
+      });
+    }
+
+    const itemRow = itemCheck.rows[0];
+    if (itemRow.available === false) {
+      return res.status(400).json({
+        error: "Item unavailable",
+        message: `"${itemRow.item_name}" is currently unavailable and can't be ordered right now.`,
+      });
+    }
+
+    if (itemRow.status && itemRow.status !== "open") {
+      return res.status(400).json({
+        error: "Concession closed",
+        message: `${itemRow.concession_name} is currently closed and not accepting new orders.`,
+      });
+    }
+
     const result = await pool.query(
       `INSERT INTO tblorderdetail (order_id, item_id, quantity, item_price, total_price, note, dining_option)
        VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
@@ -224,84 +255,29 @@ export const updateOrderDetailQuantity = async (req, res) => {
   }
 };
 
-// ==========================
 // Aggregations: Most ordered items (overall)
 // ==========================
 export const getMostOrderedItems = async (req, res) => {
-try {
-const limit = parseInt(req.query.limit) || 10;
-const result = await pool.query(
-  `SELECT mi.id, mi.item_name, mi.price, mi.category, mi.image,
-          SUM(od.quantity) AS total_qty,
-          c.concession_name, caf.cafeteria_name
-   FROM tblorderdetail od
-   JOIN tblmenuitem mi ON od.item_id = mi.id
-   JOIN tblconcession c ON mi.concession_id = c.id
-   JOIN tblcafeteria caf ON c.cafeteria_id = caf.id
-   GROUP BY mi.id, c.concession_name, caf.cafeteria_name
-   ORDER BY total_qty DESC
-   LIMIT $1`,
-  [limit]
-);
-
-const items = await Promise.all(result.rows.map(async (r) => {
-// Get variations for each menu item
-const variationsResult = await pool.query(
-  `SELECT iv.id, iv.variation_name, iv.additional_price, iv.available,
-          ivg.variation_group_name, ivg.min_selection, ivg.max_selection
-   FROM tblitemvariation iv
-   JOIN tblitemvariationgroup ivg ON iv.item_variation_group_id = ivg.id
-   WHERE ivg.menu_item_id = $1 AND iv.available = true
-   ORDER BY ivg.id, iv.id`,
-  [r.id]
-);
-
-return {
-  id: r.id,
-  item_name: r.item_name,
-  price: Number(r.price),
-  category: r.category,
-  image_url: r.image ? `data:image/jpeg;base64,${r.image.toString("base64")}` : null,
-  total_qty: Number(r.total_qty),
-  concession_name: r.concession_name,
-  cafeteria_name: r.cafeteria_name,
-  variations: variationsResult.rows.map(v => ({
-    id: v.id,
-    variation_name: v.variation_name,
-    additional_price: Number(v.additional_price),
-    available: v.available,
-    variation_group_name: v.variation_group_name,
-    min_selection: v.min_selection,
-    max_selection: v.max_selection,
-  })),
-};
-}));
-
-res.json({ status: "success", data: items });
-} catch (err) {
-console.error("Error fetching most ordered items:", err);
-res.status(500).json({ status: "failed", message: "Server error" });
-}
-};
-
-
-// ==========================
-// Aggregations: Trending items (current week)
-// ==========================
-export const getTrendingItemsThisWeek = async (req, res) => {
   try {
     const limit = parseInt(req.query.limit) || 10;
     const result = await pool.query(
       `SELECT mi.id, mi.item_name, mi.price, mi.category, mi.image,
+              mi.concession_id,
               SUM(od.quantity) AS total_qty,
-              c.concession_name, caf.cafeteria_name
+              c.concession_name,
+              c.gcash_payment_available,
+              c.oncounter_payment_available,
+              c.gcash_number,
+              caf.cafeteria_name
        FROM tblorderdetail od
-       JOIN tblorder o ON od.order_id = o.id
        JOIN tblmenuitem mi ON od.item_id = mi.id
        JOIN tblconcession c ON mi.concession_id = c.id
        JOIN tblcafeteria caf ON c.cafeteria_id = caf.id
-       WHERE date_trunc('week', o.created_at) = date_trunc('week', NOW())
-       GROUP BY mi.id, c.concession_name, caf.cafeteria_name
+       WHERE mi.available = TRUE AND c.status = 'open'
+       GROUP BY mi.id, mi.item_name, mi.price, mi.category, mi.image,
+                mi.concession_id, c.concession_name,
+                c.gcash_payment_available, c.oncounter_payment_available, c.gcash_number,
+                caf.cafeteria_name
        ORDER BY total_qty DESC
        LIMIT $1`,
       [limit]
@@ -327,6 +303,86 @@ export const getTrendingItemsThisWeek = async (req, res) => {
         image_url: r.image ? `data:image/jpeg;base64,${r.image.toString("base64")}` : null,
         total_qty: Number(r.total_qty),
         concession_name: r.concession_name,
+        concession_id: r.concession_id,
+        gcash_payment_available: r.gcash_payment_available,
+        oncounter_payment_available: r.oncounter_payment_available,
+        gcash_number: r.gcash_number,
+        cafeteria_name: r.cafeteria_name,
+        variations: variationsResult.rows.map(v => ({
+          id: v.id,
+          variation_name: v.variation_name,
+          additional_price: Number(v.additional_price),
+          available: v.available,
+          variation_group_name: v.variation_group_name,
+          min_selection: v.min_selection,
+          max_selection: v.max_selection,
+        })),
+      };
+    }));
+
+    res.json({ status: "success", data: items });
+  } catch (err) {
+    console.error("Error fetching most ordered items:", err);
+    res.status(500).json({ status: "failed", message: "Server error" });
+  }
+};
+
+
+// ==========================
+// Aggregations: Trending items (current week)
+// ==========================
+export const getTrendingItemsThisWeek = async (req, res) => {
+  try {
+    const limit = parseInt(req.query.limit) || 10;
+    const result = await pool.query(
+      `SELECT mi.id, mi.item_name, mi.price, mi.category, mi.image,
+              mi.concession_id,
+              SUM(od.quantity) AS total_qty,
+              c.concession_name,
+              c.gcash_payment_available,
+              c.oncounter_payment_available,
+              c.gcash_number,
+              caf.cafeteria_name
+       FROM tblorderdetail od
+       JOIN tblorder o ON od.order_id = o.id
+       JOIN tblmenuitem mi ON od.item_id = mi.id
+       JOIN tblconcession c ON mi.concession_id = c.id
+       JOIN tblcafeteria caf ON c.cafeteria_id = caf.id
+       WHERE date_trunc('week', o.created_at) = date_trunc('week', NOW())
+         AND mi.available = TRUE AND c.status = 'open'
+       GROUP BY mi.id, mi.item_name, mi.price, mi.category, mi.image,
+                mi.concession_id, c.concession_name,
+                c.gcash_payment_available, c.oncounter_payment_available, c.gcash_number,
+                caf.cafeteria_name
+       ORDER BY total_qty DESC
+       LIMIT $1`,
+      [limit]
+    );
+
+    const items = await Promise.all(result.rows.map(async (r) => {
+      // Get variations for each menu item
+      const variationsResult = await pool.query(
+        `SELECT iv.id, iv.variation_name, iv.additional_price, iv.available,
+                ivg.variation_group_name, ivg.min_selection, ivg.max_selection
+         FROM tblitemvariation iv
+         JOIN tblitemvariationgroup ivg ON iv.item_variation_group_id = ivg.id
+         WHERE ivg.menu_item_id = $1 AND iv.available = true
+         ORDER BY ivg.id, iv.id`,
+        [r.id]
+      );
+
+      return {
+        id: r.id,
+        item_name: r.item_name,
+        price: Number(r.price),
+        category: r.category,
+        image_url: r.image ? `data:image/jpeg;base64,${r.image.toString("base64")}` : null,
+        total_qty: Number(r.total_qty),
+        concession_name: r.concession_name,
+        concession_id: r.concession_id,
+        gcash_payment_available: r.gcash_payment_available,
+        oncounter_payment_available: r.oncounter_payment_available,
+        gcash_number: r.gcash_number,
         cafeteria_name: r.cafeteria_name,
         variations: variationsResult.rows.map(v => ({
           id: v.id,
@@ -362,7 +418,11 @@ export const getRecentItemsByUser = async (req, res) => {
               mi.price,
               mi.category,
               mi.image,
+              mi.concession_id,
               c.concession_name,
+              c.gcash_payment_available,
+              c.oncounter_payment_available,
+              c.gcash_number,
               caf.cafeteria_name,
               MAX(o.created_at) AS last_ordered_at
        FROM tblorder o
@@ -371,7 +431,11 @@ export const getRecentItemsByUser = async (req, res) => {
        JOIN tblconcession c ON mi.concession_id = c.id
        JOIN tblcafeteria caf ON c.cafeteria_id = caf.id
        WHERE o.customer_id = $1 AND o.in_cart = FALSE
-       GROUP BY od.item_id, mi.item_name, mi.price, mi.category, mi.image, c.concession_name, caf.cafeteria_name
+         AND mi.available = TRUE AND c.status = 'open'
+       GROUP BY od.item_id, mi.item_name, mi.price, mi.category, mi.image,
+                mi.concession_id, c.concession_name,
+                c.gcash_payment_available, c.oncounter_payment_available, c.gcash_number,
+                caf.cafeteria_name
        ORDER BY last_ordered_at DESC
        LIMIT $2`,
       [userId, limit]
@@ -396,6 +460,10 @@ export const getRecentItemsByUser = async (req, res) => {
         category: r.category,
         image_url: r.image ? `data:image/jpeg;base64,${r.image.toString("base64")}` : null,
         concession_name: r.concession_name,
+        concession_id: r.concession_id,
+        gcash_payment_available: r.gcash_payment_available,
+        oncounter_payment_available: r.oncounter_payment_available,
+        gcash_number: r.gcash_number,
         cafeteria_name: r.cafeteria_name,
         last_ordered_at: r.last_ordered_at,
         variations: variationsResult.rows.map(v => ({

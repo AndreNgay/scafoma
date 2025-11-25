@@ -4,20 +4,14 @@ import useStore from "../store/index.js"; // import Zustand store
 
 const links = [
     {
-        label: "Dashboard",
-        path: "/overview"
-    }, {
         label: "Cafeterias",
         path: "/cafeterias"
     }, {
+        label: "Concessions",
+        path: "/concessions"
+    }, {
         label: "Users",
         path: "/users"
-    }, {
-        label: "Menu Items",
-        path: "/menu-items"
-    }, {
-        label: "Orders",
-        path: "/orders"
     }
 ];
 

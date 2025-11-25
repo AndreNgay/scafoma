@@ -31,8 +31,10 @@ const Home = ({ navigation }: any) => {
       // Load concessions (featured/top-rated placeholder)
       const conRes = await api.get("/concession/all");
       const concessions = conRes.data.data || [];
+      // Only show concessions that are open/available
+      const openConcessions = (concessions as any[]).filter((c: any) => !c.status || c.status === "open");
       // Randomize to avoid burying less popular concessions
-      const shuffled = [...concessions];
+      const shuffled = [...openConcessions];
       for (let i = shuffled.length - 1; i > 0; i--) {
         const j = Math.floor(Math.random() * (i + 1));
         [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];

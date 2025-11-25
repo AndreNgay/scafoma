@@ -621,6 +621,29 @@ export const updatePaymentMethod = async (req, res) => {
 export const addOrder = async (req, res) => {
   const { customer_id, concession_id, dining_option, status, total_price, in_cart, payment_method } = req.body;
   try {
+    // Validate concession is still available and open
+    if (concession_id) {
+      const concessionCheck = await pool.query(
+        `SELECT concession_name, status FROM tblconcession WHERE id = $1`,
+        [concession_id]
+      );
+
+      if (concessionCheck.rowCount === 0) {
+        return res.status(400).json({
+          error: "Concession unavailable",
+          message: "This stall is no longer available. Please choose another concession.",
+        });
+      }
+
+      const concession = concessionCheck.rows[0];
+      if (concession.status && concession.status !== "open") {
+        return res.status(400).json({
+          error: "Concession closed",
+          message: `${concession.concession_name} is currently closed and not accepting new orders.`,
+        });
+      }
+    }
+
     if (in_cart) {
       const existing = await pool.query(
         `SELECT * FROM tblorder WHERE customer_id=$1 AND concession_id=$2 AND in_cart=TRUE LIMIT 1`,

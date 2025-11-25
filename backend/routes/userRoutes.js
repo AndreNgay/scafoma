@@ -19,11 +19,11 @@ const router = express.Router();
 // Get currently logged-in user
 router.get("/", authMiddleware, getUser);
 
-// Get user by ID
-router.get("/:id", getUserById);
-
 // Get all users
 router.get("/all", getAllUsers);
+
+// Get user by ID
+router.get("/:id", getUserById);
 
 // Change password (self)
 router.put("/change-password/:id", authMiddleware, changePassword);

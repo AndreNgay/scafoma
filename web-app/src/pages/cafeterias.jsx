@@ -3,7 +3,6 @@ import { toast } from "sonner";
 import api from "../libs/apiCall.js";
 import { DataGrid } from "@mui/x-data-grid";
 import { Button } from "@mui/material";
-import { useNavigate } from "react-router-dom";
 import Modal from "react-modal";
 
 // Accessibility requirement for react-modal
@@ -27,7 +26,6 @@ export const Cafeterias = () => {
   const [createData, setCreateData] = useState({ cafeteria_name: "", location: "" });
 
   const [loading, setLoading] = useState(false);
-  const navigate = useNavigate();
 
   const fetchCafeterias = async () => {
     try {
@@ -145,7 +143,7 @@ export const Cafeterias = () => {
     {
       field: "actions",
       headerName: "Actions",
-      width: 350,
+      width: 250,
       sortable: false,
       renderCell: (params) => (
         <div style={{ display: "flex", gap: "8px" }}>
@@ -164,14 +162,6 @@ export const Cafeterias = () => {
             onClick={() => handleDeleteClick(params.row)}
           >
             Delete
-          </Button>
-          <Button
-            size="small"
-            variant="contained"
-            color="secondary"
-            onClick={() => navigate(`/concessions/${params.row.id}`)}
-          >
-            Manage
           </Button>
         </div>
       ),

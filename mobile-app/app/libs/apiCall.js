@@ -3,7 +3,7 @@ import axios from "axios";
 import useStore from "../store";
 
 const api = axios.create({
-  baseURL: "http://192.168.42.23:5000/api-v1",
+  baseURL: "https://scafoma.onrender.com/api-v1",
   timeout: 20000,
 });
 

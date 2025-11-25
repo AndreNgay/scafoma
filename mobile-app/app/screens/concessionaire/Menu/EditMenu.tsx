@@ -752,7 +752,7 @@ const EditMenu: React.FC = () => {
                     <View style={styles.fieldColNarrow}>
                       <Text style={styles.smallLabel}>Price</Text>
                       <TextInput
-                        style={[styles.input, styles.variationPriceInput, { width: 110 }]}
+                        style={[styles.input, styles.variationPriceInput, { width: 80 }]}
                         placeholder="Price"
                         keyboardType="numeric"
                         value={v.price}
@@ -1024,6 +1024,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 8,
     flex: 1,
+    flexWrap: "wrap",
   },
   availableRow: {
     flexDirection: "row",
@@ -1041,10 +1042,10 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   fieldColNarrow: {
-    width: 120,
+    width: 90,
   },
   fieldColTiny: {
-    width: 120,
+    width: 80,
   },
   variationHeaderRow: {
     flexDirection: "row",
@@ -1064,7 +1065,7 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   variationNameInput: {
-    flex: 3,
+    flex: 4,
     marginTop: 0,
   },
   variationPriceInput: {
@@ -1072,7 +1073,7 @@ const styles = StyleSheet.create({
     marginTop: 0,
   },
   variationMaxAmountInput: {
-    width: 110,
+    width: 70,
     marginTop: 0,
   },
   fieldRow: {
@@ -1127,14 +1128,16 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 8,
     marginTop: 8,
+    flexWrap: "wrap",
   },
   selectionLabelContainer: {
     flexDirection: "row",
     alignItems: "center",
-    minWidth: 120,
+    minWidth: 100,
+    flexShrink: 1,
   },
   selectionInput: {
-    width: 80,
+    width: 64,
     borderWidth: 1,
     borderColor: "#ccc",
     padding: 10,
@@ -1144,8 +1147,8 @@ const styles = StyleSheet.create({
     backgroundColor: "#fff",
   },
   maxSelectionButton: {
-    width: 40,
-    height: 40,
+    width: 32,
+    height: 32,
     backgroundColor: "#A40C2D",
     borderRadius: 8,
     justifyContent: "center",
@@ -1153,7 +1156,7 @@ const styles = StyleSheet.create({
   },
   maxSelectionButtonText: {
     color: "#fff",
-    fontSize: 24,
+    fontSize: 20,
     fontWeight: "bold",
   },
   toggleContainer: {

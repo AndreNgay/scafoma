@@ -440,16 +440,18 @@ const ViewOrderConcessionaire = () => {
         renderItem={({ item }) => (
           <View style={styles.itemCard}>
             <Text style={styles.itemName}>{Number(item.quantity ?? 1)} x {item.item_name}</Text>
-            <Text style={styles.infoLabel}>Dining Option:</Text>
-            <Text style={styles.infoValue}>
-              <Ionicons
-                name={item.dining_option === "take-out" ? "cube-outline" : "restaurant-outline"}
-                size={14}
-                color="#666"
-                style={styles.inlineIcon}
-              />
-              {item.dining_option === "take-out" ? "Take-out" : "Dine-in"}
-            </Text>
+            <View style={styles.infoSection}>
+              <Text style={styles.infoLabel}>Dining Option:</Text>
+              <Text style={styles.infoValue}>
+                <Ionicons
+                  name={item.dining_option === "take-out" ? "cube-outline" : "restaurant-outline"}
+                  size={14}
+                  color="#666"
+                  style={styles.inlineIcon}
+                />
+                {item.dining_option === "take-out" ? "Take-out" : "Dine-in"}
+              </Text>
+            </View>
             <Text>₱{Number(item.total_price).toFixed(2)}</Text>
             {item.note && <Text style={styles.note}>Note: {item.note}</Text>}
             {item.variations?.length > 0 && (

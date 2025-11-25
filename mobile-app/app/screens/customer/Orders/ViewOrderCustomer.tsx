@@ -565,16 +565,18 @@ const ViewOrderCustomer = () => {
             <Text style={styles.itemName}>
               {item.item_name} x{item.quantity}
             </Text>
-            <Text style={styles.infoLabel}>Dining Option:</Text>
-            <Text style={styles.infoValue}>
-              <Ionicons
-                name={item.dining_option === "take-out" ? "cube-outline" : "restaurant-outline"}
-                size={14}
-                color="#666"
-                style={styles.inlineIcon}
-              />
-              {item.dining_option === "take-out" ? "Take-out" : "Dine-in"}
-            </Text>
+            <View style={styles.infoRow}>
+              <Text style={styles.infoLabel}>Dining Option:</Text>
+              <Text style={styles.infoValue}>
+                <Ionicons
+                  name={item.dining_option === "take-out" ? "cube-outline" : "restaurant-outline"}
+                  size={14}
+                  color="#666"
+                  style={styles.inlineIcon}
+                />
+                {item.dining_option === "take-out" ? "Take-out" : "Dine-in"}
+              </Text>
+            </View>
             <Text>₱{Number(item.total_price).toFixed(2)}</Text>
             {item.note && <Text>Note: {item.note}</Text>}
             {item.variations?.length > 0 && (

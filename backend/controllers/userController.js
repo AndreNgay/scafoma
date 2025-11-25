@@ -57,13 +57,21 @@ export const resetPassword = async (req, res) => {
     const { id } = req.params;
 
     const userExists = await pool.query({
-      text: "SELECT id FROM tbluser WHERE id = $1",
+      text: "SELECT id, role FROM tbluser WHERE id = $1",
       values: [id],
     });
     if (userExists.rowCount === 0) {
       return res.status(404).json({
         status: "failed",
         message: "User not found",
+      });
+    }
+
+    const user = userExists.rows[0];
+    if (user.role === "admin") {
+      return res.status(403).json({
+        status: "failed",
+        message: "Password reset is not allowed for admin accounts",
       });
     }
 
@@ -115,8 +123,13 @@ export const getUser = async (req, res) => {
 export const getUserById = async (req, res) => {
   try {
     const { id } = req.params;
+    const userId = parseInt(id, 10);
 
-    const result = await pool.query("SELECT id, first_name, last_name, email, role, contact_number, messenger_link, profile_image, created_at, updated_at FROM tbluser WHERE id = $1", [id]);
+    if (Number.isNaN(userId)) {
+      return res.status(400).json({ message: "Invalid user ID" });
+    }
+
+    const result = await pool.query("SELECT id, first_name, last_name, email, role, contact_number, messenger_link, profile_image, created_at, updated_at FROM tbluser WHERE id = $1", [userId]);
 
     if (result.rows.length === 0) {
       return res.status(404).json({ message: "User not found" });

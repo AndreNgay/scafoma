@@ -17,6 +17,7 @@ export const getConcessions = async (req, res) => {
       FROM tblconcession c
       LEFT JOIN tbluser u ON c.concessionaire_id = u.id
       LEFT JOIN tblcafeteria f ON c.cafeteria_id = f.id
+      WHERE c.status IS NULL OR c.status = 'open'
       ORDER BY c.created_at DESC
     `);
 

@@ -220,25 +220,14 @@ const MenuItemDetails = () => {
     const maxSelection = group.max_selection || 1;
     const selectionsInGroup = selectedVariations.filter((v) => v.group_id === group.id);
     const isSelected = selectedVariations.some((v) => v.id === variation.id);
-    
-    // Check if selection should be blocked
-    if (!isSelected) {
-      // If max_selection is 1, and another variation is already selected, show message
-      if (maxSelection === 1 && selectionsInGroup.length > 0) {
-        showToast(
-          "error",
-          `You can only select 1 option from "${group.variation_group_name}". Please deselect the current selection first.`
-        );
-        return;
-      }
-      // If max_selection is reached, show message
-      if (selectionsInGroup.length >= maxSelection) {
-        showToast(
-          "error",
-          `You can only select up to ${maxSelection} option(s) from "${group.variation_group_name}". Please deselect an option first.`
-        );
-        return;
-      }
+
+    // For groups that allow multiple distinct selections, block when limit is reached
+    if (!isSelected && maxSelection > 1 && selectionsInGroup.length >= maxSelection) {
+      showToast(
+        "error",
+        `You can only select up to ${maxSelection} option(s) from "${group.variation_group_name}". Please deselect an option first.`
+      );
+      return;
     }
     
     // If max_amount > 1, use quantity-based selection
@@ -270,10 +259,14 @@ const MenuItemDetails = () => {
       }
     } else {
       // Single selection only
-      setSelectedVariations([
-        ...selectedVariations.filter((v) => v.group_id !== group.id),
-        { ...variation, group_id: group.id },
-      ]);
+      if (alreadySelected) {
+        setSelectedVariations(selectedVariations.filter((v) => v.id !== variation.id));
+      } else {
+        setSelectedVariations([
+          ...selectedVariations.filter((v) => v.group_id !== group.id),
+          { ...variation, group_id: group.id },
+        ]);
+      }
     }
   };
 
@@ -295,14 +288,7 @@ const MenuItemDetails = () => {
     // Check if trying to add when max_selection is reached
     if (delta > 0 && currentQty === 0) {
       // Trying to add a new variation
-      if (maxSelection === 1 && selectionsInGroup.length > 0) {
-        showToast(
-          "error",
-          `You can only select 1 option from "${group.variation_group_name}". Please deselect the current selection first.`
-        );
-        return;
-      }
-      if (selectionsInGroup.length >= maxSelection) {
+      if (maxSelection > 1 && selectionsInGroup.length >= maxSelection) {
         showToast(
           "error",
           `You can only select up to ${maxSelection} option(s) from "${group.variation_group_name}". Please deselect an option first.`
@@ -320,12 +306,30 @@ const MenuItemDetails = () => {
       setVariationQuantities(newQuantities);
       setSelectedVariations(selectedVariations.filter((v) => v.id !== variation.id));
     } else {
-      // Update quantity
-      setVariationQuantities({ ...variationQuantities, [variation.id]: newQty });
-      // Ensure variation is in selectedVariations
-      if (!selectedVariations.find((v) => v.id === variation.id)) {
-        setSelectedVariations([...selectedVariations, { ...variation, group_id: group.id }]);
+      let newQuantitiesState: Record<number, number> = {
+        ...variationQuantities,
+        [variation.id]: newQty,
+      };
+      let newSelectedState = [...selectedVariations];
+
+      if (maxSelection === 1) {
+        const otherIds = selectionsInGroup.filter((v) => v.id !== variation.id).map((v) => v.id);
+        if (otherIds.length > 0) {
+          newQuantitiesState = { ...newQuantitiesState };
+          for (const id of otherIds) {
+            delete newQuantitiesState[id];
+          }
+          newSelectedState = newSelectedState.filter(
+            (v) => v.group_id !== group.id || v.id === variation.id
+          );
+        }
       }
+
+      setVariationQuantities(newQuantitiesState);
+      if (!newSelectedState.find((v) => v.id === variation.id)) {
+        newSelectedState = [...newSelectedState, { ...variation, group_id: group.id }];
+      }
+      setSelectedVariations(newSelectedState);
     }
   };
 
@@ -469,7 +473,22 @@ const MenuItemDetails = () => {
       }
     } catch (err: any) {
       console.error(err.response?.data || err);
-      showToast("error", err.response?.data?.message ?? "Failed to submit order.");
+
+      const backend = err.response?.data || {};
+      const code = backend.error as string | undefined;
+      let message: string = backend.message || backend.error || "We couldn't submit your order. Please try again.";
+
+      if (code === "Concession closed") {
+        message = backend.message || "This stall is currently closed and can't accept new orders.";
+      } else if (code === "Concession unavailable") {
+        message = backend.message || "This stall is no longer available. Please choose another concession.";
+      } else if (code === "Item unavailable" || code === "Item no longer available") {
+        message = backend.message || "This item is no longer available. Please pick another item.";
+      } else if (code === "Option unavailable" || code === "Option no longer available") {
+        message = backend.message || "One of the options for this item is no longer available. Please review your selections and try again.";
+      }
+
+      showToast("error", message);
     } finally {
       setPlacingOrder(false);
     }
@@ -650,7 +669,7 @@ const MenuItemDetails = () => {
               
               // Determine if this variation should be unclickable (but not visually disabled)
               let isUnclickable = false;
-              if (!isSelected) {
+              if (!isSelected && maxSelection > 1) {
                 // If max_selection is 1, make unselected variations unclickable when any is selected
                 if (maxSelection === 1 && selectionsInGroup.length > 0) {
                   isUnclickable = true;

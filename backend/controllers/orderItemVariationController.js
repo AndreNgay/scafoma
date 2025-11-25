@@ -33,6 +33,27 @@ export const addOrderItemVariation = async (req, res) => {
   try {
     const qty = Number.isFinite(Number(quantity)) ? Number(quantity) : 1;
 
+    // Ensure the selected variation still exists and is available
+    const variationCheck = await pool.query(
+      `SELECT variation_name, available FROM tblitemvariation WHERE id = $1`,
+      [variation_id]
+    );
+
+    if (variationCheck.rowCount === 0) {
+      return res.status(400).json({
+        error: "Option no longer available",
+        message: "One of the options you selected is no longer available for this item. Please review your choices and try again.",
+      });
+    }
+
+    const variationRow = variationCheck.rows[0];
+    if (variationRow.available === false) {
+      return res.status(400).json({
+        error: "Option unavailable",
+        message: `The option "${variationRow.variation_name}" is no longer available for this item. Please choose a different option.`,
+      });
+    }
+
     // Check if same (order_detail_id, variation_id) already exists
     const exists = await pool.query(
       `SELECT id, COALESCE(quantity, 1) AS quantity

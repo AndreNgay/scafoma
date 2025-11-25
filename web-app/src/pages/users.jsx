@@ -23,6 +23,7 @@ export const Users = () => {
   const [users, setUsers] = useState([]);
   const [filteredUsers, setFilteredUsers] = useState([]);
   const [searchTerm, setSearchTerm] = useState("");
+  const [filterRole, setFilterRole] = useState("");
 
   const [isLoading, setIsLoading] = useState(true);
 
@@ -56,8 +57,10 @@ export const Users = () => {
           }))
         : [];
 
-      setUsers(formattedUsers);
-      setFilteredUsers(formattedUsers);
+      const nonAdminUsers = formattedUsers.filter((u) => u.role !== "admin");
+
+      setUsers(nonAdminUsers);
+      setFilteredUsers(nonAdminUsers);
     } catch (error) {
       console.error("Error fetching users:", error);
       toast.error("Failed to fetch users. Please try again later.");
@@ -70,14 +73,20 @@ export const Users = () => {
     fetchUsers();
   }, []);
 
-  // custom search
+  // custom search + role filter
   useEffect(() => {
+    let base = users;
+
+    if (filterRole) {
+      base = base.filter((u) => u.role === filterRole);
+    }
+
     if (!searchTerm) {
-      setFilteredUsers(users);
+      setFilteredUsers(base);
     } else {
       const lower = searchTerm.toLowerCase();
       setFilteredUsers(
-        users.filter(
+        base.filter(
           (u) =>
             (u.first_name && u.first_name.toLowerCase().includes(lower)) ||
             (u.last_name && u.last_name.toLowerCase().includes(lower)) ||
@@ -86,7 +95,7 @@ export const Users = () => {
         )
       );
     }
-  }, [searchTerm, users]);
+  }, [searchTerm, users, filterRole]);
 
   const handleEditClick = (user) => {
     setEditingUser(user);
@@ -114,7 +123,8 @@ export const Users = () => {
       toast.success(`Password reset! New password: ${data.newPassword}`);
     } catch (error) {
       console.error("Error resetting password:", error);
-      toast.error("Failed to reset password.");
+      const message = error?.response?.data?.message || "Failed to reset password.";
+      toast.error(message);
     }
   };
 
@@ -226,8 +236,8 @@ export const Users = () => {
     <div className="p-4 sm:p-6">
       <h2 className="text-lg sm:text-xl font-bold mb-4">Users</h2>
 
-      {/* Top bar: Search left, Add button right */}
-      <div className="flex justify-between items-center mb-4">
+      {/* Top bar: Search left, filters and Add button right */}
+      <div className="flex justify-between items-center mb-4 gap-2">
         <input
           type="text"
           placeholder="Search users..."
@@ -236,12 +246,25 @@ export const Users = () => {
           className="w-full sm:w-1/3 border rounded px-3 py-2"
         />
 
-        <button
-          onClick={() => setIsAddModalOpen(true)}
-          className="ml-4 px-4 py-2 bg-green-500 text-white rounded"
-        >
-          + Add Concessionaire
-        </button>
+        <div className="flex items-center gap-2">
+          <select
+            value={filterRole}
+            onChange={(e) => setFilterRole(e.target.value)}
+            className="px-3 py-2 border rounded bg-white text-sm"
+          >
+            <option value="">All roles</option>
+            <option value="staff">Staff</option>
+            <option value="customer">Customer</option>
+            <option value="concessionaire">Concessionaire</option>
+          </select>
+
+          <button
+            onClick={() => setIsAddModalOpen(true)}
+            className="px-4 py-2 bg-green-500 text-white rounded"
+          >
+            + Add Concessionaire
+          </button>
+        </div>
       </div>
 
       {/* DataGrid */}
