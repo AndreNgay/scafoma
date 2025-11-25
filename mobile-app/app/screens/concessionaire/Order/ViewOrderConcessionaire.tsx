@@ -338,50 +338,6 @@ const ViewOrderConcessionaire = () => {
 		fetchOrderDetails(true)
 	}
 
-<<<<<<< HEAD
-      {/* Order Items */}
-      <View style={styles.sectionCard}>
-        <Text style={styles.sectionTitle}>
-          <Ionicons name="cart-outline" size={16} color="#A40C2D" style={styles.inlineIcon} /> Order Items
-        </Text>
-      <FlatList
-        data={order.items || []}
-        keyExtractor={(item) => item.id.toString()}
-        renderItem={({ item }) => (
-          <View style={styles.itemCard}>
-            <Text style={styles.itemName}>{Number(item.quantity ?? 1)} x {item.item_name}</Text>
-            <View style={styles.infoSection}>
-              <Text style={styles.infoLabel}>Dining Option:</Text>
-              <Text style={styles.infoValue}>
-                <Ionicons
-                  name={item.dining_option === "take-out" ? "cube-outline" : "restaurant-outline"}
-                  size={14}
-                  color="#666"
-                  style={styles.inlineIcon}
-                />
-                {item.dining_option === "take-out" ? "Take-out" : "Dine-in"}
-              </Text>
-            </View>
-            <Text>₱{Number(item.total_price).toFixed(2)}</Text>
-            {item.note && <Text style={styles.note}>Note: {item.note}</Text>}
-            {item.variations?.length > 0 && (
-              <View style={{ marginTop: 5 }}>
-                {item.variations.map((v: any, vIndex: number) => (
-                  <Text key={`${item.id}-${v.id}-${vIndex}`} style={styles.variation}>
-                    • {v.variation_group_name}: {v.variation_name} 
-                    {v.quantity > 1 ? ` x${v.quantity}` : ''}
-                    {' '}(+₱{Number(v.additional_price || 0).toFixed(2)})
-                    {v.quantity > 1 ? ` = ₱${(Number(v.additional_price || 0) * (v.quantity || 1)).toFixed(2)}` : ''}
-                  </Text>
-                ))}
-              </View>
-            )}
-          </View>
-        )}
-        scrollEnabled={false}
-      />
-      </View>
-=======
 	if (loading)
 		return (
 			<ActivityIndicator
@@ -390,7 +346,6 @@ const ViewOrderConcessionaire = () => {
 				style={{ flex: 1 }}
 			/>
 		)
->>>>>>> 1b1af7047c35bb178f19dee28f01ad36faec41b8
 
 	if (!order)
 		return (

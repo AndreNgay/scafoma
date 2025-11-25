@@ -621,54 +621,8 @@ const ViewOrderCustomer = () => {
 							</Text>
 						)}
 
-<<<<<<< HEAD
-      {/* Order Items */}
-      <View style={styles.sectionCard}>
-        <Text style={styles.sectionTitle}>
-          <Ionicons name="cart-outline" size={16} color="#A40C2D" style={styles.inlineIcon} /> Order Items
-        </Text>
-      <FlatList
-        data={order.items || []}
-        keyExtractor={(item) => item.id.toString()}
-        renderItem={({ item }) => (
-          <View style={styles.itemCard}>
-            <Text style={styles.itemName}>
-              {item.item_name} x{item.quantity}
-            </Text>
-            <View style={styles.infoRow}>
-              <Text style={styles.infoLabel}>Dining Option:</Text>
-              <Text style={styles.infoValue}>
-                <Ionicons
-                  name={item.dining_option === "take-out" ? "cube-outline" : "restaurant-outline"}
-                  size={14}
-                  color="#666"
-                  style={styles.inlineIcon}
-                />
-                {item.dining_option === "take-out" ? "Take-out" : "Dine-in"}
-              </Text>
-            </View>
-            <Text>₱{Number(item.total_price).toFixed(2)}</Text>
-            {item.note && <Text>Note: {item.note}</Text>}
-            {item.variations?.length > 0 && (
-              <View style={{ marginTop: 5 }}>
-                {item.variations.map((v: any) => (
-                  <Text key={v.id} style={styles.variation}>
-                    • {v.variation_group_name}: {v.variation_name}
-                    {v.quantity > 1 ? ` x${v.quantity}` : ''}
-                    {' '}(+₱{Number(v.additional_price || 0).toFixed(2)})
-                    {v.quantity > 1 ? ` = ₱${(Number(v.additional_price || 0) * (v.quantity || 1)).toFixed(2)}` : ''}
-                  </Text>
-                ))}
-              </View>
-            )}
-          </View>
-        )}
-        scrollEnabled={false}
-      />
-      </View>
-=======
-						{order.order_status === 'accepted' ||
-						order.order_status === 'ready for pickup' ? (
+						{(order.order_status === 'accepted' ||
+							order.order_status === 'ready for pickup') && (
 							<TouchableOpacity
 								style={styles.uploadBtn}
 								onPress={pickImage}
@@ -681,91 +635,66 @@ const ViewOrderCustomer = () => {
 										: 'Upload Screenshot'}
 								</Text>
 							</TouchableOpacity>
-						) : (
-							<View style={styles.uploadDisabledContainer}>
-								<Text style={styles.uploadDisabledText}>
-									{order.order_status === 'pending'
-										? 'Please wait for your order to be accepted before uploading payment proof.'
-										: order.order_status === 'declined'
-										? 'This order has been declined. No payment proof needed.'
-										: order.order_status === 'completed'
-										? 'Order completed. Payment proof already processed.'
-										: 'Please wait for your order to be accepted before uploading payment proof.'}
-								</Text>
+						)}
+					</View>
+				)}
+			</View>
+
+			<Text style={styles.sectionTitle}>
+				<Ionicons
+					name="cart-outline"
+					size={16}
+					color="#A40C2D"
+					style={styles.inlineIcon}
+				/>{' '}
+				Order Items
+			</Text>
+			<FlatList
+				data={order.items || []}
+				keyExtractor={(item) => item.id.toString()}
+				renderItem={({ item }) => (
+					<View style={styles.itemCard}>
+						<Text style={styles.itemName}>
+							{item.item_name} x{item.quantity}
+						</Text>
+						<Text style={styles.infoLabel}>Dining Option:</Text>
+						<Text style={styles.infoValue}>
+							<Ionicons
+								name={
+									item.dining_option === 'take-out'
+										? 'cube-outline'
+										: 'restaurant-outline'
+								}
+								size={14}
+								color="#666"
+								style={styles.inlineIcon}
+							/>
+							{item.dining_option === 'take-out' ? 'Take-out' : 'Dine-in'}
+						</Text>
+						<Text>₱{Number(item.total_price).toFixed(2)}</Text>
+						{item.note && <Text>Note: {item.note}</Text>}
+						{item.variations?.length > 0 && (
+							<View style={{ marginTop: 5 }}>
+								{item.variations.map((v: any) => (
+									<Text
+										key={v.id}
+										style={styles.variation}>
+										• {v.variation_group_name}: {v.variation_name}
+										{v.quantity > 1 ? ` x${v.quantity}` : ''} (+₱
+										{Number(v.additional_price || 0).toFixed(2)})
+										{v.quantity > 1
+											? ` = ₱${(
+													Number(v.additional_price || 0) * (v.quantity || 1)
+											  ).toFixed(2)}`
+											: ''}
+									</Text>
+								))}
 							</View>
 						)}
 					</View>
 				)}
->>>>>>> 1b1af7047c35bb178f19dee28f01ad36faec41b8
-
-				{/* On-Counter Payment Message */}
-				{order.payment_method === 'on-counter' && (
-					<View style={styles.onCounterSection}>
-						<Text style={{ color: '#888', fontStyle: 'italic' }}>
-							You chose On-Counter payment. No screenshot required.
-						</Text>
-					</View>
-				)}
-			</View>
-
-			{/* Order Items */}
-			<View style={styles.sectionCard}>
-				<Text style={styles.sectionTitle}>
-					<Ionicons
-						name="cart-outline"
-						size={16}
-						color="#A40C2D"
-						style={styles.inlineIcon}
-					/>{' '}
-					Order Items
-				</Text>
-				<FlatList
-					data={order.items || []}
-					keyExtractor={(item) => item.id.toString()}
-					renderItem={({ item }) => (
-						<View style={styles.itemCard}>
-							<Text style={styles.itemName}>
-								{item.item_name} x{item.quantity}
-							</Text>
-							<Text style={styles.infoLabel}>Dining Option:</Text>
-							<Text style={styles.infoValue}>
-								<Ionicons
-									name={
-										item.dining_option === 'take-out'
-											? 'cube-outline'
-											: 'restaurant-outline'
-									}
-									size={14}
-									color="#666"
-									style={styles.inlineIcon}
-								/>
-								{item.dining_option === 'take-out' ? 'Take-out' : 'Dine-in'}
-							</Text>
-							<Text>₱{Number(item.total_price).toFixed(2)}</Text>
-							{item.note && <Text>Note: {item.note}</Text>}
-							{item.variations?.length > 0 && (
-								<View style={{ marginTop: 5 }}>
-									{item.variations.map((v: any) => (
-										<Text
-											key={v.id}
-											style={styles.variation}>
-											• {v.variation_group_name}: {v.variation_name}
-											{v.quantity > 1 ? ` x${v.quantity}` : ''} (+₱
-											{Number(v.additional_price || 0).toFixed(2)})
-											{v.quantity > 1
-												? ` = ₱${(
-														Number(v.additional_price || 0) * (v.quantity || 1)
-												  ).toFixed(2)}`
-												: ''}
-										</Text>
-									))}
-								</View>
-							)}
-						</View>
-					)}
-					scrollEnabled={false}
-				/>
-			</View>
+				scrollEnabled={false}
+			/>
 
 			{/* Cancel Order Button - Only show for pending orders */}
 			{order.order_status === 'pending' && (

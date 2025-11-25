@@ -253,7 +253,6 @@ export const Users = () => {
             className="px-3 py-2 border rounded bg-white text-sm"
           >
             <option value="">All roles</option>
-            <option value="staff">Staff</option>
             <option value="customer">Customer</option>
             <option value="concessionaire">Concessionaire</option>
           </select>

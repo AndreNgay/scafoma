@@ -1,6 +1,6 @@
 // hooks/useNotifications.ts
 import { useEffect, useRef } from 'react'
-import * as Notifications from 'expo-notifications'
+import type * as Notifications from 'expo-notifications'
 import {
 	registerForPushNotificationsAsync,
 	addNotificationListener,

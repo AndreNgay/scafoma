@@ -110,17 +110,32 @@ const Notifications = () => {
 
 	const unreadCount = notifications.filter((n) => !n.is_read).length
 
+	const markNotificationAsRead = async (notificationId: number) => {
+		try {
+			await api.put(`/notification/${notificationId}/read`)
+			setNotifications((prev) =>
+				prev.map((n) => (n.id === notificationId ? { ...n, is_read: true } : n))
+			)
+		} catch (err) {
+			console.error('Error marking notification as read:', err)
+		}
+	}
+
+	const handleMarkAllAsRead = async () => {
+		if (!user?.id || unreadCount === 0) return
+
+		try {
+			await api.put(`/notification/${user.id}/read-all`)
+			setNotifications((prev) => prev.map((n) => ({ ...n, is_read: true })))
+		} catch (err) {
+			console.error('Error marking all notifications as read:', err)
+		}
+	}
+
 	const handleNotificationPress = async (item: NotificationItem) => {
 		// Mark as read
 		if (!item.is_read) {
-			try {
-				await api.put(`/notification/${item.id}/read`)
-				setNotifications((prev) =>
-					prev.map((n) => (n.id === item.id ? { ...n, is_read: true } : n))
-				)
-			} catch (err) {
-				console.error('Error marking notification as read:', err)
-			}
+			await markNotificationAsRead(item.id)
 		}
 
 		// Navigate to order if present
@@ -157,6 +172,15 @@ const Notifications = () => {
 						{new Date(item.created_at).toLocaleString()}
 					</Text>
 				</View>
+				{!item.is_read && (
+					<View style={styles.actionsRow}>
+						<TouchableOpacity
+								style={styles.markReadButton}
+								onPress={() => markNotificationAsRead(item.id)}>
+								<Text style={styles.markReadText}>Mark as read</Text>
+						</TouchableOpacity>
+					</View>
+				)}
 			</View>
 		</TouchableOpacity>
 	)
@@ -175,8 +199,15 @@ const Notifications = () => {
 			<View style={styles.headerContainer}>
 				<Text style={styles.header}>Notifications</Text>
 				{unreadCount > 0 && (
-					<View style={styles.badge}>
-						<Text style={styles.badgeText}>{unreadCount}</Text>
+					<View style={styles.headerRight}>
+						<View style={styles.badge}>
+							<Text style={styles.badgeText}>{unreadCount}</Text>
+						</View>
+						<TouchableOpacity
+								style={styles.markAllButton}
+								onPress={handleMarkAllAsRead}>
+								<Text style={styles.markAllButtonText}>Mark all as read</Text>
+						</TouchableOpacity>
 					</View>
 				)}
 			</View>
@@ -220,6 +251,11 @@ const styles = StyleSheet.create({
 		marginBottom: 10,
 	},
 	header: { fontSize: 20, fontWeight: 'bold', color: '#A40C2D' },
+	headerRight: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		columnGap: 8,
+	},
 	badge: {
 		backgroundColor: '#A40C2D',
 		borderRadius: 12,
@@ -256,6 +292,36 @@ const styles = StyleSheet.create({
 	},
 	cardContent: {
 		flex: 1,
+	},
+	actionsRow: {
+		justifyContent: 'center',
+		marginLeft: 10,
+	},
+	markReadButton: {
+		paddingHorizontal: 10,
+		paddingVertical: 6,
+		borderRadius: 6,
+		borderWidth: 1,
+		borderColor: '#A40C2D',
+		alignSelf: 'center',
+	},
+	markReadText: {
+		fontSize: 12,
+		color: '#A40C2D',
+		fontWeight: '600',
+	},
+	markAllButton: {
+		marginLeft: 8,
+		paddingHorizontal: 10,
+		paddingVertical: 6,
+		borderRadius: 6,
+		borderWidth: 1,
+		borderColor: '#A40C2D',
+	},
+	markAllButtonText: {
+		fontSize: 12,
+		color: '#A40C2D',
+		fontWeight: '600',
 	},
 	type: { fontWeight: '600', color: '#A40C2D', marginBottom: 5 },
 	message: { fontSize: 14, marginBottom: 5 },
