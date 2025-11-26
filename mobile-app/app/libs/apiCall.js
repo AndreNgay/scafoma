@@ -5,7 +5,7 @@ import useStore from '../store'
 const API_HOST = process.env.EXPO_PUBLIC_API_HOST || 'localhost'
 
 const api = axios.create({
-  baseURL: "https://scafoma.onrender.com/api-v1",
+  baseURL: "http://192.168.15.30.com/api-v1",
   timeout: 60000,
 });
 

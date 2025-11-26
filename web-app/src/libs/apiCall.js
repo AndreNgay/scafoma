@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const API_URL = `https://scafoma.onrender.com/api-v1`;
+const API_URL = `http://192.168.15.30.com/api-v1`;
 
 const api = axios.create({
     baseURL: API_URL,
