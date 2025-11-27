@@ -79,6 +79,7 @@ const SignIn: React.FC<Props> = ({ navigation }) => {
 						<TextInput
 							style={styles.input}
 							placeholder="Enter your email"
+							placeholderTextColor="#000"
 							autoCapitalize="none"
 							keyboardType="email-address"
 							value={value}
@@ -99,6 +100,7 @@ const SignIn: React.FC<Props> = ({ navigation }) => {
 							{...getPasswordInputProps()}
 							style={styles.input}
 							placeholder="Enter your password"
+							placeholderTextColor="#000"
 							value={value}
 							onChangeText={(text) => onChange(preventPaste(text, value))}
 						/>
