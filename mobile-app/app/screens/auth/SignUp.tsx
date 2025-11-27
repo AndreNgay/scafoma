@@ -138,6 +138,7 @@ const SignUp = () => {
 							<TextInput
 								style={styles.input}
 								placeholder="First Name"
+								placeholderTextColor="#9f9f9f"
 								value={value}
 								onChangeText={onChange}
 								editable={!isLoading}
@@ -156,6 +157,7 @@ const SignUp = () => {
 							<TextInput
 								style={styles.input}
 								placeholder="Last Name"
+								placeholderTextColor="#9f9f9f"
 								value={value}
 								onChangeText={onChange}
 								editable={!isLoading}
@@ -178,6 +180,7 @@ const SignUp = () => {
 								})}
 								style={styles.input}
 								placeholder="Password"
+								placeholderTextColor="#9f9f9f"
 								value={value}
 								onChangeText={onChange}
 								editable={!isLoading}
@@ -200,6 +203,7 @@ const SignUp = () => {
 								})}
 								style={styles.input}
 								placeholder="Confirm Password"
+								placeholderTextColor="#9f9f9f"
 								value={value}
 								onChangeText={onChange}
 								editable={!isLoading}
@@ -222,6 +226,7 @@ const SignUp = () => {
 							<TextInput
 								style={styles.input}
 								placeholder="Email"
+								placeholderTextColor="#9f9f9f"
 								keyboardType="email-address"
 								value={value}
 								onChangeText={onChange}
@@ -240,6 +245,7 @@ const SignUp = () => {
 							<TextInput
 								style={styles.input}
 								placeholder="Phone Number"
+								placeholderTextColor="#9f9f9f"
 								keyboardType="phone-pad"
 								value={value}
 								onChangeText={onChange}
@@ -258,6 +264,7 @@ const SignUp = () => {
 							<TextInput
 								style={styles.input}
 								placeholder="Messenger/Facebook link (optional)"
+								placeholderTextColor="#9f9f9f"
 								value={value}
 								onChangeText={onChange}
 								editable={!isLoading}
@@ -268,33 +275,31 @@ const SignUp = () => {
 			)}
 
 			{/* Submit */}
-			{step === 'profile' ? (
+			{step === 'profile' ?
 				<TouchableOpacity
 					style={[styles.button, isLoading && { opacity: 0.6 }]}
 					onPress={handleNext}
 					disabled={isLoading}>
-					{isLoading ? (
+					{isLoading ?
 						<ActivityIndicator color="#fff" />
-					) : (
-						<Text style={styles.buttonText}>Next</Text>
-					)}
+					:	<Text style={styles.buttonText}>Next</Text>}
 				</TouchableOpacity>
-			) : (
-				<TouchableOpacity
+			:	<TouchableOpacity
 					style={[styles.button, isLoading && { opacity: 0.6 }]}
 					onPress={handleSubmit(onSubmit)}
 					disabled={isLoading}>
-					{isLoading ? (
+					{isLoading ?
 						<ActivityIndicator color="#fff" />
-					) : (
-						<Text style={styles.buttonText}>Sign Up</Text>
-					)}
+					:	<Text style={styles.buttonText}>Sign Up</Text>}
 				</TouchableOpacity>
-			)}
+			}
 
 			{/* Already Have Account */}
 			<TouchableOpacity onPress={() => navigation.navigate('SignIn')}>
-				<Text style={styles.link}>Already have an account? Sign In</Text>
+				<Text style={styles.link}>
+					Already have an account?{' '}
+					<Text style={styles.linkHighlight}>Sign In</Text>{' '}
+				</Text>
 			</TouchableOpacity>
 		</View>
 	)
@@ -335,7 +340,7 @@ const styles = StyleSheet.create({
 		marginBottom: 10,
 	},
 	button: {
-		backgroundColor: '#2563EB',
+		backgroundColor: '#A40C2D',
 		padding: 14,
 		borderRadius: 8,
 		alignItems: 'center',
@@ -349,7 +354,11 @@ const styles = StyleSheet.create({
 	link: {
 		marginTop: 16,
 		textAlign: 'center',
-		color: '#2563EB',
+		color: '#374151',
 		fontWeight: '500',
+	},
+	linkHighlight: {
+		color: '#A40C2D',
+		fontWeight: '600',
 	},
 })

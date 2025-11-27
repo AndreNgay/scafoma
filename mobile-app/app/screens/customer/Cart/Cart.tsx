@@ -381,7 +381,7 @@ const Cart = ({ navigation }: any) => {
 				)}
 			</View>
 
-			{loading ? (
+			{loading ?
 				<View style={styles.loadingContainer}>
 					<ActivityIndicator
 						size="large"
@@ -389,7 +389,7 @@ const Cart = ({ navigation }: any) => {
 					/>
 					<Text style={styles.loadingText}>Loading your cart...</Text>
 				</View>
-			) : cartItems.length === 0 ? (
+			: cartItems.length === 0 ?
 				<View style={styles.emptyContainer}>
 					<Ionicons
 						name="cart-outline"
@@ -401,8 +401,7 @@ const Cart = ({ navigation }: any) => {
 						Add items from the menu to get started
 					</Text>
 				</View>
-			) : (
-				<ScrollView
+			:	<ScrollView
 					showsVerticalScrollIndicator={false}
 					contentContainerStyle={{ paddingBottom: 20 }}>
 					{groupedCarts.map((group) => (
@@ -439,12 +438,6 @@ const Cart = ({ navigation }: any) => {
 									</TouchableOpacity>
 								</View>
 							</View>
-
-							{/* Items in this concession */}
-							{group.items.map((item) => (
-								<View key={item.order_detail_id}>{renderItem(item)}</View>
-							))}
-
 							{/* Schedule Time for this concession */}
 							<View style={styles.scheduleContainer}>
 								<Text style={styles.scheduleTitle}>
@@ -507,6 +500,11 @@ const Cart = ({ navigation }: any) => {
 								)}
 							</View>
 
+							{/* Items in this concession */}
+							{group.items.map((item) => (
+								<View key={item.order_detail_id}>{renderItem(item)}</View>
+							))}
+
 							{/* Checkout button for this concession */}
 							<TouchableOpacity
 								style={styles.checkoutBtn}
@@ -517,16 +515,16 @@ const Cart = ({ navigation }: any) => {
 								<Text style={styles.checkoutBtnText}>
 									<Ionicons
 										name={
-											scheduleTimes[group.orderId]
-												? 'calendar-outline'
-												: 'bag-check-outline'
+											scheduleTimes[group.orderId] ?
+												'calendar-outline'
+											:	'bag-check-outline'
 										}
 										size={16}
 										color="#fff"
 									/>{' '}
-									{scheduleTimes[group.orderId]
-										? 'Schedule Order'
-										: 'Place Order'}
+									{scheduleTimes[group.orderId] ?
+										'Schedule Order'
+									:	'Place Order'}
 								</Text>
 								<Text style={styles.checkoutBtnAmount}>
 									₱{group.total.toFixed(2)}
@@ -535,7 +533,7 @@ const Cart = ({ navigation }: any) => {
 						</View>
 					))}
 				</ScrollView>
-			)}
+			}
 
 			{/* Date Picker */}
 			{showDatePicker && activeOrderId && (
@@ -566,9 +564,9 @@ const Cart = ({ navigation }: any) => {
 					<View style={styles.modalContainer}>
 						<Text style={styles.modalHeader}>Remove Item</Text>
 						<Text style={styles.modalSubtitle}>
-							{itemToRemove
-								? `Are you sure you want to remove "${itemToRemove.name}" from your cart?`
-								: 'Are you sure you want to remove this item from your cart?'}
+							{itemToRemove ?
+								`Are you sure you want to remove "${itemToRemove.name}" from your cart?`
+							:	'Are you sure you want to remove this item from your cart?'}
 						</Text>
 
 						<View style={styles.modalButtonRow}>
@@ -599,9 +597,10 @@ const Cart = ({ navigation }: any) => {
 					<View style={styles.modalContainer}>
 						<Text style={styles.modalHeader}>Remove All Items</Text>
 						<Text style={styles.modalSubtitle}>
-							{groupToRemove
-								? `Are you sure you want to remove ALL items from "${groupToRemove.concessionName}"?`
-								: 'Are you sure you want to remove all items from this concession?'}
+							{groupToRemove ?
+								`Are you sure you want to remove ALL items from "${groupToRemove.concessionName}"?`
+							:	'Are you sure you want to remove all items from this concession?'
+							}
 						</Text>
 
 						<View style={styles.modalButtonRow}>

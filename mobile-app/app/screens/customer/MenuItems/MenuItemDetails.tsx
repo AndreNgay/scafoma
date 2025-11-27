@@ -574,7 +574,7 @@ const MenuItemDetails = () => {
 				{/* Cafeteria + Concession */}
 				<Text style={styles.subText}>
 					{cafeteria?.cafeteria_name || cafeteriaName || item?.cafeteria_name} •{' '}
-					{concession ? (
+					{concession ?
 						<Text
 							style={styles.link}
 							onPress={() =>
@@ -585,30 +585,8 @@ const MenuItemDetails = () => {
 							}>
 							{concession?.concession_name}
 						</Text>
-					) : (
-						<Text style={styles.link}>{item?.concession_name || ''}</Text>
-					)}
+					:	<Text style={styles.link}>{item?.concession_name || ''}</Text>}
 				</Text>
-
-				{/* Price & Quantity */}
-				<View style={styles.priceQtyWrapper}>
-					<Text style={styles.price}>
-						₱{Number(displayPrice || 0).toFixed(2)}
-					</Text>
-					<View style={styles.quantityContainer}>
-						<TouchableOpacity
-							onPress={() => setQuantity(Math.max(1, quantity - 1))}
-							style={styles.qtyBtn}>
-							<Text style={styles.qtyText}>-</Text>
-						</TouchableOpacity>
-						<Text style={styles.qtyValue}>{quantity}</Text>
-						<TouchableOpacity
-							onPress={() => setQuantity(quantity + 1)}
-							style={styles.qtyBtn}>
-							<Text style={styles.qtyText}>+</Text>
-						</TouchableOpacity>
-					</View>
-				</View>
 
 				<Text style={styles.desc}>{item.description}</Text>
 
@@ -660,84 +638,13 @@ const MenuItemDetails = () => {
 					</View>
 				</View>
 
-				{/* Payment Method */}
-				<View style={styles.paymentMethodContainer}>
-					<Text style={styles.paymentMethodTitle}>Payment Method</Text>
-					{!availablePaymentMethods.gcash &&
-					!availablePaymentMethods.onCounter ? (
-						<Text style={styles.noPaymentMethodsText}>
-							No payment methods are currently available for this concession.
-						</Text>
-					) : (
-						<>
-							<View style={styles.paymentMethodButtons}>
-								{availablePaymentMethods.gcash && (
-									<TouchableOpacity
-										style={[
-											styles.paymentMethodButton,
-											paymentMethod === 'gcash' && styles.paymentMethodSelected,
-										]}
-										onPress={() => setPaymentMethod('gcash')}>
-										<View style={styles.paymentMethodContent}>
-											<Image
-												source={GCashIcon}
-												style={styles.paymentMethodIcon}
-											/>
-											<Text
-												style={[
-													styles.paymentMethodText,
-													paymentMethod === 'gcash' &&
-														styles.paymentMethodTextSelected,
-												]}>
-												GCash
-											</Text>
-										</View>
-									</TouchableOpacity>
-								)}
-								{availablePaymentMethods.onCounter && (
-									<TouchableOpacity
-										style={[
-											styles.paymentMethodButton,
-											paymentMethod === 'on-counter' &&
-												styles.paymentMethodSelected,
-										]}
-										onPress={() => setPaymentMethod('on-counter')}>
-										<Text
-											style={[
-												styles.paymentMethodText,
-												paymentMethod === 'on-counter' &&
-													styles.paymentMethodTextSelected,
-											]}>
-											<Ionicons
-												name="cash-outline"
-												size={14}
-												color={
-													paymentMethod === 'on-counter' ? '#A40C2D' : '#666'
-												}
-												style={styles.inlineIcon}
-											/>{' '}
-											On-Counter
-										</Text>
-									</TouchableOpacity>
-								)}
-							</View>
-							{paymentMethod === 'gcash' && item.gcash_number && (
-								<Text style={styles.gcashNumberText}>
-									GCash Number: {item.gcash_number}
-								</Text>
-							)}
-						</>
-					)}
-				</View>
-
 				{/* Variations */}
-				{loadingVariations ? (
+				{loadingVariations ?
 					<ActivityIndicator
 						style={{ marginTop: 10 }}
 						color="#A40C2D"
 					/>
-				) : (
-					Object.entries<any>(groupedVariations).map(([groupName, group]) => {
+				:	Object.entries<any>(groupedVariations).map(([groupName, group]) => {
 						const selectionsInGroup = selectedVariations.filter(
 							(v) => v.group_id === group.id
 						)
@@ -767,9 +674,10 @@ const MenuItemDetails = () => {
 									const maxAmount = variation.max_amount || 1
 									const variationQty = variationQuantities[variation.id] || 0
 									const showQuantityControls = maxAmount > 1
-									const isSelected = showQuantityControls
-										? variationQty > 0
-										: selectedVariations.some((v) => v.id === variation.id)
+									const isSelected =
+										showQuantityControls ?
+											variationQty > 0
+										:	selectedVariations.some((v) => v.id === variation.id)
 
 									// Determine if this variation should be unclickable (but not visually disabled)
 									let isUnclickable = false
@@ -836,7 +744,7 @@ const MenuItemDetails = () => {
 													</Text>
 												</View>
 											</TouchableOpacity>
-											{showQuantityControls ? (
+											{showQuantityControls ?
 												<View style={styles.variationQuantityContainer}>
 													<TouchableOpacity
 														style={[
@@ -894,14 +802,14 @@ const MenuItemDetails = () => {
 														</Text>
 													</TouchableOpacity>
 												</View>
-											) : null}
+											:	null}
 										</View>
 									)
 								})}
 							</View>
 						)
 					})
-				)}
+				}
 
 				{/* Note */}
 				<Text style={styles.noteLabel}>Add Note:</Text>
@@ -912,6 +820,96 @@ const MenuItemDetails = () => {
 					onChangeText={setNote}
 					multiline
 				/>
+
+				{/* Price & Quantity */}
+				<View style={styles.priceQtyWrapper}>
+					<Text style={styles.price}>
+						₱{Number(displayPrice || 0).toFixed(2)}
+					</Text>
+					<View style={styles.quantityContainer}>
+						<TouchableOpacity
+							onPress={() => setQuantity(Math.max(1, quantity - 1))}
+							style={styles.qtyBtn}>
+							<Text style={styles.qtyText}>-</Text>
+						</TouchableOpacity>
+						<Text style={styles.qtyValue}>{quantity}</Text>
+						<TouchableOpacity
+							onPress={() => setQuantity(quantity + 1)}
+							style={styles.qtyBtn}>
+							<Text style={styles.qtyText}>+</Text>
+						</TouchableOpacity>
+					</View>
+				</View>
+
+				{/* Payment Method */}
+				<View style={styles.paymentMethodContainer}>
+					<Text style={styles.paymentMethodTitle}>Payment Method</Text>
+					{(
+						!availablePaymentMethods.gcash && !availablePaymentMethods.onCounter
+					) ?
+						<Text style={styles.noPaymentMethodsText}>
+							No payment methods are currently available for this concession.
+						</Text>
+					:	<>
+							<View style={styles.paymentMethodButtons}>
+								{availablePaymentMethods.gcash && (
+									<TouchableOpacity
+										style={[
+											styles.paymentMethodButton,
+											paymentMethod === 'gcash' && styles.paymentMethodSelected,
+										]}
+										onPress={() => setPaymentMethod('gcash')}>
+										<View style={styles.paymentMethodContent}>
+											<Image
+												source={GCashIcon}
+												style={styles.paymentMethodIcon}
+											/>
+											<Text
+												style={[
+													styles.paymentMethodText,
+													paymentMethod === 'gcash' &&
+														styles.paymentMethodTextSelected,
+												]}>
+												GCash
+											</Text>
+										</View>
+									</TouchableOpacity>
+								)}
+								{availablePaymentMethods.onCounter && (
+									<TouchableOpacity
+										style={[
+											styles.paymentMethodButton,
+											paymentMethod === 'on-counter' &&
+												styles.paymentMethodSelected,
+										]}
+										onPress={() => setPaymentMethod('on-counter')}>
+										<Text
+											style={[
+												styles.paymentMethodText,
+												paymentMethod === 'on-counter' &&
+													styles.paymentMethodTextSelected,
+											]}>
+											<Ionicons
+												name="cash-outline"
+												size={14}
+												color={
+													paymentMethod === 'on-counter' ? '#A40C2D' : '#666'
+												}
+												style={styles.inlineIcon}
+											/>{' '}
+											On-Counter
+										</Text>
+									</TouchableOpacity>
+								)}
+							</View>
+							{paymentMethod === 'gcash' && item.gcash_number && (
+								<Text style={styles.gcashNumberText}>
+									GCash Number: {item.gcash_number}
+								</Text>
+							)}
+						</>
+					}
+				</View>
 
 				{/* Buttons */}
 				<TouchableOpacity
@@ -937,6 +935,7 @@ const MenuItemDetails = () => {
 						Add to Cart
 					</Text>
 				</TouchableOpacity>
+
 				<TouchableOpacity
 					style={[
 						styles.btn,
@@ -965,13 +964,13 @@ const MenuItemDetails = () => {
 				{/* Feedback Section */}
 				<View style={styles.feedbackContainer}>
 					<Text style={styles.feedbackTitle}>Customer Feedback</Text>
-					{eligibilityChecked && !canLeaveFeedback ? (
+					{eligibilityChecked && !canLeaveFeedback ?
 						<Text style={styles.feedbackInfo}>
 							Only customers who have completed an order for this item can leave
 							feedback.
 						</Text>
-					) : null}
-					{eligibilityChecked && canLeaveFeedback ? (
+					:	null}
+					{eligibilityChecked && canLeaveFeedback ?
 						<View style={{ gap: 8, marginBottom: 10 }}>
 							<Text style={{ fontWeight: '600' }}>Add Feedback</Text>
 							<View style={styles.ratingRow}>
@@ -1016,33 +1015,31 @@ const MenuItemDetails = () => {
 								</TouchableOpacity>
 							</View>
 						</View>
-					) : null}
-					{feedbacks.length === 0 ? (
+					:	null}
+					{feedbacks.length === 0 ?
 						<Text style={styles.noFeedback}>No feedback yet.</Text>
-					) : (
-						feedbacks.map((fb) => (
+					:	feedbacks.map((fb) => (
 							<View
 								key={fb.id}
 								style={styles.feedbackCard}>
 								<View style={styles.feedbackHeader}>
-									{fb.profile_image ? (
+									{fb.profile_image ?
 										<Image
 											source={{ uri: fb.profile_image }}
 											style={styles.profileImage}
 										/>
-									) : (
-										<View style={styles.profilePlaceholder}>
+									:	<View style={styles.profilePlaceholder}>
 											<Text style={styles.profileInitials}>
 												{fb.first_name?.[0]}
 												{fb.last_name?.[0]}
 											</Text>
 										</View>
-									)}
+									}
 									<View style={{ flex: 1 }}>
 										<Text style={styles.feedbackUser}>
-											{fb.customer_id === user?.id
-												? `${fb.first_name} ${fb.last_name} (You)`
-												: `${fb.first_name} ${fb.last_name}`}
+											{fb.customer_id === user?.id ?
+												`${fb.first_name} ${fb.last_name} (You)`
+											:	`${fb.first_name} ${fb.last_name}`}
 										</Text>
 										<Text style={styles.feedbackRating}>⭐ {fb.rating}</Text>
 										{/* Star icon text kept simple without emoji */}
@@ -1056,7 +1053,7 @@ const MenuItemDetails = () => {
 								</Text>
 							</View>
 						))
-					)}
+					}
 				</View>
 			</ScrollView>
 

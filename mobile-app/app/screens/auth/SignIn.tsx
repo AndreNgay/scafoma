@@ -79,7 +79,7 @@ const SignIn: React.FC<Props> = ({ navigation }) => {
 						<TextInput
 							style={styles.input}
 							placeholder="Enter your email"
-							placeholderTextColor="#000"
+							placeholderTextColor="#9f9f9f"
 							autoCapitalize="none"
 							keyboardType="email-address"
 							value={value}
@@ -100,7 +100,7 @@ const SignIn: React.FC<Props> = ({ navigation }) => {
 							{...getPasswordInputProps()}
 							style={styles.input}
 							placeholder="Enter your password"
-							placeholderTextColor="#000"
+							placeholderTextColor="#9f9f9f"
 							value={value}
 							onChangeText={(text) => onChange(preventPaste(text, value))}
 						/>
@@ -115,11 +115,9 @@ const SignIn: React.FC<Props> = ({ navigation }) => {
 					style={[styles.button, loading && styles.buttonDisabled]}
 					onPress={handleSubmit(onSubmit)}
 					disabled={loading}>
-					{loading ? (
+					{loading ?
 						<ActivityIndicator color="#fff" />
-					) : (
-						<Text style={styles.buttonText}>Sign In</Text>
-					)}
+					:	<Text style={styles.buttonText}>Sign In</Text>}
 				</TouchableOpacity>
 				{/* Forgot Password Link */}
 				<TouchableOpacity onPress={() => navigation.navigate('ForgotPassword')}>
