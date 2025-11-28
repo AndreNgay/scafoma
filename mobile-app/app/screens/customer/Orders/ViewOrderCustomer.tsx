@@ -137,21 +137,6 @@ const ViewOrderCustomer = () => {
 				acceptedDate.getTime() + (hours * 3600 + minutes * 60 + seconds) * 1000
 			const remainingMs = deadlineMs - currentTime
 
-			// Debug logs
-			console.log('Timer Debug:', {
-				accepted_at: order.accepted_at,
-				receipt_timer: order.receipt_timer,
-				acceptedDate: acceptedDate.toISOString(),
-				acceptedMs: acceptedDate.getTime(),
-				hours,
-				minutes,
-				seconds,
-				durationMs: (hours * 3600 + minutes * 60 + seconds) * 1000,
-				deadlineMs,
-				currentTime,
-				remainingMs,
-			})
-
 			if (remainingMs <= 0) {
 				return { timeRemaining: 'Expired', isExpired: true }
 			}
@@ -641,6 +626,8 @@ const ViewOrderCustomer = () => {
 						{(order.order_status === 'accepted' ||
 							order.order_status === 'ready for pickup') &&
 							(() => {
+								console.log(order.accepted_at)
+								console.log(order.receipt_timer)
 								// Check if receipt timer expired
 								let isTimerExpired = false
 								if (

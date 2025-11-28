@@ -341,6 +341,7 @@ export const getOrderById = async (req, res) => {
               concessionaire.messenger_link AS concessionaire_messenger_link,
               c.concession_name,
               c.gcash_number,
+              c.receipt_timer,
               c.image AS concession_image,
               caf.cafeteria_name,
               caf.location AS cafeteria_location,
