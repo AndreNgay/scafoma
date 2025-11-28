@@ -332,14 +332,87 @@ const Concession = () => {
 						concession.gcash_payment_available && setShowTimePicker(true)
 					}
 					disabled={!concession.gcash_payment_available}>
-					<Text
-						style={[
-							styles.timePickerButtonText,
-							!concession.gcash_payment_available &&
-								styles.timePickerButtonTextDisabled,
-						]}>
-						{concession.receipt_timer || '00:15:00'}
-					</Text>
+					<View style={styles.timerDisplay}>
+						{(() => {
+							const [h, m, s] = (concession.receipt_timer || '00:15:00').split(
+								':'
+							)
+							return (
+								<>
+									<View style={styles.timerUnit}>
+										<Text
+											style={[
+												styles.timerValue,
+												!concession.gcash_payment_available &&
+													styles.timerValueDisabled,
+											]}>
+											{h}
+										</Text>
+										<Text
+											style={[
+												styles.timerLabel,
+												!concession.gcash_payment_available &&
+													styles.timerLabelDisabled,
+											]}>
+											hours
+										</Text>
+									</View>
+									<Text
+										style={[
+											styles.timerColon,
+											!concession.gcash_payment_available &&
+												styles.timerColonDisabled,
+										]}>
+										:
+									</Text>
+									<View style={styles.timerUnit}>
+										<Text
+											style={[
+												styles.timerValue,
+												!concession.gcash_payment_available &&
+													styles.timerValueDisabled,
+											]}>
+											{m}
+										</Text>
+										<Text
+											style={[
+												styles.timerLabel,
+												!concession.gcash_payment_available &&
+													styles.timerLabelDisabled,
+											]}>
+											minutes
+										</Text>
+									</View>
+									<Text
+										style={[
+											styles.timerColon,
+											!concession.gcash_payment_available &&
+												styles.timerColonDisabled,
+										]}>
+										:
+									</Text>
+									<View style={styles.timerUnit}>
+										<Text
+											style={[
+												styles.timerValue,
+												!concession.gcash_payment_available &&
+													styles.timerValueDisabled,
+											]}>
+											{s}
+										</Text>
+										<Text
+											style={[
+												styles.timerLabel,
+												!concession.gcash_payment_available &&
+													styles.timerLabelDisabled,
+											]}>
+											seconds
+										</Text>
+									</View>
+								</>
+							)
+						})()}
+					</View>
 				</TouchableOpacity>
 				{showTimePicker && (
 					<DateTimePicker
@@ -352,12 +425,11 @@ const Concession = () => {
 				)}
 				<Text style={styles.helperText}>
 					Time limit for customers to upload GCash receipt after order is
-					accepted
+					accepted. Order will be automatically declined if time expires.
 				</Text>
 				{errors.receipt_timer && (
 					<Text style={styles.error}>{errors.receipt_timer}</Text>
 				)}
-
 				<View style={{ marginTop: 20 }}>
 					<Button
 						title={saving ? 'Saving...' : 'Save Changes'}
@@ -432,6 +504,40 @@ const styles = StyleSheet.create({
 		fontWeight: '600',
 	},
 	timePickerButtonTextDisabled: {
+		color: '#888',
+	},
+	timerDisplay: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		justifyContent: 'center',
+		gap: 8,
+	},
+	timerUnit: {
+		alignItems: 'center',
+	},
+	timerValue: {
+		fontSize: 20,
+		fontWeight: '700',
+		color: '#333',
+	},
+	timerValueDisabled: {
+		color: '#888',
+	},
+	timerLabel: {
+		fontSize: 11,
+		color: '#666',
+		marginTop: 2,
+	},
+	timerLabelDisabled: {
+		color: '#999',
+	},
+	timerColon: {
+		fontSize: 20,
+		fontWeight: '700',
+		color: '#333',
+		marginTop: -12,
+	},
+	timerColonDisabled: {
 		color: '#888',
 	},
 	error: { color: 'red', fontSize: 12, marginTop: 4 },

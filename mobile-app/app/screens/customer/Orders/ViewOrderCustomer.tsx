@@ -41,6 +41,7 @@ const ViewOrderCustomer = () => {
 	const [updatingPayment, setUpdatingPayment] = useState(false)
 	const [cancelConfirmVisible, setCancelConfirmVisible] = useState(false)
 	const [previewSource, setPreviewSource] = useState<string | null>(null)
+	const [currentTime, setCurrentTime] = useState(Date.now())
 	const { showToast } = useToast()
 
 	const copyGcashNumber = async () => {
@@ -115,6 +116,58 @@ const ViewOrderCustomer = () => {
 	const formatSchedule = (value: any) => formatManila(value)
 	const formatDateTime = (value: any) => formatManila(value)
 
+	// Calculate receipt timer
+	const calculateTimer = () => {
+		if (
+			!order ||
+			order.payment_method !== 'gcash' ||
+			order.order_status !== 'accepted' ||
+			!order.accepted_at ||
+			!order.receipt_timer
+		) {
+			return { timeRemaining: null, isExpired: false }
+		}
+
+		try {
+			const acceptedDate = new Date(order.accepted_at)
+			const [hours, minutes, seconds] = order.receipt_timer
+				.split(':')
+				.map(Number)
+			const deadlineMs =
+				acceptedDate.getTime() + (hours * 3600 + minutes * 60 + seconds) * 1000
+			const remainingMs = deadlineMs - currentTime
+
+			// Debug logs
+			console.log('Timer Debug:', {
+				accepted_at: order.accepted_at,
+				receipt_timer: order.receipt_timer,
+				acceptedDate: acceptedDate.toISOString(),
+				acceptedMs: acceptedDate.getTime(),
+				hours,
+				minutes,
+				seconds,
+				durationMs: (hours * 3600 + minutes * 60 + seconds) * 1000,
+				deadlineMs,
+				currentTime,
+				remainingMs,
+			})
+
+			if (remainingMs <= 0) {
+				return { timeRemaining: 'Expired', isExpired: true }
+			}
+
+			const remainingMinutes = Math.floor(remainingMs / 60000)
+			const remainingSeconds = Math.floor((remainingMs % 60000) / 1000)
+			return {
+				timeRemaining: `${remainingMinutes}:${remainingSeconds.toString().padStart(2, '0')}`,
+				isExpired: false,
+			}
+		} catch (e) {
+			console.error('Error calculating timer:', e)
+			return { timeRemaining: null, isExpired: false }
+		}
+	}
+
 	// ===============================
 	// Fetch order by ID
 	// ===============================
@@ -147,6 +200,14 @@ const ViewOrderCustomer = () => {
 	useEffect(() => {
 		fetchOrder()
 	}, [orderId])
+
+	// Update current time every second for timer
+	useEffect(() => {
+		const interval = setInterval(() => {
+			setCurrentTime(Date.now())
+		}, 1000)
+		return () => clearInterval(interval)
+	}, [])
 
 	useFocusEffect(
 		React.useCallback(() => {
@@ -361,119 +422,6 @@ const ViewOrderCustomer = () => {
 				)}
 			</View>
 
-			{/* Location & Concessionaire Info */}
-			<View style={styles.sectionCard}>
-				<Text style={styles.sectionTitle}>
-					<Ionicons
-						name="location-outline"
-						size={16}
-						color="#A40C2D"
-						style={styles.inlineIcon}
-					/>{' '}
-					Location & Vendor
-				</Text>
-				<View style={styles.locationInfo}>
-					<Text style={styles.locationText}>
-						{order.cafeteria_name}
-						{order.cafeteria_location && ` • ${order.cafeteria_location}`}
-					</Text>
-					<Text style={styles.concessionText}>
-						Concession: {order.concession_name}
-					</Text>
-				</View>
-
-				<TouchableOpacity
-					style={styles.concessionaireCard}
-					onPress={() =>
-						navigation.navigate('View Concessionaire Profile', {
-							concessionaireId: order.concessionaire_id || order.concession_id,
-							concessionaireData: {
-								first_name: order.concessionaire_first_name,
-								last_name: order.concessionaire_last_name,
-								email: order.concessionaire_email,
-								contact_number: order.concessionaire_contact_number,
-								messenger_link: order.concessionaire_messenger_link,
-								profile_image_url: order.concessionaire_profile_image_url,
-								concession_name: order.concession_name,
-								cafeteria_name: order.cafeteria_name,
-							},
-						})
-					}>
-					{order.concessionaire_profile_image_url ?
-						<Image
-							source={{ uri: order.concessionaire_profile_image_url }}
-							style={styles.concessionaireAvatar}
-						/>
-					:	<View style={styles.concessionaireAvatarPlaceholder}>
-							<Text style={styles.concessionaireAvatarInitials}>
-								{order.concessionaire_first_name?.[0] || ''}
-								{order.concessionaire_last_name?.[0] || ''}
-							</Text>
-						</View>
-					}
-					<View style={{ flex: 1 }}>
-						<Text style={styles.concessionaireLabel}>Concessionaire</Text>
-						<Text style={styles.concessionaireName}>
-							{order.concessionaire_first_name} {order.concessionaire_last_name}
-						</Text>
-					</View>
-				</TouchableOpacity>
-			</View>
-			{/* Pricing Information */}
-			<View style={styles.sectionCard}>
-				<Text style={styles.sectionTitle}>
-					<Ionicons
-						name="pricetag-outline"
-						size={16}
-						color="#A40C2D"
-						style={styles.inlineIcon}
-					/>{' '}
-					Pricing
-				</Text>
-				{(
-					order.updated_total_price !== null &&
-					order.updated_total_price !== undefined &&
-					!Number.isNaN(Number(order.updated_total_price)) &&
-					!Number.isNaN(Number(order.total_price)) &&
-					Number(order.updated_total_price) !== Number(order.total_price)
-				) ?
-					<>
-						<View style={styles.infoRow}>
-							<Text style={styles.infoLabel}>Original Total:</Text>
-							<Text style={styles.infoValue}>
-								₱{Number(order.total_price).toFixed(2)}
-							</Text>
-						</View>
-						<View style={styles.infoRow}>
-							<Text style={styles.infoLabel}>Updated Total:</Text>
-							<Text style={[styles.infoValue, styles.updatedPrice]}>
-								₱{Number(order.updated_total_price).toFixed(2)}
-							</Text>
-						</View>
-						{order.price_change_reason && (
-							<View style={styles.infoRow}>
-								<Text style={styles.infoLabel}>Reason for change:</Text>
-								<Text style={styles.infoValue}>
-									{order.price_change_reason}
-								</Text>
-							</View>
-						)}
-					</>
-				:	<View style={styles.infoRow}>
-						<Text style={styles.infoLabel}>Total:</Text>
-						<Text style={[styles.infoValue, styles.totalPrice]}>
-							₱{Number(order.total_price).toFixed(2)}
-						</Text>
-					</View>
-				}
-				{order.note && (
-					<View style={styles.noteSection}>
-						<Text style={styles.infoLabel}>Note:</Text>
-						<Text style={styles.noteText}>{order.note}</Text>
-					</View>
-				)}
-			</View>
-
 			{/* Decline Reason (if applicable) */}
 			{order.order_status === 'declined' && order.decline_reason && (
 				<View style={[styles.sectionCard, styles.declineCard]}>
@@ -603,46 +551,7 @@ const ViewOrderCustomer = () => {
 							order.accepted_at &&
 							order.receipt_timer &&
 							(() => {
-								const [timeRemaining, setTimeRemaining] = useState<
-									string | null
-								>(null)
-								const [isExpired, setIsExpired] = useState(false)
-
-								useEffect(() => {
-									const updateTimer = () => {
-										try {
-											const acceptedDate = new Date(order.accepted_at)
-											const [hours, minutes, seconds] = order.receipt_timer
-												.split(':')
-												.map(Number)
-											const deadlineMs =
-												acceptedDate.getTime() +
-												(hours * 3600 + minutes * 60 + seconds) * 1000
-											const nowMs = Date.now()
-											const remainingMs = deadlineMs - nowMs
-
-											if (remainingMs <= 0) {
-												setIsExpired(true)
-												setTimeRemaining('Expired')
-											} else {
-												setIsExpired(false)
-												const remainingMinutes = Math.floor(remainingMs / 60000)
-												const remainingSeconds = Math.floor(
-													(remainingMs % 60000) / 1000
-												)
-												setTimeRemaining(
-													`${remainingMinutes}:${remainingSeconds.toString().padStart(2, '0')}`
-												)
-											}
-										} catch (e) {
-											console.error('Error calculating timer:', e)
-										}
-									}
-
-									updateTimer()
-									const interval = setInterval(updateTimer, 1000)
-									return () => clearInterval(interval)
-								}, [order.accepted_at, order.receipt_timer])
+								const { timeRemaining, isExpired } = calculateTimer()
 
 								return (
 									<View
@@ -681,8 +590,8 @@ const ViewOrderCustomer = () => {
 										)}
 										{isExpired && (
 											<Text style={styles.timerExpiredMessage}>
-												GCash payment is no longer available. Payment will be
-												on-counter.
+												⏰ Time expired! Your order will be automatically
+												declined if receipt is not uploaded.
 											</Text>
 										)}
 										<TouchableOpacity
@@ -707,7 +616,6 @@ const ViewOrderCustomer = () => {
 									</View>
 								)
 							})()}
-
 						<Text style={styles.paymentLabel}>
 							Payment Screenshot{' '}
 							{order.payment_proof ? '(Uploaded)' : '(Required)'}
@@ -782,61 +690,178 @@ const ViewOrderCustomer = () => {
 				)}
 			</View>
 
-			<Text style={styles.sectionTitle}>
-				<Ionicons
-					name="cart-outline"
-					size={16}
-					color="#A40C2D"
-					style={styles.inlineIcon}
-				/>{' '}
-				Order Items
-			</Text>
-			<FlatList
-				data={order.items || []}
-				keyExtractor={(item) => item.id.toString()}
-				renderItem={({ item }) => (
-					<View style={styles.itemCard}>
-						<Text style={styles.itemName}>
-							{item.item_name} x{item.quantity}
-						</Text>
-						<Text style={styles.infoLabel}>Dining Option:</Text>
-						<Text style={styles.infoValue}>
-							<Ionicons
-								name={
-									item.dining_option === 'take-out' ?
-										'cube-outline'
-									:	'restaurant-outline'
-								}
-								size={14}
-								color="#666"
-								style={styles.inlineIcon}
-							/>
-							{item.dining_option === 'take-out' ? 'Take-out' : 'Dine-in'}
-						</Text>
-						<Text>₱{Number(item.total_price).toFixed(2)}</Text>
-						{item.note && <Text>Note: {item.note}</Text>}
-						{item.variations?.length > 0 && (
-							<View style={{ marginTop: 5 }}>
-								{item.variations.map((v: any) => (
-									<Text
-										key={v.id}
-										style={styles.variation}>
-										• {v.variation_group_name}: {v.variation_name}
-										{v.quantity > 1 ? ` x${v.quantity}` : ''} (+₱
-										{Number(v.additional_price || 0).toFixed(2)})
-										{v.quantity > 1 ?
-											` = ₱${(
-												Number(v.additional_price || 0) * (v.quantity || 1)
-											).toFixed(2)}`
-										:	''}
-									</Text>
-								))}
+			{/* Order Items */}
+			<View style={styles.sectionCard}>
+				<Text style={styles.sectionTitle}>
+					<Ionicons
+						name="cart-outline"
+						size={16}
+						color="#A40C2D"
+						style={styles.inlineIcon}
+					/>{' '}
+					Order Items
+				</Text>
+				<FlatList
+					data={order.items || []}
+					keyExtractor={(item) => item.id.toString()}
+					renderItem={({ item }) => (
+						<View style={styles.itemCard}>
+							<Text style={styles.itemName}>
+								{item.item_name} x{item.quantity}
+							</Text>
+							<Text style={styles.infoLabel}>Dining Option:</Text>
+							<Text style={styles.infoValue}>
+								<Ionicons
+									name={
+										item.dining_option === 'take-out' ?
+											'cube-outline'
+										:	'restaurant-outline'
+									}
+									size={14}
+									color="#666"
+									style={styles.inlineIcon}
+								/>
+								{item.dining_option === 'take-out' ? 'Take-out' : 'Dine-in'}
+							</Text>
+							<Text>₱{Number(item.total_price).toFixed(2)}</Text>
+							{item.note && <Text>Note: {item.note}</Text>}
+							{item.variations?.length > 0 && (
+								<View style={{ marginTop: 5 }}>
+									{item.variations.map((v: any) => (
+										<Text
+											key={v.id}
+											style={styles.variation}>
+											• {v.variation_group_name}: {v.variation_name}
+											{v.quantity > 1 ? ` x${v.quantity}` : ''} (+₱
+											{Number(v.additional_price || 0).toFixed(2)})
+											{v.quantity > 1 ?
+												` = ₱${(
+													Number(v.additional_price || 0) * (v.quantity || 1)
+												).toFixed(2)}`
+											:	''}
+										</Text>
+									))}
+								</View>
+							)}
+						</View>
+					)}
+					scrollEnabled={false}
+				/>
+			</View>
+
+			{/* Pricing Information */}
+			<View style={styles.sectionCard}>
+				<Text style={styles.sectionTitle}>
+					<Ionicons
+						name="pricetag-outline"
+						size={16}
+						color="#A40C2D"
+						style={styles.inlineIcon}
+					/>{' '}
+					Pricing
+				</Text>
+				{(
+					order.updated_total_price !== null &&
+					order.updated_total_price !== undefined &&
+					!Number.isNaN(Number(order.updated_total_price)) &&
+					!Number.isNaN(Number(order.total_price)) &&
+					Number(order.updated_total_price) !== Number(order.total_price)
+				) ?
+					<>
+						<View style={styles.infoRow}>
+							<Text style={styles.infoLabel}>Original Total:</Text>
+							<Text style={styles.infoValue}>
+								₱{Number(order.total_price).toFixed(2)}
+							</Text>
+						</View>
+						<View style={styles.infoRow}>
+							<Text style={styles.infoLabel}>Updated Total:</Text>
+							<Text style={[styles.infoValue, styles.updatedPrice]}>
+								₱{Number(order.updated_total_price).toFixed(2)}
+							</Text>
+						</View>
+						{order.price_change_reason && (
+							<View style={styles.infoRow}>
+								<Text style={styles.infoLabel}>Reason for change:</Text>
+								<Text style={styles.infoValue}>
+									{order.price_change_reason}
+								</Text>
 							</View>
 						)}
+					</>
+				:	<View style={styles.infoRow}>
+						<Text style={styles.infoLabel}>Total:</Text>
+						<Text style={[styles.infoValue, styles.totalPrice]}>
+							₱{Number(order.total_price).toFixed(2)}
+						</Text>
+					</View>
+				}
+				{order.note && (
+					<View style={styles.noteSection}>
+						<Text style={styles.infoLabel}>Note:</Text>
+						<Text style={styles.noteText}>{order.note}</Text>
 					</View>
 				)}
-				scrollEnabled={false}
-			/>
+			</View>
+
+			{/* Location & Concessionaire Info */}
+			<View style={styles.sectionCard}>
+				<Text style={styles.sectionTitle}>
+					<Ionicons
+						name="location-outline"
+						size={16}
+						color="#A40C2D"
+						style={styles.inlineIcon}
+					/>{' '}
+					Location & Vendor
+				</Text>
+				<View style={styles.locationInfo}>
+					<Text style={styles.locationText}>
+						{order.cafeteria_name}
+						{order.cafeteria_location && ` • ${order.cafeteria_location}`}
+					</Text>
+					<Text style={styles.concessionText}>
+						Concession: {order.concession_name}
+					</Text>
+				</View>
+
+				<TouchableOpacity
+					style={styles.concessionaireCard}
+					onPress={() =>
+						navigation.navigate('View Concessionaire Profile', {
+							concessionaireId: order.concessionaire_id || order.concession_id,
+							concessionaireData: {
+								first_name: order.concessionaire_first_name,
+								last_name: order.concessionaire_last_name,
+								email: order.concessionaire_email,
+								contact_number: order.concessionaire_contact_number,
+								messenger_link: order.concessionaire_messenger_link,
+								profile_image_url: order.concessionaire_profile_image_url,
+								concession_name: order.concession_name,
+								cafeteria_name: order.cafeteria_name,
+							},
+						})
+					}>
+					{order.concessionaire_profile_image_url ?
+						<Image
+							source={{ uri: order.concessionaire_profile_image_url }}
+							style={styles.concessionaireAvatar}
+						/>
+					:	<View style={styles.concessionaireAvatarPlaceholder}>
+							<Text style={styles.concessionaireAvatarInitials}>
+								{order.concessionaire_first_name?.[0] || ''}
+								{order.concessionaire_last_name?.[0] || ''}
+							</Text>
+						</View>
+					}
+					<View style={{ flex: 1 }}>
+						<Text style={styles.concessionaireLabel}>Concessionaire</Text>
+						<Text style={styles.concessionaireName}>
+							{order.concessionaire_first_name} {order.concessionaire_last_name}
+						</Text>
+					</View>
+				</TouchableOpacity>
+			</View>
 
 			{/* Cancel Order Button - Only show for pending orders */}
 			{order.order_status === 'pending' && (
