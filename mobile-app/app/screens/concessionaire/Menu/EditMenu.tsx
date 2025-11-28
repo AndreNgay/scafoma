@@ -98,9 +98,9 @@ const EditMenu: React.FC = () => {
 							name: v.variation_name,
 							price: v.additional_price?.toString() || '',
 							max_amount:
-								typeof v.max_amount === 'number' && v.max_amount > 0
-									? v.max_amount
-									: undefined,
+								typeof v.max_amount === 'number' && v.max_amount > 0 ?
+									v.max_amount
+								:	undefined,
 							image_url: v.image_url,
 							variation_id: v.id,
 							available: v.available !== false,
@@ -173,9 +173,9 @@ const EditMenu: React.FC = () => {
 						name: v.name,
 						price: v.price != null ? String(v.price) : '',
 						max_amount:
-							typeof v.max_amount === 'number' && v.max_amount > 0
-								? v.max_amount
-								: undefined,
+							typeof v.max_amount === 'number' && v.max_amount > 0 ?
+								v.max_amount
+							:	undefined,
 						image_url: v.image_url,
 						variation_id: v.variation_id,
 						available: v.available !== false,
@@ -291,9 +291,8 @@ const EditMenu: React.FC = () => {
 		const removed = group.variations[vIndex]
 		group.variations.splice(vIndex, 1)
 		const removedWasAvailable = removed?.available !== false
-		const nextAvailable = removedWasAvailable
-			? prevAvailable - 1
-			: prevAvailable
+		const nextAvailable =
+			removedWasAvailable ? prevAvailable - 1 : prevAvailable
 
 		if (group.max_selection === prevAvailable) {
 			group.max_selection = nextAvailable
@@ -663,14 +662,12 @@ const EditMenu: React.FC = () => {
 				<TouchableOpacity
 					style={styles.imagePicker}
 					onPress={pickImage}>
-					{image ? (
+					{image ?
 						<Image
 							source={{ uri: image.uri }}
 							style={styles.previewImage}
 						/>
-					) : (
-						<Text style={{ color: '#555' }}>Pick an image</Text>
-					)}
+					:	<Text style={{ color: '#555' }}>Pick an image</Text>}
 				</TouchableOpacity>
 
 				<Text style={styles.label}>Category</Text>
@@ -732,7 +729,7 @@ const EditMenu: React.FC = () => {
 					Optional: Add variation groups for sizes, add-ons, or combos.
 				</Text>
 
-				{variationGroupsLoading && variationGroups.length === 0 ? (
+				{variationGroupsLoading && variationGroups.length === 0 ?
 					<View style={styles.variationLoadingRow}>
 						<ActivityIndicator
 							size="small"
@@ -740,7 +737,7 @@ const EditMenu: React.FC = () => {
 						/>
 						<Text style={styles.variationLoadingText}>Loading options...</Text>
 					</View>
-				) : null}
+				:	null}
 
 				{variationGroups.map((group, gIndex) => (
 					<View
@@ -819,51 +816,58 @@ const EditMenu: React.FC = () => {
 									<Text style={styles.removeVariationButtonText}>✕</Text>
 								</TouchableOpacity>
 
-								<View style={styles.variationRow}>
-									<View>
+								<View style={styles.variationColumn}>
+									{/* Image row */}
+									<View style={styles.variationImageRow}>
 										<Text style={styles.smallLabel}>Image</Text>
 										<TouchableOpacity
 											style={styles.variationImageButton}
 											onPress={() => pickVariationImage(gIndex, vIndex)}>
-											{v.image || v.image_url ? (
+											{v.image || v.image_url ?
 												<Image
 													source={{ uri: v.image?.uri || v.image_url }}
 													style={styles.variationImagePreview}
 												/>
-											) : (
-												<View style={styles.variationImagePlaceholder}>
+											:	<View style={styles.variationImagePlaceholder}>
 													<Text style={styles.variationImagePlaceholderText}>
 														📷
 													</Text>
 												</View>
-											)}
+											}
 										</TouchableOpacity>
 									</View>
 
-									<View style={styles.variationDivider} />
-
-                <View style={styles.variationFields}>
-                  <View style={styles.variationRowLine}>
-                    <View style={styles.fieldColWide}>
-                      <Text style={styles.smallLabel}>Name</Text>
-                      <TextInput
-                        style={[styles.input, styles.variationNameInput]}
-                        placeholder="Name"
-                        value={v.name}
-                        onChangeText={(t) => updateVariation(gIndex, vIndex, "name", t)}
-                      />
-                    </View>
-                    <View style={styles.fieldColNarrow}>
-                      <Text style={styles.smallLabel}>Price</Text>
-                      <TextInput
-                        style={[styles.input, styles.variationPriceInput, { width: 110 }]}
-                        placeholder="Price"
-                        keyboardType="numeric"
-                        value={v.price}
-                        onChangeText={(t) => updateVariation(gIndex, vIndex, "price", t)}
-                      />
-                    </View>
-                  </View>
+									{/* Input fields row */}
+									<View style={styles.variationFields}>
+										<View style={styles.variationRowLine}>
+											<View style={styles.fieldColWide}>
+												<Text style={styles.smallLabel}>Name</Text>
+												<TextInput
+													style={[styles.input, styles.variationNameInput]}
+													placeholder="Name"
+													value={v.name}
+													onChangeText={(t) =>
+														updateVariation(gIndex, vIndex, 'name', t)
+													}
+												/>
+											</View>
+											<View style={styles.fieldColNarrow}>
+												<Text style={styles.smallLabel}>Price</Text>
+												<TextInput
+													style={[
+														styles.input,
+														styles.variationPriceInput,
+														{ width: 110 },
+													]}
+													placeholder="Price"
+													keyboardType="numeric"
+													value={v.price}
+													onChangeText={(t) =>
+														updateVariation(gIndex, vIndex, 'price', t)
+													}
+												/>
+											</View>
+										</View>
 
 										<View style={styles.variationRowLine}>
 											<View style={[styles.availableRow, { flex: 1 }]}>
@@ -970,7 +974,7 @@ const EditMenu: React.FC = () => {
 								Choose an existing menu item to copy its variation groups.
 							</Text>
 
-							{importItemsLoading ? (
+							{importItemsLoading ?
 								<View style={styles.modalLoadingRow}>
 									<ActivityIndicator
 										size="small"
@@ -978,32 +982,31 @@ const EditMenu: React.FC = () => {
 									/>
 									<Text style={styles.modalLoadingText}>Loading items...</Text>
 								</View>
-							) : importSourceItems.length === 0 ? (
+							: importSourceItems.length === 0 ?
 								<Text style={styles.modalEmptyText}>
 									No other items with variations found.
 								</Text>
-							) : (
-								importSourceItems.map((item) => (
+							:	importSourceItems.map((item) => (
 									<TouchableOpacity
 										key={item.id}
 										style={styles.modalOption}
 										onPress={() => handleImportFromItem(item)}
 										disabled={importFromItemLoading}>
 										<Text style={styles.modalOptionText}>{item.item_name}</Text>
-										{item.category ? (
+										{item.category ?
 											<Text style={styles.modalOptionMeta}>
 												{item.category}
 											</Text>
-										) : null}
+										:	null}
 									</TouchableOpacity>
 								))
-							)}
+							}
 
-							{importFromItemLoading ? (
+							{importFromItemLoading ?
 								<Text style={styles.modalImportHint}>
 									Importing variations...
 								</Text>
-							) : null}
+							:	null}
 						</TouchableOpacity>
 					</TouchableOpacity>
 				</Modal>
@@ -1015,463 +1018,458 @@ const EditMenu: React.FC = () => {
 export default EditMenu
 
 const styles = StyleSheet.create({
-  container: { flex: 1, padding: 16, backgroundColor: "#fff" },
-  label: { marginTop: 12, fontSize: 14, fontWeight: "600" },
-  labelRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-  },
-  infoIcon: { fontSize: 16, color: "#555" },
-  tooltipBox: {
-    backgroundColor: "#333",
-    padding: 8,
-    borderRadius: 6,
-    marginTop: 4,
-    marginBottom: 6,
-    maxWidth: "90%",
-  },
-  tooltipText: { fontSize: 12, color: "#fff" },
-  input: {
-    borderWidth: 1,
-    borderColor: "#ccc",
-    padding: 10,
-    borderRadius: 8,
-    marginTop: 6,
-    backgroundColor: "#fff",
-  },
-  sectionCard: {
-    backgroundColor: "#fff",
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 16,
-    borderWidth: 1,
-    borderColor: "#eee",
-    shadowColor: "#000",
-    shadowOpacity: 0.03,
-    shadowOffset: { width: 0, height: 1 },
-    shadowRadius: 3,
-    elevation: 1,
-  },
-  sectionHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 12,
-  },
-  sectionTitle: {
-    fontSize: 16,
-    fontWeight: "600",
-  },
-  sectionHint: {
-    fontSize: 12,
-    color: "#888",
-  },
-  required: {
-    color: "#A40C2D",
-  },
-  currencyInputWrapper: {
-    flexDirection: "row",
-    alignItems: "center",
-    borderWidth: 1,
-    borderColor: "#ccc",
-    borderRadius: 10,
-    paddingHorizontal: 10,
-    marginTop: 6,
-    backgroundColor: "#fff",
-  },
-  currencyPrefix: {
-    fontSize: 16,
-    marginRight: 4,
-  },
-  currencyInput: {
-    flex: 1,
-    paddingVertical: 10,
-    fontSize: 16,
-  },
-  helperText: {
-    fontSize: 12,
-    color: "#666",
-    marginTop: 4,
-  },
-  importButton: {
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: "#A40C2D",
-  },
-  importButtonText: {
-    fontSize: 12,
-    color: "#A40C2D",
-    fontWeight: "600",
-  },
-  imagePicker: {
-    borderWidth: 1,
-    borderColor: "#ccc",
-    borderRadius: 8,
-    padding: 12,
-    alignItems: "center",
-    justifyContent: "center",
-    marginTop: 6,
-  },
-  previewImage: { width: 120, height: 120, borderRadius: 10 },
-  toggleRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    marginTop: 8,
-  },
-  variationLoadingRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginTop: 8,
-    gap: 8,
-  },
-  variationLoadingText: {
-    fontSize: 12,
-    color: "#666",
-  },
-  groupBox: {
-    borderWidth: 1,
-    borderColor: "#aaa",
-    borderRadius: 8,
-    padding: 10,
-    marginTop: 12,
-    backgroundColor: "#f9f9f9",
-  },
-  variationRow: { 
-    flexDirection: "row",
-    alignItems: "center",
-    marginTop: 6,
-    gap: 6,
-  },
-  variationCard: {
-    borderWidth: 1,
-    borderColor: "#ddd",
-    borderRadius: 10,
-    padding: 10,
-    marginTop: 8,
-    backgroundColor: "#fff",
-    position: "relative",
-  },
-  variationImageButton: {
-    width: 50,
-    height: 50,
-    borderRadius: 8,
-    overflow: "hidden",
-    borderWidth: 1,
-    borderColor: "#ddd",
-  },
-  variationImagePreview: {
-    width: "100%",
-    height: "100%",
-  },
-  variationImagePlaceholder: {
-    width: "100%",
-    height: "100%",
-    backgroundColor: "#f0f0f0",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  variationImagePlaceholderText: {
-    fontSize: 20,
-  },
-  removeVariationIcon: {
-    position: "absolute",
-    top: 6,
-    right: 6,
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    backgroundColor: "#ffefef",
-    alignItems: "center",
-    justifyContent: "center",
-    zIndex: 2,
-  },
-  variationFields: {
-    flex: 1,
-    gap: 8,
-  },
-  variationRowLine: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    flex: 1,
-  },
-  availableRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    flex: 1,
-  },
-  variationDivider: {
-    width: 1,
-    backgroundColor: "#eee",
-    alignSelf: "stretch",
-    marginHorizontal: 10,
-  },
-  fieldColWide: {
-    flex: 1,
-  },
-  fieldColNarrow: {
-    width: 120,
-  },
-  fieldColTiny: {
-    width: 120,
-  },
-  variationHeaderRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginTop: 8,
-    marginBottom: 4,
-    gap: 6,
-    paddingHorizontal: 4,
-  },
-  headerText: {
-    fontSize: 12,
-    color: "#666",
-  },
-  smallLabel: {
-    fontSize: 12,
-    color: "#666",
-    marginBottom: 4,
-  },
-  variationNameInput: {
-    flex: 3,
-    marginTop: 0,
-  },
-  variationPriceInput: {
-    flex: 1,
-    marginTop: 0,
-  },
-  variationMaxAmountInput: {
-    width: 110,
-    marginTop: 0,
-  },
-  fieldRow: {
-    flex: 1,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    marginLeft: 8,
-  },
-  removeVariationButton: {
-    width: 40,
-    height: 40,
-    backgroundColor: "#ffdddd",
-    borderRadius: 8,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  removeVariationButtonText: {
-    color: "darkred",
-    fontSize: 20,
-    fontWeight: "bold",
-  },
-  maxSelectionContainer: {
-    marginTop: 8,
-  },
-  maxSelectionRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-  },
-  toastContainer: {
-    marginTop: 12,
-    padding: 10,
-    borderRadius: 8,
-    alignItems: "center",
-  },
-  toastSuccess: {
-    backgroundColor: "#4caf50",
-  },
-  toastError: {
-    backgroundColor: "#f44336",
-  },
-  toastInfo: {
-    backgroundColor: "#333",
-  },
-  toastText: {
-    color: "#fff",
-    fontSize: 13,
-  },
-  selectionRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    marginTop: 8,
-  },
-  selectionLabelContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    minWidth: 120,
-  },
-  selectionInput: {
-    width: 80,
-    borderWidth: 1,
-    borderColor: "#ccc",
-    padding: 10,
-    borderRadius: 8,
-    textAlign: "center",
-    fontSize: 16,
-    backgroundColor: "#fff",
-  },
-  maxSelectionButton: {
-    width: 40,
-    height: 40,
-    backgroundColor: "#A40C2D",
-    borderRadius: 8,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  maxSelectionButtonText: {
-    color: "#fff",
-    fontSize: 24,
-    fontWeight: "bold",
-  },
-  toggleContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-  },
-  variationRightCol: {
-    flex: 1,
-    marginLeft: 8,
-    gap: 6,
-  },
-  toggleLabel: {
-    fontSize: 14,
-  },
-  maxSelectionHint: {
-    fontSize: 12,
-    color: "#666",
-    marginTop: 4,
-    marginLeft: 8,
-  },
-  modalBackdrop: {
-    flex: 1,
-    backgroundColor: "rgba(0,0,0,0.4)",
-    justifyContent: "flex-end",
-  },
-  modalSheet: {
-    backgroundColor: "#fff",
-    paddingHorizontal: 20,
-    paddingTop: 16,
-    paddingBottom: 24,
-    borderTopLeftRadius: 16,
-    borderTopRightRadius: 16,
-  },
-  modalTitle: {
-    fontSize: 16,
-    fontWeight: "700",
-    color: "#111",
-    marginBottom: 4,
-  },
-  modalSubtitle: {
-    fontSize: 13,
-    color: "#555",
-    marginBottom: 10,
-  },
-  modalLoadingRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginTop: 8,
-    gap: 8,
-  },
-  modalLoadingText: {
-    fontSize: 12,
-    color: "#666",
-  },
-  modalOption: {
-    paddingVertical: 10,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: "#eee",
-  },
-  modalOptionText: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: "#111",
-  },
-  modalOptionMeta: {
-    fontSize: 12,
-    color: "#666",
-    marginTop: 2,
-  },
-  modalEmptyText: {
-    fontSize: 12,
-    color: "#666",
-    marginTop: 8,
-  },
-  modalImportHint: {
-    fontSize: 12,
-    color: "#A40C2D",
-    marginTop: 10,
-  },
-  categoryChipsContainer: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    marginTop: 6,
-    gap: 6,
-  },
-  categoryChip: {
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: "#ccc",
-    backgroundColor: "#f8f8f8",
-  },
-  categoryChipSelected: {
-    borderColor: "darkred",
-    backgroundColor: "#ffecec",
-  },
-  categoryChipText: {
-    fontSize: 12,
-    color: "#555",
-  },
-  categoryChipTextSelected: {
-    color: "darkred",
-    fontWeight: "600",
-  },
-  removeButton: {
-    backgroundColor: "#ffdddd",
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 6,
-  },
-  removeButtonText: { color: "darkred", fontWeight: "bold" },
-  smallButton: {
-    backgroundColor: "#eee",
-    padding: 8,
-    borderRadius: 6,
-    marginTop: 8,
-    alignItems: "center",
-  },
-  smallButtonText: { color: "darkred", fontWeight: "600" },
-  removeGroupButton: {
-    backgroundColor: "#ffeaea",
-    padding: 8,
-    borderRadius: 6,
-    marginTop: 8,
-    alignItems: "center",
-  },
-  removeGroupButtonText: { color: "red", fontWeight: "600" },
-  buttonOutline: {
-    borderWidth: 1,
-    borderColor: "darkred",
-    padding: 14,
-    borderRadius: 8,
-    marginTop: 16,
-    alignItems: "center",
-  },
-  buttonOutlineText: { color: "darkred", fontWeight: "600", fontSize: 14 },
-  button: {
-    backgroundColor: "darkred",
-    padding: 14,
-    borderRadius: 8,
-    marginTop: 20,
-    alignItems: "center",
-  },
-  buttonText: { color: "white", fontWeight: "600", fontSize: 16 },
-});
+	container: { flex: 1, padding: 16, backgroundColor: '#fff' },
+	label: { marginTop: 12, fontSize: 14, fontWeight: '600' },
+	labelRow: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		justifyContent: 'space-between',
+	},
+	infoIcon: { fontSize: 16, color: '#555' },
+	tooltipBox: {
+		backgroundColor: '#333',
+		padding: 8,
+		borderRadius: 6,
+		marginTop: 4,
+		marginBottom: 6,
+		maxWidth: '90%',
+	},
+	tooltipText: { fontSize: 12, color: '#fff' },
+	input: {
+		borderWidth: 1,
+		borderColor: '#ccc',
+		padding: 10,
+		borderRadius: 8,
+		marginTop: 6,
+		backgroundColor: '#fff',
+	},
+	sectionCard: {
+		backgroundColor: '#fff',
+		borderRadius: 12,
+		padding: 16,
+		marginBottom: 16,
+		borderWidth: 1,
+		borderColor: '#eee',
+		shadowColor: '#000',
+		shadowOpacity: 0.03,
+		shadowOffset: { width: 0, height: 1 },
+		shadowRadius: 3,
+		elevation: 1,
+	},
+	sectionHeader: {
+		flexDirection: 'row',
+		justifyContent: 'space-between',
+		alignItems: 'center',
+		marginBottom: 12,
+	},
+	sectionTitle: {
+		fontSize: 16,
+		fontWeight: '600',
+	},
+	sectionHint: {
+		fontSize: 12,
+		color: '#888',
+	},
+	required: {
+		color: '#A40C2D',
+	},
+	currencyInputWrapper: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		borderWidth: 1,
+		borderColor: '#ccc',
+		borderRadius: 10,
+		paddingHorizontal: 10,
+		marginTop: 6,
+		backgroundColor: '#fff',
+	},
+	currencyPrefix: {
+		fontSize: 16,
+		marginRight: 4,
+	},
+	currencyInput: {
+		flex: 1,
+		paddingVertical: 10,
+		fontSize: 16,
+	},
+	helperText: {
+		fontSize: 12,
+		color: '#666',
+		marginTop: 4,
+	},
+	importButton: {
+		paddingHorizontal: 10,
+		paddingVertical: 6,
+		borderRadius: 16,
+		borderWidth: 1,
+		borderColor: '#A40C2D',
+	},
+	importButtonText: {
+		fontSize: 12,
+		color: '#A40C2D',
+		fontWeight: '600',
+	},
+	imagePicker: {
+		borderWidth: 1,
+		borderColor: '#ccc',
+		borderRadius: 8,
+		padding: 12,
+		alignItems: 'center',
+		justifyContent: 'center',
+		marginTop: 6,
+	},
+	previewImage: { width: 120, height: 120, borderRadius: 10 },
+	toggleRow: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		justifyContent: 'space-between',
+		marginTop: 8,
+	},
+	variationLoadingRow: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		marginTop: 8,
+		gap: 8,
+	},
+	variationLoadingText: {
+		fontSize: 12,
+		color: '#666',
+	},
+	groupBox: {
+		borderWidth: 1,
+		borderColor: '#aaa',
+		borderRadius: 8,
+		padding: 10,
+		marginTop: 12,
+		backgroundColor: '#f9f9f9',
+	},
+	variationCard: {
+		borderWidth: 1,
+		borderColor: '#ddd',
+		borderRadius: 10,
+		padding: 10,
+		marginTop: 8,
+		backgroundColor: '#fff',
+		position: 'relative',
+	},
+	variationColumn: {
+		gap: 12,
+	},
+	variationImageRow: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		gap: 8,
+	},
+	variationImageButton: {
+		width: 60,
+		height: 60,
+		borderRadius: 8,
+		overflow: 'hidden',
+		borderWidth: 1,
+		borderColor: '#ddd',
+	},
+	variationImagePreview: {
+		width: '100%',
+		height: '100%',
+	},
+	variationImagePlaceholder: {
+		width: '100%',
+		height: '100%',
+		backgroundColor: '#f0f0f0',
+		justifyContent: 'center',
+		alignItems: 'center',
+	},
+	variationImagePlaceholderText: {
+		fontSize: 20,
+	},
+	removeVariationIcon: {
+		position: 'absolute',
+		top: 6,
+		right: 6,
+		width: 24,
+		height: 24,
+		borderRadius: 12,
+		backgroundColor: '#ffefef',
+		alignItems: 'center',
+		justifyContent: 'center',
+		zIndex: 2,
+	},
+	variationFields: {
+		gap: 8,
+	},
+	variationRowLine: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		gap: 8,
+		flex: 1,
+	},
+	availableRow: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		gap: 8,
+		flex: 1,
+	},
+	fieldColWide: {
+		flex: 1,
+	},
+	fieldColNarrow: {
+		width: 120,
+	},
+	fieldColTiny: {
+		width: 120,
+	},
+	variationHeaderRow: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		marginTop: 8,
+		marginBottom: 4,
+		gap: 6,
+		paddingHorizontal: 4,
+	},
+	headerText: {
+		fontSize: 12,
+		color: '#666',
+	},
+	smallLabel: {
+		fontSize: 12,
+		color: '#666',
+		marginBottom: 4,
+	},
+	variationNameInput: {
+		flex: 3,
+		marginTop: 0,
+	},
+	variationPriceInput: {
+		flex: 1,
+		marginTop: 0,
+	},
+	variationMaxAmountInput: {
+		width: 110,
+		marginTop: 0,
+	},
+	fieldRow: {
+		flex: 1,
+		flexDirection: 'row',
+		alignItems: 'center',
+		gap: 6,
+		marginLeft: 8,
+	},
+	removeVariationButton: {
+		width: 40,
+		height: 40,
+		backgroundColor: '#ffdddd',
+		borderRadius: 8,
+		justifyContent: 'center',
+		alignItems: 'center',
+	},
+	removeVariationButtonText: {
+		color: 'darkred',
+		fontSize: 20,
+		fontWeight: 'bold',
+	},
+	maxSelectionContainer: {
+		marginTop: 8,
+	},
+	maxSelectionRow: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		gap: 8,
+	},
+	toastContainer: {
+		marginTop: 12,
+		padding: 10,
+		borderRadius: 8,
+		alignItems: 'center',
+	},
+	toastSuccess: {
+		backgroundColor: '#4caf50',
+	},
+	toastError: {
+		backgroundColor: '#f44336',
+	},
+	toastInfo: {
+		backgroundColor: '#333',
+	},
+	toastText: {
+		color: '#fff',
+		fontSize: 13,
+	},
+	selectionRow: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		gap: 8,
+		marginTop: 8,
+	},
+	selectionLabelContainer: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		minWidth: 120,
+	},
+	selectionInput: {
+		width: 80,
+		borderWidth: 1,
+		borderColor: '#ccc',
+		padding: 10,
+		borderRadius: 8,
+		textAlign: 'center',
+		fontSize: 16,
+		backgroundColor: '#fff',
+	},
+	maxSelectionButton: {
+		width: 40,
+		height: 40,
+		backgroundColor: '#A40C2D',
+		borderRadius: 8,
+		justifyContent: 'center',
+		alignItems: 'center',
+	},
+	maxSelectionButtonText: {
+		color: '#fff',
+		fontSize: 24,
+		fontWeight: 'bold',
+	},
+	toggleContainer: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		gap: 6,
+	},
+	variationRightCol: {
+		flex: 1,
+		marginLeft: 8,
+		gap: 6,
+	},
+	toggleLabel: {
+		fontSize: 14,
+	},
+	maxSelectionHint: {
+		fontSize: 12,
+		color: '#666',
+		marginTop: 4,
+		marginLeft: 8,
+	},
+	modalBackdrop: {
+		flex: 1,
+		backgroundColor: 'rgba(0,0,0,0.4)',
+		justifyContent: 'flex-end',
+	},
+	modalSheet: {
+		backgroundColor: '#fff',
+		paddingHorizontal: 20,
+		paddingTop: 16,
+		paddingBottom: 24,
+		borderTopLeftRadius: 16,
+		borderTopRightRadius: 16,
+	},
+	modalTitle: {
+		fontSize: 16,
+		fontWeight: '700',
+		color: '#111',
+		marginBottom: 4,
+	},
+	modalSubtitle: {
+		fontSize: 13,
+		color: '#555',
+		marginBottom: 10,
+	},
+	modalLoadingRow: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		marginTop: 8,
+		gap: 8,
+	},
+	modalLoadingText: {
+		fontSize: 12,
+		color: '#666',
+	},
+	modalOption: {
+		paddingVertical: 10,
+		borderBottomWidth: StyleSheet.hairlineWidth,
+		borderBottomColor: '#eee',
+	},
+	modalOptionText: {
+		fontSize: 14,
+		fontWeight: '600',
+		color: '#111',
+	},
+	modalOptionMeta: {
+		fontSize: 12,
+		color: '#666',
+		marginTop: 2,
+	},
+	modalEmptyText: {
+		fontSize: 12,
+		color: '#666',
+		marginTop: 8,
+	},
+	modalImportHint: {
+		fontSize: 12,
+		color: '#A40C2D',
+		marginTop: 10,
+	},
+	categoryChipsContainer: {
+		flexDirection: 'row',
+		flexWrap: 'wrap',
+		marginTop: 6,
+		gap: 6,
+	},
+	categoryChip: {
+		paddingHorizontal: 10,
+		paddingVertical: 6,
+		borderRadius: 16,
+		borderWidth: 1,
+		borderColor: '#ccc',
+		backgroundColor: '#f8f8f8',
+	},
+	categoryChipSelected: {
+		borderColor: 'darkred',
+		backgroundColor: '#ffecec',
+	},
+	categoryChipText: {
+		fontSize: 12,
+		color: '#555',
+	},
+	categoryChipTextSelected: {
+		color: 'darkred',
+		fontWeight: '600',
+	},
+	removeButton: {
+		backgroundColor: '#ffdddd',
+		paddingHorizontal: 10,
+		paddingVertical: 6,
+		borderRadius: 6,
+	},
+	removeButtonText: { color: 'darkred', fontWeight: 'bold' },
+	smallButton: {
+		backgroundColor: '#eee',
+		padding: 8,
+		borderRadius: 6,
+		marginTop: 8,
+		alignItems: 'center',
+	},
+	smallButtonText: { color: 'darkred', fontWeight: '600' },
+	removeGroupButton: {
+		backgroundColor: '#ffeaea',
+		padding: 8,
+		borderRadius: 6,
+		marginTop: 8,
+		alignItems: 'center',
+	},
+	removeGroupButtonText: { color: 'red', fontWeight: '600' },
+	buttonOutline: {
+		borderWidth: 1,
+		borderColor: 'darkred',
+		padding: 14,
+		borderRadius: 8,
+		marginTop: 16,
+		alignItems: 'center',
+	},
+	buttonOutlineText: { color: 'darkred', fontWeight: '600', fontSize: 14 },
+	button: {
+		backgroundColor: 'darkred',
+		padding: 14,
+		borderRadius: 8,
+		marginTop: 20,
+		alignItems: 'center',
+	},
+	buttonText: { color: 'white', fontWeight: '600', fontSize: 16 },
+})

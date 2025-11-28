@@ -133,9 +133,9 @@ const AddMenu: React.FC = () => {
 						name: v.name,
 						price: v.price != null ? String(v.price) : '',
 						max_amount:
-							typeof v.max_amount === 'number' && v.max_amount > 0
-								? v.max_amount
-								: undefined,
+							typeof v.max_amount === 'number' && v.max_amount > 0 ?
+								v.max_amount
+							:	undefined,
 						image_url: v.image_url,
 						available: v.available !== false,
 					})),
@@ -221,9 +221,8 @@ const AddMenu: React.FC = () => {
 		const removed = group.variations[vIndex]
 		group.variations.splice(vIndex, 1)
 		const removedWasAvailable = removed?.available !== false
-		const nextAvailable = removedWasAvailable
-			? prevAvailable - 1
-			: prevAvailable
+		const nextAvailable =
+			removedWasAvailable ? prevAvailable - 1 : prevAvailable
 
 		if (group.max_selection === prevAvailable) {
 			group.max_selection = nextAvailable
@@ -467,9 +466,9 @@ const AddMenu: React.FC = () => {
 				name: v.name,
 				price: v.price,
 				max_amount:
-					typeof v.max_amount === 'number' && v.max_amount > 0
-						? v.max_amount
-						: undefined,
+					typeof v.max_amount === 'number' && v.max_amount > 0 ?
+						v.max_amount
+					:	undefined,
 				available: v.available !== false,
 				// image_url may be a data URL (imported) or undefined. The backend will
 				// ignore non-data URLs and still rely on the separate upload endpoint
@@ -607,14 +606,12 @@ const AddMenu: React.FC = () => {
 				<TouchableOpacity
 					style={styles.imagePicker}
 					onPress={pickImage}>
-					{image ? (
+					{image ?
 						<Image
 							source={{ uri: image.uri }}
 							style={styles.previewImage}
 						/>
-					) : (
-						<Text style={{ color: '#555' }}>Pick an image</Text>
-					)}
+					:	<Text style={{ color: '#555' }}>Pick an image</Text>}
 				</TouchableOpacity>
 
 				<Text style={styles.label}>Category</Text>
@@ -752,29 +749,28 @@ const AddMenu: React.FC = () => {
 									<Text style={styles.removeVariationButtonText}>✕</Text>
 								</TouchableOpacity>
 
-								<View style={styles.variationRow}>
-									<View>
+								<View style={styles.variationColumn}>
+									{/* Image row */}
+									<View style={styles.variationImageRow}>
 										<Text style={styles.smallLabel}>Image</Text>
 										<TouchableOpacity
 											style={styles.variationImageButton}
 											onPress={() => pickVariationImage(gIndex, vIndex)}>
-											{v.image || v.image_url ? (
+											{v.image || v.image_url ?
 												<Image
 													source={{ uri: v.image?.uri || v.image_url }}
 													style={styles.variationImagePreview}
 												/>
-											) : (
-												<View style={styles.variationImagePlaceholder}>
+											:	<View style={styles.variationImagePlaceholder}>
 													<Text style={styles.variationImagePlaceholderText}>
 														📷
 													</Text>
 												</View>
-											)}
+											}
 										</TouchableOpacity>
 									</View>
 
-									<View style={styles.variationDivider} />
-
+									{/* Input fields row */}
 									<View style={styles.variationFields}>
 										<View style={styles.variationRowLine}>
 											<View style={styles.fieldColWide}>
@@ -911,7 +907,7 @@ const AddMenu: React.FC = () => {
 								Choose an existing menu item to copy its variation groups.
 							</Text>
 
-							{importItemsLoading ? (
+							{importItemsLoading ?
 								<View style={styles.modalLoadingRow}>
 									<ActivityIndicator
 										size="small"
@@ -919,32 +915,31 @@ const AddMenu: React.FC = () => {
 									/>
 									<Text style={styles.modalLoadingText}>Loading items...</Text>
 								</View>
-							) : importSourceItems.length === 0 ? (
+							: importSourceItems.length === 0 ?
 								<Text style={styles.modalEmptyText}>
 									No items with variations found yet.
 								</Text>
-							) : (
-								importSourceItems.map((item) => (
+							:	importSourceItems.map((item) => (
 									<TouchableOpacity
 										key={item.id}
 										style={styles.modalOption}
 										onPress={() => handleImportFromItem(item)}
 										disabled={importFromItemLoading}>
 										<Text style={styles.modalOptionText}>{item.item_name}</Text>
-										{item.category ? (
+										{item.category ?
 											<Text style={styles.modalOptionMeta}>
 												{item.category}
 											</Text>
-										) : null}
+										:	null}
 									</TouchableOpacity>
 								))
-							)}
+							}
 
-							{importFromItemLoading ? (
+							{importFromItemLoading ?
 								<Text style={styles.modalImportHint}>
 									Importing variations...
 								</Text>
-							) : null}
+							:	null}
 						</TouchableOpacity>
 					</TouchableOpacity>
 				</Modal>
@@ -1072,12 +1067,6 @@ const styles = StyleSheet.create({
 		marginTop: 12,
 		backgroundColor: '#f9f9f9',
 	},
-	variationRow: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		marginTop: 6,
-		gap: 6,
-	},
 	variationCard: {
 		borderWidth: 1,
 		borderColor: '#ddd',
@@ -1087,9 +1076,17 @@ const styles = StyleSheet.create({
 		backgroundColor: '#fff',
 		position: 'relative',
 	},
+	variationColumn: {
+		gap: 12,
+	},
+	variationImageRow: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		gap: 8,
+	},
 	variationImageButton: {
-		width: 50,
-		height: 50,
+		width: 60,
+		height: 60,
 		borderRadius: 8,
 		overflow: 'hidden',
 		borderWidth: 1,
@@ -1122,7 +1119,6 @@ const styles = StyleSheet.create({
 		zIndex: 2,
 	},
 	variationFields: {
-		flex: 1,
 		gap: 8,
 	},
 	variationRowLine: {
@@ -1136,12 +1132,6 @@ const styles = StyleSheet.create({
 		alignItems: 'center',
 		gap: 8,
 		flex: 1,
-	},
-	variationDivider: {
-		width: 1,
-		backgroundColor: '#eee',
-		alignSelf: 'stretch',
-		marginHorizontal: 10,
 	},
 	fieldColWide: {
 		flex: 1,

@@ -570,11 +570,6 @@ const MenuItemDetails = () => {
 					/>
 				</TouchableOpacity>
 
-				{/* Price - Floating Card */}
-				<View style={styles.priceQtyWrapper}>
-					<Text style={styles.price}>₱{displayPrice.toFixed(2)}</Text>
-				</View>
-
 				{/* Content with padding */}
 				<View style={{ paddingHorizontal: 16 }}>
 					<Text style={styles.title}>{item.item_name}</Text>
@@ -833,9 +828,14 @@ const MenuItemDetails = () => {
 					/>
 				</View>
 
-				{/* Quantity */}
+				{/* Quantity & Price */}
 				<View style={styles.quantitySection}>
-					<Text style={styles.quantityLabel}>Quantity</Text>
+					<View style={styles.quantityHeader}>
+						<Text style={styles.quantityLabel}>Quantity</Text>
+						<Text style={styles.priceInQuantity}>
+							₱{displayPrice.toFixed(2)}
+						</Text>
+					</View>
 					<View style={styles.quantityControls}>
 						<TouchableOpacity
 							style={styles.qtyBtn}
@@ -1093,28 +1093,6 @@ const styles = StyleSheet.create({
 	subText: { fontSize: 14, color: '#6b7280', marginBottom: 12 },
 	link: { color: '#A40C2D', fontWeight: '600' },
 
-	priceQtyWrapper: {
-		flexDirection: 'row',
-		justifyContent: 'center',
-		alignItems: 'center',
-		backgroundColor: '#fff',
-		padding: 16,
-		marginHorizontal: 16,
-		marginTop: -30,
-		borderRadius: 12,
-		shadowColor: '#000',
-		shadowOffset: { width: 0, height: 2 },
-		shadowOpacity: 0.1,
-		shadowRadius: 8,
-		elevation: 4,
-		marginBottom: 16,
-	},
-	price: {
-		fontSize: 24,
-		fontWeight: 'bold',
-		color: '#A40C2D',
-	},
-	quantityContainer: { flexDirection: 'row', alignItems: 'center' },
 	qtyBtn: {
 		width: 32,
 		height: 32,
@@ -1374,11 +1352,21 @@ const styles = StyleSheet.create({
 		shadowRadius: 4,
 		elevation: 2,
 	},
+	quantityHeader: {
+		flexDirection: 'row',
+		justifyContent: 'space-between',
+		alignItems: 'center',
+		marginBottom: 12,
+	},
 	quantityLabel: {
 		fontSize: 16,
 		fontWeight: '600',
 		color: '#1f2937',
-		marginBottom: 12,
+	},
+	priceInQuantity: {
+		fontSize: 24,
+		fontWeight: 'bold',
+		color: '#A40C2D',
 	},
 	quantityControls: {
 		flexDirection: 'row',

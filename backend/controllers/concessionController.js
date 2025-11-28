@@ -161,6 +161,7 @@ export const updateMyConcession = async (req, res) => {
 		gcash_payment_available,
 		oncounter_payment_available,
 		gcash_number,
+		receipt_timer,
 		status,
 	} = req.body
 
@@ -179,15 +180,17 @@ export const updateMyConcession = async (req, res) => {
          gcash_payment_available = $3,
          oncounter_payment_available = $4,
          gcash_number = $5,
-         status = $6,
+         receipt_timer = COALESCE($6, receipt_timer),
+         status = $7,
          updated_at = CURRENT_TIMESTAMP
-       WHERE concessionaire_id = $7`,
+       WHERE concessionaire_id = $8`,
 			[
 				concession_name,
 				imageBuffer,
 				gcash_payment_available,
 				oncounter_payment_available,
 				gcash_number,
+				receipt_timer,
 				status,
 				req.user.id,
 			]

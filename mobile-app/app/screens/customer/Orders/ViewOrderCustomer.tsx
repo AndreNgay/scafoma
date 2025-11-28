@@ -399,19 +399,18 @@ const ViewOrderCustomer = () => {
 							},
 						})
 					}>
-					{order.concessionaire_profile_image_url ? (
+					{order.concessionaire_profile_image_url ?
 						<Image
 							source={{ uri: order.concessionaire_profile_image_url }}
 							style={styles.concessionaireAvatar}
 						/>
-					) : (
-						<View style={styles.concessionaireAvatarPlaceholder}>
+					:	<View style={styles.concessionaireAvatarPlaceholder}>
 							<Text style={styles.concessionaireAvatarInitials}>
 								{order.concessionaire_first_name?.[0] || ''}
 								{order.concessionaire_last_name?.[0] || ''}
 							</Text>
 						</View>
-					)}
+					}
 					<View style={{ flex: 1 }}>
 						<Text style={styles.concessionaireLabel}>Concessionaire</Text>
 						<Text style={styles.concessionaireName}>
@@ -431,11 +430,13 @@ const ViewOrderCustomer = () => {
 					/>{' '}
 					Pricing
 				</Text>
-				{order.updated_total_price !== null &&
-				order.updated_total_price !== undefined &&
-				!Number.isNaN(Number(order.updated_total_price)) &&
-				!Number.isNaN(Number(order.total_price)) &&
-				Number(order.updated_total_price) !== Number(order.total_price) ? (
+				{(
+					order.updated_total_price !== null &&
+					order.updated_total_price !== undefined &&
+					!Number.isNaN(Number(order.updated_total_price)) &&
+					!Number.isNaN(Number(order.total_price)) &&
+					Number(order.updated_total_price) !== Number(order.total_price)
+				) ?
 					<>
 						<View style={styles.infoRow}>
 							<Text style={styles.infoLabel}>Original Total:</Text>
@@ -458,14 +459,13 @@ const ViewOrderCustomer = () => {
 							</View>
 						)}
 					</>
-				) : (
-					<View style={styles.infoRow}>
+				:	<View style={styles.infoRow}>
 						<Text style={styles.infoLabel}>Total:</Text>
 						<Text style={[styles.infoValue, styles.totalPrice]}>
 							₱{Number(order.total_price).toFixed(2)}
 						</Text>
 					</View>
-				)}
+				}
 				{order.note && (
 					<View style={styles.noteSection}>
 						<Text style={styles.infoLabel}>Note:</Text>
@@ -598,11 +598,121 @@ const ViewOrderCustomer = () => {
 							</View>
 						)}
 
+						{/* Receipt Timer - only show when accepted */}
+						{order.order_status === 'accepted' &&
+							order.accepted_at &&
+							order.receipt_timer &&
+							(() => {
+								const [timeRemaining, setTimeRemaining] = useState<
+									string | null
+								>(null)
+								const [isExpired, setIsExpired] = useState(false)
+
+								useEffect(() => {
+									const updateTimer = () => {
+										try {
+											const acceptedDate = new Date(order.accepted_at)
+											const [hours, minutes, seconds] = order.receipt_timer
+												.split(':')
+												.map(Number)
+											const deadlineMs =
+												acceptedDate.getTime() +
+												(hours * 3600 + minutes * 60 + seconds) * 1000
+											const nowMs = Date.now()
+											const remainingMs = deadlineMs - nowMs
+
+											if (remainingMs <= 0) {
+												setIsExpired(true)
+												setTimeRemaining('Expired')
+											} else {
+												setIsExpired(false)
+												const remainingMinutes = Math.floor(remainingMs / 60000)
+												const remainingSeconds = Math.floor(
+													(remainingMs % 60000) / 1000
+												)
+												setTimeRemaining(
+													`${remainingMinutes}:${remainingSeconds.toString().padStart(2, '0')}`
+												)
+											}
+										} catch (e) {
+											console.error('Error calculating timer:', e)
+										}
+									}
+
+									updateTimer()
+									const interval = setInterval(updateTimer, 1000)
+									return () => clearInterval(interval)
+								}, [order.accepted_at, order.receipt_timer])
+
+								return (
+									<View
+										style={[
+											styles.timerCard,
+											isExpired && styles.timerCardExpired,
+										]}>
+										<View style={styles.timerHeader}>
+											<Ionicons
+												name={isExpired ? 'alert-circle' : 'time'}
+												size={20}
+												color={isExpired ? '#dc3545' : '#28a745'}
+											/>
+											<Text
+												style={[
+													styles.timerTitle,
+													isExpired && styles.timerTitleExpired,
+												]}>
+												{isExpired ?
+													'Receipt Upload Expired'
+												:	'Time Remaining'}
+											</Text>
+										</View>
+										<Text
+											style={[
+												styles.timerCountdown,
+												isExpired && styles.timerCountdownExpired,
+											]}>
+											{timeRemaining || '--:--'}
+										</Text>
+										{!isExpired && (
+											<Text style={styles.timerInstructions}>
+												⚠️ Please upload your GCash payment receipt before time
+												expires
+											</Text>
+										)}
+										{isExpired && (
+											<Text style={styles.timerExpiredMessage}>
+												GCash payment is no longer available. Payment will be
+												on-counter.
+											</Text>
+										)}
+										<TouchableOpacity
+											style={styles.contactButton}
+											onPress={() => {
+												// Navigate to concessionaire profile
+												if (order.concessionaire_id) {
+													navigation.navigate('ViewConcessionaireProfile', {
+														concessionaireId: order.concessionaire_id,
+													})
+												}
+											}}>
+											<Ionicons
+												name="chatbubble-outline"
+												size={16}
+												color="#A40C2D"
+											/>
+											<Text style={styles.contactButtonText}>
+												Contact Concessionaire
+											</Text>
+										</TouchableOpacity>
+									</View>
+								)
+							})()}
+
 						<Text style={styles.paymentLabel}>
 							Payment Screenshot{' '}
 							{order.payment_proof ? '(Uploaded)' : '(Required)'}
 						</Text>
-						{order.payment_proof ? (
+						{order.payment_proof ?
 							<View>
 								<TouchableOpacity
 									onPress={() => setPreviewSource(order.payment_proof || null)}>
@@ -615,27 +725,59 @@ const ViewOrderCustomer = () => {
 									Screenshot uploaded successfully
 								</Text>
 							</View>
-						) : (
-							<Text style={{ color: '#888', marginBottom: 10 }}>
+						:	<Text style={{ color: '#888', marginBottom: 10 }}>
 								No screenshot uploaded
 							</Text>
-						)}
+						}
 
 						{(order.order_status === 'accepted' ||
-							order.order_status === 'ready for pickup') && (
-							<TouchableOpacity
-								style={styles.uploadBtn}
-								onPress={pickImage}
-								disabled={uploading}>
-								<Text>
-									{uploading
-										? 'Uploading...'
-										: order.payment_proof
-										? 'Replace Screenshot'
-										: 'Upload Screenshot'}
-								</Text>
-							</TouchableOpacity>
-						)}
+							order.order_status === 'ready for pickup') &&
+							(() => {
+								// Check if receipt timer expired
+								let isTimerExpired = false
+								if (
+									order.order_status === 'accepted' &&
+									order.accepted_at &&
+									order.receipt_timer
+								) {
+									try {
+										const acceptedDate = new Date(order.accepted_at)
+										const [hours, minutes, seconds] = order.receipt_timer
+											.split(':')
+											.map(Number)
+										const deadlineMs =
+											acceptedDate.getTime() +
+											(hours * 3600 + minutes * 60 + seconds) * 1000
+										isTimerExpired = Date.now() > deadlineMs
+									} catch (e) {
+										console.error('Error checking timer:', e)
+									}
+								}
+
+								return (
+									<TouchableOpacity
+										style={[
+											styles.uploadBtn,
+											(uploading || isTimerExpired) && styles.uploadBtnDisabled,
+										]}
+										onPress={pickImage}
+										disabled={uploading || isTimerExpired}>
+										<Text
+											style={
+												(uploading || isTimerExpired) &&
+												styles.uploadBtnTextDisabled
+											}>
+											{uploading ?
+												'Uploading...'
+											: isTimerExpired ?
+												'Upload Time Expired'
+											: order.payment_proof ?
+												'Replace Screenshot'
+											:	'Upload Screenshot'}
+										</Text>
+									</TouchableOpacity>
+								)
+							})()}
 					</View>
 				)}
 			</View>
@@ -661,9 +803,9 @@ const ViewOrderCustomer = () => {
 						<Text style={styles.infoValue}>
 							<Ionicons
 								name={
-									item.dining_option === 'take-out'
-										? 'cube-outline'
-										: 'restaurant-outline'
+									item.dining_option === 'take-out' ?
+										'cube-outline'
+									:	'restaurant-outline'
 								}
 								size={14}
 								color="#666"
@@ -682,11 +824,11 @@ const ViewOrderCustomer = () => {
 										• {v.variation_group_name}: {v.variation_name}
 										{v.quantity > 1 ? ` x${v.quantity}` : ''} (+₱
 										{Number(v.additional_price || 0).toFixed(2)})
-										{v.quantity > 1
-											? ` = ₱${(
-													Number(v.additional_price || 0) * (v.quantity || 1)
-											  ).toFixed(2)}`
-											: ''}
+										{v.quantity > 1 ?
+											` = ₱${(
+												Number(v.additional_price || 0) * (v.quantity || 1)
+											).toFixed(2)}`
+										:	''}
 									</Text>
 								))}
 							</View>
@@ -706,14 +848,12 @@ const ViewOrderCustomer = () => {
 						]}
 						onPress={cancelOrder}
 						disabled={cancelling}>
-						{cancelling ? (
+						{cancelling ?
 							<ActivityIndicator
 								color="#fff"
 								size="small"
 							/>
-						) : (
-							<Text style={styles.cancelButtonText}>Cancel Order</Text>
-						)}
+						:	<Text style={styles.cancelButtonText}>Cancel Order</Text>}
 					</TouchableOpacity>
 				</View>
 			)}
@@ -1237,6 +1377,80 @@ const styles = StyleSheet.create({
 		width: 20,
 		height: 20,
 		marginRight: 8,
+	},
+	timerCard: {
+		backgroundColor: '#e8f5e9',
+		borderRadius: 8,
+		padding: 12,
+		marginBottom: 12,
+		borderWidth: 2,
+		borderColor: '#28a745',
+	},
+	timerCardExpired: {
+		backgroundColor: '#ffebee',
+		borderColor: '#dc3545',
+	},
+	timerHeader: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		marginBottom: 8,
+		gap: 8,
+	},
+	timerTitle: {
+		fontSize: 16,
+		fontWeight: '700',
+		color: '#28a745',
+	},
+	timerTitleExpired: {
+		color: '#dc3545',
+	},
+	timerCountdown: {
+		fontSize: 32,
+		fontWeight: '900',
+		color: '#28a745',
+		textAlign: 'center',
+		marginVertical: 8,
+	},
+	timerCountdownExpired: {
+		color: '#dc3545',
+	},
+	timerInstructions: {
+		fontSize: 12,
+		color: '#666',
+		textAlign: 'center',
+		marginBottom: 8,
+	},
+	timerExpiredMessage: {
+		fontSize: 12,
+		color: '#dc3545',
+		textAlign: 'center',
+		marginBottom: 8,
+		fontWeight: '600',
+	},
+	contactButton: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		justifyContent: 'center',
+		backgroundColor: '#fff',
+		paddingVertical: 8,
+		paddingHorizontal: 12,
+		borderRadius: 6,
+		borderWidth: 1,
+		borderColor: '#A40C2D',
+		gap: 6,
+		marginTop: 4,
+	},
+	contactButtonText: {
+		fontSize: 14,
+		fontWeight: '600',
+		color: '#A40C2D',
+	},
+	uploadBtnDisabled: {
+		backgroundColor: '#ccc',
+		opacity: 0.6,
+	},
+	uploadBtnTextDisabled: {
+		color: '#666',
 	},
 })
 

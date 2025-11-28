@@ -113,6 +113,7 @@ CREATE TABLE IF NOT EXISTS public.tblorder
     decline_reason text COLLATE pg_catalog."default",
     created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
     updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
+    accepted_at timestamp without time zone,
     payer_customer_id integer,
     updated_total_price numeric(10, 2),
     price_change_reason text COLLATE pg_catalog."default",

@@ -159,7 +159,9 @@ export const getOrdersByCustomerId = async (req, res) => {
 			const result = await pool.query(
 				`SELECT o.*, 
                 o.payment_method,
-                c.concession_name, 
+                o.accepted_at,
+                c.concession_name,
+                c.receipt_timer,
                 caf.cafeteria_name,
                 COALESCE(c.gcash_payment_available, FALSE) AS gcash_payment_available,
                 COALESCE(c.oncounter_payment_available, FALSE) AS oncounter_payment_available,
@@ -205,7 +207,9 @@ export const getOrdersByCustomerId = async (req, res) => {
 			const result = await pool.query(
 				`SELECT o.*, 
                 o.payment_method,
-                c.concession_name, 
+                o.accepted_at,
+                c.concession_name,
+                c.receipt_timer,
                 caf.cafeteria_name,
                 COALESCE(c.gcash_payment_available, FALSE) AS gcash_payment_available,
                 COALESCE(c.oncounter_payment_available, FALSE) AS oncounter_payment_available,
@@ -454,9 +458,16 @@ export const updateOrderStatus = async (req, res) => {
                  SET order_status = $1,
                      updated_total_price = $2,
                      price_change_reason = $3,
+                     accepted_at = NOW(),
                      updated_at = NOW()
                  WHERE id = $4 RETURNING *`
 				params = [order_status, updatedTotal, price_change_reason || null, id]
+			} else if (order_status === 'accepted') {
+				// Accepting without price change
+				query = `UPDATE tblorder 
+                 SET order_status = $1, accepted_at = NOW(), updated_at = NOW()
+                 WHERE id = $2 RETURNING *`
+				params = [order_status, id]
 			} else {
 				// Update without decline reason or price change
 				query = `UPDATE tblorder 
@@ -645,7 +656,7 @@ export const addOrder = async (req, res) => {
 				return res.status(400).json({
 					error: 'Concession unavailable',
 					message:
-						"This stall is no longer available. Please choose another concession.",
+						'This stall is no longer available. Please choose another concession.',
 				})
 			}
 
@@ -1091,12 +1102,10 @@ export const cancelOrder = async (req, res) => {
 		)
 
 		if (orderResult.rowCount === 0) {
-			return res
-				.status(404)
-				.json({
-					error:
-						"Order not found or you don't have permission to cancel this order",
-				})
+			return res.status(404).json({
+				error:
+					"Order not found or you don't have permission to cancel this order",
+			})
 		}
 
 		const order = orderResult.rows[0]
