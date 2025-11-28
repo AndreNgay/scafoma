@@ -569,26 +569,36 @@ const MenuItemDetails = () => {
 						style={styles.image}
 					/>
 				</TouchableOpacity>
-				<Text style={styles.title}>{item.item_name}</Text>
 
-				{/* Cafeteria + Concession */}
-				<Text style={styles.subText}>
-					{cafeteria?.cafeteria_name || cafeteriaName || item?.cafeteria_name} •{' '}
-					{concession ?
-						<Text
-							style={styles.link}
-							onPress={() =>
-								navigation.navigate('View Concession', {
-									concession,
-									cafeteria,
-								})
-							}>
-							{concession?.concession_name}
-						</Text>
-					:	<Text style={styles.link}>{item?.concession_name || ''}</Text>}
-				</Text>
+				{/* Price - Floating Card */}
+				<View style={styles.priceQtyWrapper}>
+					<Text style={styles.price}>₱{displayPrice.toFixed(2)}</Text>
+				</View>
 
-				<Text style={styles.desc}>{item.description}</Text>
+				{/* Content with padding */}
+				<View style={{ paddingHorizontal: 16 }}>
+					<Text style={styles.title}>{item.item_name}</Text>
+
+					{/* Cafeteria + Concession */}
+					<Text style={styles.subText}>
+						{cafeteria?.cafeteria_name || cafeteriaName || item?.cafeteria_name}{' '}
+						•{' '}
+						{concession ?
+							<Text
+								style={styles.link}
+								onPress={() =>
+									navigation.navigate('View Concession', {
+										concession,
+										cafeteria,
+									})
+								}>
+								{concession?.concession_name}
+							</Text>
+						:	<Text style={styles.link}>{item?.concession_name || ''}</Text>}
+					</Text>
+
+					<Text style={styles.desc}>{item.description}</Text>
+				</View>
 
 				{/* Dining Option */}
 				<View style={styles.diningOptionContainer}>
@@ -812,30 +822,30 @@ const MenuItemDetails = () => {
 				}
 
 				{/* Note */}
-				<Text style={styles.noteLabel}>Add Note:</Text>
-				<TextInput
-					style={styles.noteInput}
-					placeholder="e.g. No onions, extra spicy..."
-					value={note}
-					onChangeText={setNote}
-					multiline
-				/>
+				<View style={styles.noteContainer}>
+					<Text style={styles.noteLabel}>Add Note:</Text>
+					<TextInput
+						style={styles.noteInput}
+						placeholder="e.g. No onions, extra spicy..."
+						value={note}
+						onChangeText={setNote}
+						multiline
+					/>
+				</View>
 
-				{/* Price & Quantity */}
-				<View style={styles.priceQtyWrapper}>
-					<Text style={styles.price}>
-						₱{Number(displayPrice || 0).toFixed(2)}
-					</Text>
-					<View style={styles.quantityContainer}>
+				{/* Quantity */}
+				<View style={styles.quantitySection}>
+					<Text style={styles.quantityLabel}>Quantity</Text>
+					<View style={styles.quantityControls}>
 						<TouchableOpacity
-							onPress={() => setQuantity(Math.max(1, quantity - 1))}
-							style={styles.qtyBtn}>
-							<Text style={styles.qtyText}>-</Text>
+							style={styles.qtyBtn}
+							onPress={() => setQuantity(Math.max(1, quantity - 1))}>
+							<Text style={styles.qtyText}>−</Text>
 						</TouchableOpacity>
 						<Text style={styles.qtyValue}>{quantity}</Text>
 						<TouchableOpacity
-							onPress={() => setQuantity(quantity + 1)}
-							style={styles.qtyBtn}>
+							style={styles.qtyBtn}
+							onPress={() => setQuantity(quantity + 1)}>
 							<Text style={styles.qtyText}>+</Text>
 						</TouchableOpacity>
 					</View>
@@ -1068,51 +1078,104 @@ const MenuItemDetails = () => {
 }
 
 const styles = StyleSheet.create({
-	container: { flex: 1, padding: 15, backgroundColor: '#fff' },
-	image: { width: '100%', height: 200, borderRadius: 10, marginBottom: 15 },
-	title: { fontSize: 22, fontWeight: 'bold', color: '#A40C2D' },
-	subText: { fontSize: 14, color: '#555', marginBottom: 5 },
+	container: { flex: 1, backgroundColor: '#f5f5f5' },
+	image: {
+		width: '100%',
+		height: 250,
+		backgroundColor: '#e5e7eb',
+	},
+	title: {
+		fontSize: 24,
+		fontWeight: 'bold',
+		color: '#1f2937',
+		marginBottom: 8,
+	},
+	subText: { fontSize: 14, color: '#6b7280', marginBottom: 12 },
 	link: { color: '#A40C2D', fontWeight: '600' },
 
-	priceQtyWrapper: { alignItems: 'flex-start', marginVertical: 10 },
+	priceQtyWrapper: {
+		flexDirection: 'row',
+		justifyContent: 'center',
+		alignItems: 'center',
+		backgroundColor: '#fff',
+		padding: 16,
+		marginHorizontal: 16,
+		marginTop: -30,
+		borderRadius: 12,
+		shadowColor: '#000',
+		shadowOffset: { width: 0, height: 2 },
+		shadowOpacity: 0.1,
+		shadowRadius: 8,
+		elevation: 4,
+		marginBottom: 16,
+	},
 	price: {
-		fontSize: 20,
+		fontSize: 24,
 		fontWeight: 'bold',
 		color: '#A40C2D',
-		marginBottom: 5,
 	},
 	quantityContainer: { flexDirection: 'row', alignItems: 'center' },
 	qtyBtn: {
-		padding: 6,
+		width: 32,
+		height: 32,
 		backgroundColor: '#A40C2D',
-		borderRadius: 6,
+		borderRadius: 8,
+		justifyContent: 'center',
+		alignItems: 'center',
 		marginHorizontal: 8,
 	},
-	qtyText: { color: '#fff', fontSize: 16, fontWeight: 'bold' },
-	qtyValue: { fontSize: 16, fontWeight: '600' },
+	qtyText: { color: '#fff', fontSize: 18, fontWeight: 'bold' },
+	qtyValue: {
+		fontSize: 18,
+		fontWeight: '600',
+		minWidth: 30,
+		textAlign: 'center',
+	},
 
-	desc: { fontSize: 14, color: '#666', marginBottom: 15 },
+	desc: {
+		fontSize: 14,
+		color: '#6b7280',
+		lineHeight: 20,
+		marginBottom: 16,
+	},
 
-	diningOptionContainer: { marginBottom: 20 },
-	diningOptionTitle: { fontSize: 16, fontWeight: '600', marginBottom: 10 },
+	diningOptionContainer: {
+		backgroundColor: '#fff',
+		padding: 16,
+		marginHorizontal: 16,
+		borderRadius: 12,
+		marginBottom: 16,
+		shadowColor: '#000',
+		shadowOffset: { width: 0, height: 1 },
+		shadowOpacity: 0.05,
+		shadowRadius: 4,
+		elevation: 2,
+	},
+	diningOptionTitle: {
+		fontSize: 16,
+		fontWeight: '600',
+		color: '#1f2937',
+		marginBottom: 12,
+	},
 	diningOptionButtons: { flexDirection: 'row', gap: 10 },
 	diningOptionButton: {
 		flex: 1,
-		padding: 12,
+		paddingVertical: 12,
+		paddingHorizontal: 8,
 		borderRadius: 8,
 		borderWidth: 2,
-		borderColor: '#ddd',
-		backgroundColor: '#f9f9f9',
+		borderColor: '#e5e7eb',
+		backgroundColor: '#fff',
 		alignItems: 'center',
 	},
 	diningOptionSelected: {
 		borderColor: '#A40C2D',
-		backgroundColor: '#A40C2D22',
+		backgroundColor: '#fee2e2',
 	},
 	diningOptionText: {
 		fontSize: 14,
 		fontWeight: '500',
-		color: '#666',
+		color: '#6b7280',
 	},
 	inlineIcon: {
 		width: 14,
@@ -1124,26 +1187,43 @@ const styles = StyleSheet.create({
 		fontWeight: '600',
 	},
 
-	paymentMethodContainer: { marginBottom: 20 },
-	paymentMethodTitle: { fontSize: 16, fontWeight: '600', marginBottom: 10 },
+	paymentMethodContainer: {
+		backgroundColor: '#fff',
+		padding: 16,
+		marginHorizontal: 16,
+		borderRadius: 12,
+		marginBottom: 16,
+		shadowColor: '#000',
+		shadowOffset: { width: 0, height: 1 },
+		shadowOpacity: 0.05,
+		shadowRadius: 4,
+		elevation: 2,
+	},
+	paymentMethodTitle: {
+		fontSize: 16,
+		fontWeight: '600',
+		color: '#1f2937',
+		marginBottom: 12,
+	},
 	paymentMethodButtons: { flexDirection: 'row', gap: 10 },
 	paymentMethodButton: {
 		flex: 1,
-		padding: 12,
+		paddingVertical: 12,
+		paddingHorizontal: 8,
 		borderRadius: 8,
 		borderWidth: 2,
-		borderColor: '#ddd',
-		backgroundColor: '#f9f9f9',
+		borderColor: '#e5e7eb',
+		backgroundColor: '#fff',
 		alignItems: 'center',
 	},
 	paymentMethodSelected: {
 		borderColor: '#A40C2D',
-		backgroundColor: '#A40C2D22',
+		backgroundColor: '#fee2e2',
 	},
 	paymentMethodText: {
 		fontSize: 14,
 		fontWeight: '500',
-		color: '#666',
+		color: '#6b7280',
 	},
 	paymentMethodTextSelected: {
 		color: '#A40C2D',
@@ -1176,8 +1256,24 @@ const styles = StyleSheet.create({
 		borderRadius: 8,
 	},
 
-	group: { marginBottom: 20 },
-	groupTitle: { fontSize: 16, fontWeight: '600', marginBottom: 8 },
+	group: {
+		backgroundColor: '#fff',
+		padding: 16,
+		marginHorizontal: 16,
+		borderRadius: 12,
+		marginBottom: 16,
+		shadowColor: '#000',
+		shadowOffset: { width: 0, height: 1 },
+		shadowOpacity: 0.05,
+		shadowRadius: 4,
+		elevation: 2,
+	},
+	groupTitle: {
+		fontSize: 16,
+		fontWeight: '600',
+		color: '#1f2937',
+		marginBottom: 12,
+	},
 	required: { color: 'red', fontSize: 14 },
 	multiple: { fontSize: 12, color: '#555', marginLeft: 5 },
 	selectionCounter: {
@@ -1236,32 +1332,85 @@ const styles = StyleSheet.create({
 		textAlign: 'center',
 	},
 
+	noteContainer: {
+		backgroundColor: '#fff',
+		padding: 16,
+		marginHorizontal: 16,
+		borderRadius: 12,
+		marginBottom: 16,
+		shadowColor: '#000',
+		shadowOffset: { width: 0, height: 1 },
+		shadowOpacity: 0.05,
+		shadowRadius: 4,
+		elevation: 2,
+	},
 	noteLabel: {
-		fontSize: 14,
+		fontSize: 16,
 		fontWeight: '600',
-		marginTop: 10,
-		marginBottom: 5,
+		color: '#1f2937',
+		marginBottom: 8,
 	},
 	noteInput: {
+		backgroundColor: '#f9fafb',
 		borderWidth: 1,
-		borderColor: '#ccc',
-		borderRadius: 6,
-		padding: 10,
-		minHeight: 50,
-		marginBottom: 15,
+		borderColor: '#e5e7eb',
+		borderRadius: 8,
+		padding: 12,
+		minHeight: 80,
+		textAlignVertical: 'top',
+		fontSize: 14,
+		color: '#1f2937',
+	},
+
+	quantitySection: {
+		backgroundColor: '#fff',
+		padding: 16,
+		marginHorizontal: 16,
+		borderRadius: 12,
+		marginBottom: 16,
+		shadowColor: '#000',
+		shadowOffset: { width: 0, height: 1 },
+		shadowOpacity: 0.05,
+		shadowRadius: 4,
+		elevation: 2,
+	},
+	quantityLabel: {
+		fontSize: 16,
+		fontWeight: '600',
+		color: '#1f2937',
+		marginBottom: 12,
+	},
+	quantityControls: {
+		flexDirection: 'row',
+		justifyContent: 'center',
+		alignItems: 'center',
 	},
 
 	btn: {
 		backgroundColor: '#A40C2D',
-		padding: 15,
-		borderRadius: 8,
+		paddingVertical: 16,
+		paddingHorizontal: 24,
+		borderRadius: 12,
 		alignItems: 'center',
-		marginBottom: 10,
+		marginHorizontal: 16,
+		marginBottom: 12,
+		shadowColor: '#A40C2D',
+		shadowOffset: { width: 0, height: 4 },
+		shadowOpacity: 0.3,
+		shadowRadius: 8,
+		elevation: 4,
 	},
-	btnAlt: { backgroundColor: '#444' },
-	btnDisabled: { backgroundColor: '#ccc', opacity: 0.6 },
+	btnAlt: {
+		backgroundColor: '#6b7280',
+		shadowColor: '#6b7280',
+	},
+	btnDisabled: {
+		backgroundColor: '#d1d5db',
+		opacity: 0.6,
+		shadowOpacity: 0,
+	},
 	btnText: { color: '#fff', fontWeight: 'bold', fontSize: 16 },
-	btnTextDisabled: { color: '#999' },
+	btnTextDisabled: { color: '#9ca3af' },
 
 	feedbackContainer: { marginTop: 20 },
 	feedbackTitle: { fontSize: 18, fontWeight: 'bold', marginBottom: 10 },

@@ -200,25 +200,39 @@ const FullConcessionMenu = () => {
 	)
 
 	return (
-		<View style={{ flex: 1, backgroundColor: '#fff' }}>
-			{/* Header */}
-			<View style={styles.header}>
+		<View style={{ flex: 1, backgroundColor: '#f9fafb' }}>
+			{/* Concession Info Header */}
+			<View style={styles.infoHeader}>
 				<TouchableOpacity
-					style={styles.backButton}
-					onPress={() => navigation.goBack()}>
+					style={styles.concessionButton}
+					onPress={() => {
+						// Navigate to ViewConcession
+						;(navigation as any).navigate('View Concession', {
+							concession: {
+								id: concessionId,
+								concession_name: concessionName,
+								cafeteria_id: menuItems[0]?.cafeteria_id,
+							},
+							cafeteria: {
+								id: menuItems[0]?.cafeteria_id,
+								cafeteria_name: menuItems[0]?.cafeteria_name,
+							},
+						})
+					}}
+					activeOpacity={0.7}>
+					<View style={{ flex: 1 }}>
+						<Text style={styles.concessionNameHeader}>{concessionName}</Text>
+						<Text style={styles.itemCount}>
+							{filteredItems.length}{' '}
+							{filteredItems.length === 1 ? 'item' : 'items'}
+						</Text>
+					</View>
 					<Ionicons
-						name="arrow-back"
-						size={24}
-						color="#1f2937"
+						name="chevron-forward"
+						size={20}
+						color="#A40C2D"
 					/>
 				</TouchableOpacity>
-				<View style={{ flex: 1 }}>
-					<Text style={styles.headerTitle}>{concessionName}</Text>
-					<Text style={styles.headerSubtitle}>
-						{filteredItems.length}{' '}
-						{filteredItems.length === 1 ? 'item' : 'items'}
-					</Text>
-				</View>
 			</View>
 
 			{/* Search */}
@@ -306,42 +320,55 @@ const FullConcessionMenu = () => {
 }
 
 const styles = StyleSheet.create({
-	header: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		paddingHorizontal: 16,
+	infoHeader: {
+		backgroundColor: '#fff',
 		paddingVertical: 12,
+		paddingHorizontal: 16,
 		borderBottomWidth: 1,
 		borderBottomColor: '#e5e7eb',
-		backgroundColor: '#fff',
+		shadowColor: '#000',
+		shadowOffset: { width: 0, height: 1 },
+		shadowOpacity: 0.05,
+		shadowRadius: 2,
+		elevation: 2,
 	},
-	backButton: {
-		padding: 4,
-		marginRight: 12,
+	concessionButton: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		paddingVertical: 4,
 	},
-	headerTitle: {
-		fontSize: 20,
-		fontWeight: 'bold',
-		color: '#1f2937',
+	concessionNameHeader: {
+		fontSize: 18,
+		fontWeight: '600',
+		color: '#A40C2D',
+		marginBottom: 2,
 	},
-	headerSubtitle: {
-		fontSize: 14,
+	itemCount: {
+		fontSize: 13,
 		color: '#6b7280',
 	},
 	searchContainer: {
 		flexDirection: 'row',
 		alignItems: 'center',
-		margin: 16,
-		padding: 12,
-		backgroundColor: '#f9fafb',
+		marginHorizontal: 16,
+		marginVertical: 12,
+		paddingHorizontal: 12,
+		paddingVertical: 8,
+		backgroundColor: '#fff',
 		borderRadius: 8,
 		borderWidth: 1,
 		borderColor: '#e5e7eb',
+		shadowColor: '#000',
+		shadowOffset: { width: 0, height: 1 },
+		shadowOpacity: 0.05,
+		shadowRadius: 2,
+		elevation: 1,
 	},
 	searchInput: {
 		flex: 1,
-		fontSize: 16,
+		fontSize: 15,
 		color: '#1f2937',
+		paddingVertical: 4,
 	},
 	categoryFilterContainer: {
 		flexDirection: 'row',

@@ -319,38 +319,53 @@ const MenuItems = () => {
 	)
 
 	// Render a concession card with horizontal scroll of items
-	const renderConcession = (concession: Concession) => {
+	const renderConcession = (concession: Concession, cafeteriaId: number) => {
 		const itemsToShow = concession.items.slice(0, 5) // Show max 5 items
-		const hasMore = concession.items.length > 5
 
 		return (
 			<View
 				key={concession.id}
 				style={styles.concessionCard}>
-				<Text style={styles.concessionName}>{concession.name}</Text>
-
+				<TouchableOpacity
+					style={styles.concessionHeader}
+					onPress={() =>
+						(navigation as any).navigate('View Concession', {
+							concession: {
+								id: concession.id,
+								concession_name: concession.name,
+								cafeteria_id: cafeteriaId,
+							},
+							cafeteria: cafeteriaFilters.find((c) => c.id === cafeteriaId),
+						})
+					}
+					activeOpacity={0.7}>
+					<Text style={styles.concessionName}>{concession.name}</Text>
+					<Ionicons
+						name="chevron-forward"
+						size={18}
+						color="#A40C2D"
+					/>
+				</TouchableOpacity>
 				<ScrollView
 					horizontal
 					showsHorizontalScrollIndicator={false}
 					contentContainerStyle={styles.horizontalScrollContent}>
 					{itemsToShow.map((item) => renderMenuItem(item, true))}
 
-					{hasMore && (
-						<TouchableOpacity
-							style={styles.viewAllButton}
-							onPress={() =>
-								(navigation as any).navigate('Full Concession Menu', {
-									concessionId: concession.id,
-									concessionName: concession.name,
-									cafeteriaId: concession.items[0]?.cafeteria_id,
-								})
-							}>
-							<Text style={styles.viewAllText}>View All</Text>
-							<Text style={styles.viewAllCount}>
-								({concession.items.length} items)
-							</Text>
-						</TouchableOpacity>
-					)}
+					<TouchableOpacity
+						style={styles.viewAllButton}
+						onPress={() =>
+							(navigation as any).navigate('Full Concession Menu', {
+								concessionId: concession.id,
+								concessionName: concession.name,
+								cafeteriaId: concession.items[0]?.cafeteria_id,
+							})
+						}>
+						<Text style={styles.viewAllText}>View All</Text>
+						<Text style={styles.viewAllCount}>
+							({concession.items.length} items)
+						</Text>
+					</TouchableOpacity>
 				</ScrollView>
 			</View>
 		)
@@ -361,8 +376,18 @@ const MenuItems = () => {
 		<View
 			key={cafeteria.id}
 			style={styles.cafeteriaSection}>
-			<Text style={styles.cafeteriaName}>Cafeteria: {cafeteria.name}</Text>
-			{cafeteria.concessions.map((concession) => renderConcession(concession))}
+			<View style={styles.cafeteriaHeader}>
+				<Ionicons
+					name="restaurant"
+					size={22}
+					color="#A40C2D"
+					style={{ marginRight: 8 }}
+				/>
+				<Text style={styles.cafeteriaName}>{cafeteria.name}</Text>
+			</View>
+			{cafeteria.concessions.map((concession) =>
+				renderConcession(concession, cafeteria.id)
+			)}
 			<View style={styles.cafeteriaDivider} />
 		</View>
 	)
@@ -371,7 +396,7 @@ const MenuItems = () => {
 	const isSearching = searchQuery.trim().length > 0
 
 	return (
-		<View style={{ flex: 1 }}>
+		<View style={styles.mainContainer}>
 			{/* Search + Filters */}
 			<View style={styles.searchFilterRow}>
 				<TextInput
@@ -392,6 +417,42 @@ const MenuItems = () => {
 					/>
 				</TouchableOpacity>
 			</View>
+
+			{/* Selected Filters Display */}
+			{(selectedCafeteriaId || sortBy !== 'name') && !isSearching && (
+				<View style={styles.selectedFiltersContainer}>
+					<Text style={styles.selectedFiltersLabel}>Active Filters:</Text>
+					<View style={styles.selectedFiltersRow}>
+						{selectedCafeteriaId && (
+							<View style={styles.selectedFilterChip}>
+								<Text style={styles.selectedFilterText}>
+									{cafeteriaFilters.find((c) => c.id === selectedCafeteriaId)
+										?.cafeteria_name ||
+										cafeteriaFilters.find((c) => c.id === selectedCafeteriaId)
+											?.name ||
+										'Unknown'}
+								</Text>
+								<TouchableOpacity
+									onPress={() => setSelectedCafeteriaId(null)}
+									style={styles.removeFilterBtn}>
+									<Ionicons
+										name="close-circle"
+										size={16}
+										color="#fff"
+									/>
+								</TouchableOpacity>
+							</View>
+						)}
+						{sortBy !== 'name' && (
+							<View style={styles.selectedFilterChip}>
+								<Text style={styles.selectedFilterText}>
+									Sort: {sortBy === 'price_asc' ? 'Price ↑' : 'Price ↓'}
+								</Text>
+							</View>
+						)}
+					</View>
+				</View>
+			)}
 
 			{/* Main Content */}
 			{loading ?
@@ -500,13 +561,23 @@ const MenuItems = () => {
 }
 
 const styles = StyleSheet.create({
+	mainContainer: {
+		flex: 1,
+		backgroundColor: '#f9fafb',
+	},
 	searchFilterRow: {
 		flexDirection: 'row',
 		alignItems: 'center',
 		paddingHorizontal: 10,
-		marginTop: 14,
-		marginBottom: 10,
+		paddingTop: 14,
+		paddingBottom: 10,
 		columnGap: 10,
+		backgroundColor: '#fff',
+		shadowColor: '#000',
+		shadowOffset: { width: 0, height: 1 },
+		shadowOpacity: 0.05,
+		shadowRadius: 2,
+		elevation: 2,
 	},
 	searchInput: {
 		flex: 1,
@@ -600,13 +671,27 @@ const styles = StyleSheet.create({
 	applyText: { color: '#fff', textAlign: 'center', fontWeight: 'bold' },
 	// New styles for grouped view
 	cafeteriaSection: {
-		marginBottom: 20,
+		marginBottom: 24,
+		backgroundColor: '#fff',
+		paddingVertical: 16,
+		paddingHorizontal: 12,
+		marginHorizontal: 10,
+		borderRadius: 12,
+		shadowColor: '#000',
+		shadowOffset: { width: 0, height: 2 },
+		shadowOpacity: 0.05,
+		shadowRadius: 4,
+		elevation: 2,
+	},
+	cafeteriaHeader: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		marginBottom: 16,
 	},
 	cafeteriaName: {
 		fontSize: 20,
 		fontWeight: 'bold',
 		color: '#1f2937',
-		marginBottom: 12,
 	},
 	cafeteriaDivider: {
 		height: 1,
@@ -616,17 +701,29 @@ const styles = StyleSheet.create({
 	concessionCard: {
 		marginBottom: 16,
 	},
+	concessionHeader: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		justifyContent: 'space-between',
+		backgroundColor: '#f9fafb',
+		paddingVertical: 10,
+		paddingHorizontal: 12,
+		borderRadius: 8,
+		marginBottom: 10,
+		borderWidth: 1,
+		borderColor: '#e5e7eb',
+	},
 	concessionName: {
 		fontSize: 16,
 		fontWeight: '600',
-		color: '#374151',
-		marginBottom: 8,
+		color: '#A40C2D',
+		flex: 1,
 	},
 	horizontalScrollContent: {
 		paddingRight: 10,
 	},
 	horizontalCard: {
-		width: 200,
+		width: 240,
 		marginRight: 12,
 	},
 	viewAllButton: {
@@ -653,6 +750,38 @@ const styles = StyleSheet.create({
 		color: '#6b7280',
 		fontSize: 16,
 		marginTop: 40,
+	},
+	selectedFiltersContainer: {
+		paddingHorizontal: 10,
+		paddingBottom: 8,
+	},
+	selectedFiltersLabel: {
+		fontSize: 12,
+		fontWeight: '600',
+		color: '#6b7280',
+		marginBottom: 6,
+	},
+	selectedFiltersRow: {
+		flexDirection: 'row',
+		flexWrap: 'wrap',
+		gap: 8,
+	},
+	selectedFilterChip: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		backgroundColor: '#A40C2D',
+		paddingVertical: 4,
+		paddingHorizontal: 10,
+		borderRadius: 999,
+		gap: 6,
+	},
+	selectedFilterText: {
+		color: '#fff',
+		fontSize: 12,
+		fontWeight: '600',
+	},
+	removeFilterBtn: {
+		padding: 2,
 	},
 })
 
