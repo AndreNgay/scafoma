@@ -11,6 +11,7 @@ import { useForm, Controller } from 'react-hook-form'
 import { z } from 'zod'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { NativeStackScreenProps } from '@react-navigation/native-stack'
+import { Ionicons } from '@expo/vector-icons'
 import useStore from '../../store'
 import api from '../../libs/apiCall' // axios instance
 import { useToast } from '../../contexts/ToastContext'
@@ -32,6 +33,7 @@ type Props = NativeStackScreenProps<any, 'SignIn'>
 const SignIn: React.FC<Props> = ({ navigation }) => {
 	const { setCredentials } = useStore((state) => state)
 	const [loading, setLoading] = useState(false)
+	const [showPassword, setShowPassword] = useState(false)
 	const { showToast } = useToast()
 
 	const {
@@ -92,20 +94,32 @@ const SignIn: React.FC<Props> = ({ navigation }) => {
 				)}
 
 				{/* Password Field */}
-				<Controller
-					control={control}
-					name="password"
-					render={({ field: { onChange, value } }) => (
-						<TextInput
-							{...getPasswordInputProps()}
-							style={styles.input}
-							placeholder="Enter your password"
-							placeholderTextColor="#9f9f9f"
-							value={value}
-							onChangeText={(text) => onChange(preventPaste(text, value))}
+				<View style={styles.passwordContainer}>
+					<Controller
+						control={control}
+						name="password"
+						render={({ field: { onChange, value } }) => (
+							<TextInput
+								{...getPasswordInputProps()}
+								secureTextEntry={!showPassword}
+								style={[styles.input, styles.passwordInput]}
+								placeholder="Enter your password"
+								placeholderTextColor="#9f9f9f"
+								value={value}
+								onChangeText={(text) => onChange(preventPaste(text, value))}
+							/>
+						)}
+					/>
+					<TouchableOpacity
+						style={styles.eyeIcon}
+						onPress={() => setShowPassword(!showPassword)}>
+						<Ionicons
+							name={showPassword ? 'eye-off-outline' : 'eye-outline'}
+							size={22}
+							color="#666"
 						/>
-					)}
-				/>
+					</TouchableOpacity>
+				</View>
 				{errors.password && (
 					<Text style={styles.error}>{errors.password.message}</Text>
 				)}
@@ -176,6 +190,20 @@ const styles = StyleSheet.create({
 		padding: 12,
 		marginBottom: 8,
 		backgroundColor: '#fff',
+	},
+	passwordContainer: {
+		position: 'relative',
+		marginBottom: 8,
+	},
+	passwordInput: {
+		marginBottom: 0,
+		paddingRight: 45,
+	},
+	eyeIcon: {
+		position: 'absolute',
+		right: 12,
+		top: 12,
+		padding: 4,
 	},
 	button: {
 		backgroundColor: '#A40C2D',

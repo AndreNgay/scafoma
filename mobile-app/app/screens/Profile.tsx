@@ -72,6 +72,9 @@ const Profile = () => {
 		newPassword: '',
 		confirmPassword: '',
 	})
+	const [showCurrentPassword, setShowCurrentPassword] = useState(false)
+	const [showNewPassword, setShowNewPassword] = useState(false)
+	const [showConfirmPassword, setShowConfirmPassword] = useState(false)
 	const [logoutConfirmVisible, setLogoutConfirmVisible] = useState(false)
 	const [activeTab, setActiveTab] = useState<
 		'profile' | 'contact' | 'password'
@@ -118,11 +121,12 @@ const Profile = () => {
 					email: u.email || '',
 					contact_number: u.contact_number || '',
 					messenger_link: u.messenger_link || '',
-					profile_image_url: u.profile_image_url
-						? u.profile_image_url.startsWith('data:')
-							? u.profile_image_url
-							: String(u.profile_image_url)
-						: '',
+					profile_image_url:
+						u.profile_image_url ?
+							u.profile_image_url.startsWith('data:') ?
+								u.profile_image_url
+							:	String(u.profile_image_url)
+						:	'',
 				})
 			} catch (error) {
 				console.error('Error fetching user:', error)
@@ -238,11 +242,9 @@ const Profile = () => {
 	]
 
 	const primaryActionLabel =
-		activeTab === 'profile'
-			? 'Save Profile'
-			: activeTab === 'contact'
-			? 'Save Contact'
-			: 'Change Password'
+		activeTab === 'profile' ? 'Save Profile'
+		: activeTab === 'contact' ? 'Save Contact'
+		: 'Change Password'
 
 	const primaryActionHandler =
 		activeTab === 'password' ? handleChangePassword : handleUpdateProfile
@@ -264,13 +266,12 @@ const Profile = () => {
 					<TouchableOpacity
 						onPress={pickImage}
 						style={styles.imageContainer}>
-						{profile.profile_image_url ? (
+						{profile.profile_image_url ?
 							<Image
 								source={{ uri: String(profile.profile_image_url) }}
 								style={styles.profileImage}
 							/>
-						) : (
-							<View style={styles.imagePlaceholder}>
+						:	<View style={styles.imagePlaceholder}>
 								<Ionicons
 									name="person-circle-outline"
 									size={40}
@@ -280,7 +281,7 @@ const Profile = () => {
 									Tap to add photo
 								</Text>
 							</View>
-						)}
+						}
 						<View style={styles.cameraIcon}>
 							<Ionicons
 								name="camera-outline"
@@ -437,48 +438,74 @@ const Profile = () => {
 							/>
 							Security
 						</Text>
-
 						<View style={styles.inputGroup}>
 							<Text style={styles.label}>Current Password</Text>
-							<TextInput
-								{...getPasswordInputProps()}
-								style={styles.input}
-								value={passwords.currentPassword}
-								onChangeText={(t) =>
-									setPasswords({
-										...passwords,
-										currentPassword: preventPaste(t, passwords.currentPassword),
-									})
-								}
-								placeholder="Enter current password"
-							/>
+							<View style={styles.passwordContainer}>
+								<TextInput
+									{...getPasswordInputProps()}
+									style={[styles.input, styles.passwordInput]}
+									secureTextEntry={!showCurrentPassword}
+									value={passwords.currentPassword}
+									onChangeText={(t) =>
+										setPasswords({
+											...passwords,
+											currentPassword: preventPaste(
+												t,
+												passwords.currentPassword
+											),
+										})
+									}
+									placeholder="Enter current password"
+								/>
+								<TouchableOpacity
+									style={styles.eyeIcon}
+									onPress={() => setShowCurrentPassword(!showCurrentPassword)}>
+									<Ionicons
+										name={
+											showCurrentPassword ? 'eye-off-outline' : 'eye-outline'
+										}
+										size={22}
+										color="#666"
+									/>
+								</TouchableOpacity>
+							</View>
 							{errors.currentPassword && (
 								<Text style={styles.error}>{errors.currentPassword}</Text>
 							)}
 						</View>
-
 						<View style={styles.inputGroup}>
 							<Text style={styles.label}>New Password</Text>
-							<TextInput
-								{...getPasswordInputProps({
-									textContentType: 'newPassword',
-									autoComplete: 'password-new',
-								})}
-								style={styles.input}
-								value={passwords.newPassword}
-								onChangeText={(t) =>
-									setPasswords({
-										...passwords,
-										newPassword: preventPaste(t, passwords.newPassword),
-									})
-								}
-								placeholder="Enter new password"
-							/>
+							<View style={styles.passwordContainer}>
+								<TextInput
+									{...getPasswordInputProps({
+										textContentType: 'newPassword',
+										autoComplete: 'password-new',
+									})}
+									style={[styles.input, styles.passwordInput]}
+									secureTextEntry={!showNewPassword}
+									value={passwords.newPassword}
+									onChangeText={(t) =>
+										setPasswords({
+											...passwords,
+											newPassword: preventPaste(t, passwords.newPassword),
+										})
+									}
+									placeholder="Enter new password"
+								/>
+								<TouchableOpacity
+									style={styles.eyeIcon}
+									onPress={() => setShowNewPassword(!showNewPassword)}>
+									<Ionicons
+										name={showNewPassword ? 'eye-off-outline' : 'eye-outline'}
+										size={22}
+										color="#666"
+									/>
+								</TouchableOpacity>
+							</View>
 							{errors.newPassword && (
 								<Text style={styles.error}>{errors.newPassword}</Text>
 							)}
 						</View>
-
 						<View style={styles.inputGroup}>
 							<Text style={styles.label}>Confirm New Password</Text>
 							<TextInput
@@ -850,5 +877,19 @@ const styles = StyleSheet.create({
 		color: '#fff',
 		fontWeight: '600',
 		fontSize: 14,
+	},
+	passwordContainer: {
+		position: 'relative',
+		marginBottom: 0,
+	},
+	passwordInput: {
+		marginBottom: 0,
+		paddingRight: 45,
+	},
+	eyeIcon: {
+		position: 'absolute',
+		right: 12,
+		top: 12,
+		padding: 4,
 	},
 })

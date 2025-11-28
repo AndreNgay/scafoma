@@ -12,6 +12,7 @@ import { useForm, Controller } from 'react-hook-form'
 import { z } from 'zod'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useNavigation } from '@react-navigation/native'
+import { Ionicons } from '@expo/vector-icons'
 import api from '../../libs/apiCall'
 import useStore from '../../store'
 import {
@@ -49,6 +50,8 @@ type RegisterForm = z.infer<typeof RegisterSchema>
 const SignUp = () => {
 	const [isLoading, setLoading] = useState(false)
 	const [step, setStep] = useState<'profile' | 'contact'>('profile')
+	const [showPassword, setShowPassword] = useState(false)
+	const [showConfirmPassword, setShowConfirmPassword] = useState(false)
 	const navigation = useNavigation<any>()
 	const { setCredentials } = useStore((state) => state)
 
@@ -148,7 +151,6 @@ const SignUp = () => {
 					{errors.first_name && (
 						<Text style={styles.error}>{errors.first_name.message}</Text>
 					)}
-
 					{/* Last Name */}
 					<Controller
 						control={control}
@@ -167,30 +169,40 @@ const SignUp = () => {
 					{errors.last_name && (
 						<Text style={styles.error}>{errors.last_name.message}</Text>
 					)}
-
 					{/* Password */}
-					<Controller
-						control={control}
-						name="password"
-						render={({ field: { onChange, value } }) => (
-							<TextInput
-								{...getPasswordInputProps({
-									textContentType: 'newPassword',
-									autoComplete: 'password-new',
-								})}
-								style={styles.input}
-								placeholder="Password"
-								placeholderTextColor="#9f9f9f"
-								value={value}
-								onChangeText={onChange}
-								editable={!isLoading}
+					<View style={styles.passwordContainer}>
+						<Controller
+							control={control}
+							name="password"
+							render={({ field: { onChange, value } }) => (
+								<TextInput
+									{...getPasswordInputProps({
+										textContentType: 'newPassword',
+										autoComplete: 'password-new',
+									})}
+									secureTextEntry={!showPassword}
+									style={[styles.input, styles.passwordInput]}
+									placeholder="Password"
+									placeholderTextColor="#9f9f9f"
+									value={value}
+									onChangeText={onChange}
+									editable={!isLoading}
+								/>
+							)}
+						/>
+						<TouchableOpacity
+							style={styles.eyeIcon}
+							onPress={() => setShowPassword(!showPassword)}>
+							<Ionicons
+								name={showPassword ? 'eye-off-outline' : 'eye-outline'}
+								size={22}
+								color="#666"
 							/>
-						)}
-					/>
+						</TouchableOpacity>
+					</View>
 					{errors.password && (
 						<Text style={styles.error}>{errors.password.message}</Text>
-					)}
-
+					)}{' '}
 					{/* Confirm Password */}
 					<Controller
 						control={control}
@@ -333,6 +345,20 @@ const styles = StyleSheet.create({
 		borderRadius: 8,
 		padding: 12,
 		marginBottom: 6,
+	},
+	passwordContainer: {
+		position: 'relative',
+		marginBottom: 6,
+	},
+	passwordInput: {
+		marginBottom: 0,
+		paddingRight: 45,
+	},
+	eyeIcon: {
+		position: 'absolute',
+		right: 12,
+		top: 12,
+		padding: 4,
 	},
 	error: {
 		color: 'red',

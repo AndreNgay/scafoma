@@ -15,6 +15,7 @@ import Profile from './screens/Profile'
 import EditMenu from './screens/concessionaire/Menu/EditMenu'
 import Concession from './screens/concessionaire/Concession/Concession'
 import MenuItems from './screens/customer/MenuItems/MenuItems'
+import FullConcessionMenu from './screens/customer/MenuItems/FullConcessionMenu'
 import MenuItemDetails from './screens/customer/MenuItems/MenuItemDetails'
 import ViewConcession from './screens/customer/ViewConcession'
 import Home from './screens/customer/Home'
@@ -80,6 +81,11 @@ function MenuItemsStack() {
 			<MenuStackNav.Screen
 				name="View Menu Items"
 				component={MenuItems}
+				options={{ title: 'Menu' }}
+			/>
+			<MenuStackNav.Screen
+				name="Full Concession Menu"
+				component={FullConcessionMenu}
 				options={{ title: 'Menu' }}
 			/>
 			<MenuStackNav.Screen
@@ -582,31 +588,29 @@ export default function RootNavigator() {
 		<Stack.Navigator
 			screenOptions={{ headerShown: false }}
 			initialRouteName={
-				!user
-					? 'Auth'
-					: user.role === 'customer'
-					? 'Customer'
-					: 'Concessionaire'
+				!user ? 'Auth'
+				: user.role === 'customer' ?
+					'Customer'
+				:	'Concessionaire'
 			}>
-			{!user ? (
+			{!user ?
 				<Stack.Screen
 					name="Auth"
 					component={AuthStack}
 					options={{ title: '' }}
 				/>
-			) : user.role === 'customer' ? (
+			: user.role === 'customer' ?
 				<Stack.Screen
 					name="Customer"
 					component={CustomerTabs}
 					options={{ title: '' }}
 				/>
-			) : (
-				<Stack.Screen
+			:	<Stack.Screen
 					name="Concessionaire"
 					component={ConcessionaireTabs}
 					options={{ title: '' }}
 				/>
-			)}
+			}
 		</Stack.Navigator>
 	)
 }
