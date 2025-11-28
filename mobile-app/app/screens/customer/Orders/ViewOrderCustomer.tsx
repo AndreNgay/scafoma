@@ -153,6 +153,36 @@ const ViewOrderCustomer = () => {
 		}
 	}
 
+	// Auto-decline order if timer expires
+	useEffect(() => {
+		if (!order) return
+
+		const checkExpiration = async () => {
+			// Only check GCash orders that are accepted without receipt
+			if (
+				order.payment_method === 'gcash' &&
+				order.order_status === 'accepted' &&
+				!order.payment_proof
+			) {
+				const { isExpired } = calculateTimer()
+				if (isExpired) {
+					try {
+						await api.post(`/order/${order.id}/check-expired`)
+						await fetchOrder()
+						showToast(
+							'error',
+							'Order automatically declined: Receipt not uploaded in time'
+						)
+					} catch (err) {
+						console.error('Error auto-declining order:', err)
+					}
+				}
+			}
+		}
+
+		checkExpiration()
+	}, [currentTime, order?.id, order?.order_status, order?.payment_proof])
+
 	// ===============================
 	// Fetch order by ID
 	// ===============================

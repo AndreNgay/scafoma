@@ -43,6 +43,8 @@ const ViewOrderConcessionaire = () => {
 	const [customPriceReason, setCustomPriceReason] = useState<string>('')
 	const [previewSource, setPreviewSource] = useState<string | null>(null)
 	const [closingConcession, setClosingConcession] = useState(false)
+	const [currentTime, setCurrentTime] = useState(Date.now())
+	const [rejectingReceipt, setRejectingReceipt] = useState(false)
 	const { showToast } = useToast()
 
 	// Format dates with Asia/Manila timezone
@@ -129,6 +131,81 @@ const ViewOrderConcessionaire = () => {
 	useEffect(() => {
 		fetchOrderDetails()
 	}, [orderId])
+
+	// Update current time every second for timer
+	useEffect(() => {
+		const interval = setInterval(() => {
+			setCurrentTime(Date.now())
+		}, 1000)
+		return () => clearInterval(interval)
+	}, [])
+
+	// Calculate receipt timer
+	const calculateTimer = () => {
+		if (
+			!order ||
+			order.payment_method !== 'gcash' ||
+			order.order_status !== 'accepted' ||
+			!order.accepted_at ||
+			!order.receipt_timer
+		) {
+			return { timeRemaining: null, isExpired: false }
+		}
+
+		try {
+			const acceptedDate = new Date(order.accepted_at)
+			const [hours, minutes, seconds] = order.receipt_timer
+				.split(':')
+				.map(Number)
+			const deadlineMs =
+				acceptedDate.getTime() + (hours * 3600 + minutes * 60 + seconds) * 1000
+			const remainingMs = deadlineMs - currentTime
+
+			if (remainingMs <= 0) {
+				return { timeRemaining: 'Expired', isExpired: true }
+			}
+
+			const remainingMinutes = Math.floor(remainingMs / 60000)
+			const remainingSeconds = Math.floor((remainingMs % 60000) / 1000)
+			return {
+				timeRemaining: `${remainingMinutes}:${remainingSeconds.toString().padStart(2, '0')}`,
+				isExpired: false,
+			}
+		} catch (e) {
+			console.error('Error calculating timer:', e)
+			return { timeRemaining: null, isExpired: false }
+		}
+	}
+
+	// Auto-decline order if timer expires
+	useEffect(() => {
+		if (!order) return
+
+		const checkExpiration = async () => {
+			// Only check GCash orders that are accepted without receipt
+			if (
+				order.payment_method === 'gcash' &&
+				order.order_status === 'accepted' &&
+				!order.gcash_screenshot
+			) {
+				const { isExpired } = calculateTimer()
+				if (isExpired) {
+					try {
+						await api.post(`/order/${order.id}/check-expired`)
+						await fetchOrderDetails()
+						showToast(
+							'error',
+							'Order automatically declined: Receipt not uploaded in time'
+						)
+					} catch (err) {
+						console.error('Error auto-declining order:', err)
+					}
+				}
+			}
+		}
+
+		checkExpiration()
+	}, [currentTime, order?.id, order?.order_status, order?.gcash_screenshot])
 
 	// Update order status
 	const updateStatus = async (newStatus: string, declineReason?: string) => {
@@ -266,16 +343,20 @@ const ViewOrderConcessionaire = () => {
 	const openAcceptModal = () => {
 		if (!order) return
 		const baseTotal =
-			order.updated_total_price !== null &&
-			order.updated_total_price !== undefined
-				? order.updated_total_price
-				: order.total_price
+			(
+				order.updated_total_price !== null &&
+				order.updated_total_price !== undefined
+			) ?
+				order.updated_total_price
+			:	order.total_price
 		const formatted =
-			baseTotal !== null &&
-			baseTotal !== undefined &&
-			!Number.isNaN(Number(baseTotal))
-				? Number(baseTotal).toFixed(2)
-				: ''
+			(
+				baseTotal !== null &&
+				baseTotal !== undefined &&
+				!Number.isNaN(Number(baseTotal))
+			) ?
+				Number(baseTotal).toFixed(2)
+			:	''
 		setAdjustedTotal(formatted)
 		setPriceReason('')
 		setCustomPriceReason('')
@@ -336,6 +417,23 @@ const ViewOrderConcessionaire = () => {
 	const onRefresh = () => {
 		if (loading) return
 		fetchOrderDetails(true)
+	}
+
+	// Reject receipt and restart timer
+	const rejectReceipt = async () => {
+		if (!order) return
+
+		try {
+			setRejectingReceipt(true)
+			await api.put(`/order/${order.id}/reject-receipt`)
+			await fetchOrderDetails()
+			showToast('success', 'Receipt rejected. Timer restarted.')
+		} catch (err) {
+			console.error('Error rejecting receipt:', err)
+			showToast('error', 'Failed to reject receipt')
+		} finally {
+			setRejectingReceipt(false)
+		}
 	}
 
 	if (loading)
@@ -421,19 +519,18 @@ const ViewOrderConcessionaire = () => {
 						customerId: order.customer_id,
 					})
 				}>
-				{order.customer_profile_image ? (
+				{order.customer_profile_image ?
 					<Image
 						source={{ uri: order.customer_profile_image }}
 						style={styles.customerAvatar}
 					/>
-				) : (
-					<View style={styles.customerAvatarPlaceholder}>
+				:	<View style={styles.customerAvatarPlaceholder}>
 						<Text style={styles.customerInitials}>
 							{order.customer_first_name?.[0]}
 							{order.customer_last_name?.[0]}
 						</Text>
 					</View>
-				)}
+				}
 				<View style={styles.customerInfo}>
 					<Text style={styles.customerName}>
 						{order.customer_first_name} {order.customer_last_name}
@@ -498,11 +595,13 @@ const ViewOrderConcessionaire = () => {
 					/>{' '}
 					Pricing
 				</Text>
-				{order.updated_total_price !== null &&
-				order.updated_total_price !== undefined &&
-				!Number.isNaN(Number(order.updated_total_price)) &&
-				!Number.isNaN(Number(order.total_price)) &&
-				Number(order.updated_total_price) !== Number(order.total_price) ? (
+				{(
+					order.updated_total_price !== null &&
+					order.updated_total_price !== undefined &&
+					!Number.isNaN(Number(order.updated_total_price)) &&
+					!Number.isNaN(Number(order.total_price)) &&
+					Number(order.updated_total_price) !== Number(order.total_price)
+				) ?
 					<>
 						<View style={styles.infoSection}>
 							<Text style={styles.infoLabel}>Original Total:</Text>
@@ -525,14 +624,13 @@ const ViewOrderConcessionaire = () => {
 							</View>
 						)}
 					</>
-				) : (
-					<View style={styles.infoSection}>
+				:	<View style={styles.infoSection}>
 						<Text style={styles.infoLabel}>Total:</Text>
 						<Text style={[styles.infoValue, styles.totalPrice]}>
 							₱{Number(order.total_price).toFixed(2)}
 						</Text>
 					</View>
-				)}
+				}
 			</View>
 
 			{/* Payment Information */}
@@ -549,10 +647,9 @@ const ViewOrderConcessionaire = () => {
 				<View style={styles.infoSection}>
 					<Text style={styles.infoLabel}>Payment Method:</Text>
 					<View style={styles.paymentMethodDisplay}>
-						{order.payment_method === 'gcash' ? (
+						{order.payment_method === 'gcash' ?
 							<Text style={styles.infoValue}>GCash</Text>
-						) : (
-							<Text style={styles.infoValue}>
+						:	<Text style={styles.infoValue}>
 								<Ionicons
 									name="cash-outline"
 									size={14}
@@ -561,14 +658,91 @@ const ViewOrderConcessionaire = () => {
 								/>{' '}
 								On-Counter
 							</Text>
-						)}
+						}
 					</View>
 				</View>
 				{order.payment_method === 'gcash' && (
 					<View style={styles.gcashSection}>
-						{order.gcash_screenshot && (
+						{/* Receipt Timer - only show when accepted */}
+						{order.order_status === 'accepted' &&
+							order.accepted_at &&
+							order.receipt_timer &&
+							(() => {
+								const { timeRemaining, isExpired } = calculateTimer()
+
+								return timeRemaining ?
+										<View
+											style={[
+												styles.timerCard,
+												isExpired && styles.timerCardExpired,
+											]}>
+											<View style={styles.timerHeader}>
+												<Ionicons
+													name={isExpired ? 'alert-circle' : 'time'}
+													size={20}
+													color={isExpired ? '#dc3545' : '#28a745'}
+												/>
+												<Text
+													style={[
+														styles.timerTitle,
+														isExpired && styles.timerTitleExpired,
+													]}>
+													{isExpired ?
+														'Receipt Upload Expired'
+													:	'Time Remaining for Receipt'}
+												</Text>
+											</View>
+											<Text
+												style={[
+													styles.timerCountdown,
+													isExpired && styles.timerCountdownExpired,
+												]}>
+												{timeRemaining}
+											</Text>
+											{!isExpired && (
+												<Text style={styles.timerInstructions}>
+													⏳ Customer must upload GCash receipt before timer
+													expires
+												</Text>
+											)}
+											{isExpired && (
+												<Text style={styles.timerExpiredMessage}>
+													⏰ Upload time has expired. Consider declining this
+													order.
+												</Text>
+											)}
+										</View>
+									:	null
+							})()}
+
+						{/* Receipt Status Indicators */}
+						{order.gcash_screenshot ?
 							<View style={styles.paymentProofSection}>
-								<Text style={styles.infoLabel}>GCash Screenshot:</Text>
+								<View
+									style={{
+										flexDirection: 'row',
+										justifyContent: 'space-between',
+										alignItems: 'center',
+										marginBottom: 8,
+									}}>
+									<Text style={styles.infoLabel}>GCash Screenshot:</Text>
+									<View
+										style={{
+											backgroundColor: '#28a745',
+											paddingHorizontal: 8,
+											paddingVertical: 4,
+											borderRadius: 4,
+										}}>
+										<Text
+											style={{
+												color: '#fff',
+												fontSize: 12,
+												fontWeight: '600',
+											}}>
+											Uploaded
+										</Text>
+									</View>
+								</View>
 								<TouchableOpacity
 									onPress={() => setPreviewSource(order.gcash_screenshot)}>
 									<Image
@@ -576,12 +750,44 @@ const ViewOrderConcessionaire = () => {
 										style={styles.paymentProof}
 									/>
 								</TouchableOpacity>
+
+								{/* Reject Receipt Button */}
+								{order.order_status === 'accepted' && (
+									<TouchableOpacity
+										style={[
+											styles.rejectReceiptBtn,
+											rejectingReceipt && styles.rejectReceiptBtnDisabled,
+										]}
+										onPress={rejectReceipt}
+										disabled={rejectingReceipt}>
+										<Ionicons
+											name="close-circle-outline"
+											size={16}
+											color="#fff"
+											style={{ marginRight: 6 }}
+										/>
+										<Text style={styles.rejectReceiptText}>
+											{rejectingReceipt ?
+												'Rejecting...'
+											:	'Reject Receipt (Not Legitimate)'}
+										</Text>
+									</TouchableOpacity>
+								)}
 							</View>
-						)}
+						:	<View style={styles.noReceiptContainer}>
+								<Ionicons
+									name="alert-circle-outline"
+									size={24}
+									color="#ff9800"
+								/>
+								<Text style={styles.noReceiptText}>
+									No GCash receipt uploaded yet
+								</Text>
+							</View>
+						}
 					</View>
 				)}
 			</View>
-
 			{/* Decline Reason (if applicable) */}
 			{order.order_status === 'declined' && order.decline_reason && (
 				<View style={[styles.sectionCard, styles.declineCard]}>
@@ -626,9 +832,9 @@ const ViewOrderConcessionaire = () => {
 							<Text style={styles.infoValue}>
 								<Ionicons
 									name={
-										item.dining_option === 'take-out'
-											? 'cube-outline'
-											: 'restaurant-outline'
+										item.dining_option === 'take-out' ?
+											'cube-outline'
+										:	'restaurant-outline'
 									}
 									size={14}
 									color="#666"
@@ -647,11 +853,11 @@ const ViewOrderConcessionaire = () => {
 											• {v.variation_group_name}: {v.variation_name}
 											{v.quantity > 1 ? ` x${v.quantity}` : ''} (+₱
 											{Number(v.additional_price || 0).toFixed(2)})
-											{v.quantity > 1
-												? ` = ₱${(
-														Number(v.additional_price || 0) * (v.quantity || 1)
-												  ).toFixed(2)}`
-												: ''}
+											{v.quantity > 1 ?
+												` = ₱${(
+													Number(v.additional_price || 0) * (v.quantity || 1)
+												).toFixed(2)}`
+											:	''}
 										</Text>
 									))}
 								</View>
@@ -714,9 +920,9 @@ const ViewOrderConcessionaire = () => {
 								key={index}
 								style={[
 									styles.reasonOption,
-									(index === 3
-										? priceReason === 'custom'
-										: priceReason === reason) && styles.selectedReason,
+									(index === 3 ?
+										priceReason === 'custom'
+									:	priceReason === reason) && styles.selectedReason,
 								]}
 								onPress={() => {
 									if (index === 3) {
@@ -729,9 +935,9 @@ const ViewOrderConcessionaire = () => {
 								<Text
 									style={[
 										styles.reasonText,
-										(index === 3
-											? priceReason === 'custom'
-											: priceReason === reason) && styles.selectedReasonText,
+										(index === 3 ?
+											priceReason === 'custom'
+										:	priceReason === reason) && styles.selectedReasonText,
 									]}>
 									{reason}
 								</Text>
@@ -998,11 +1204,14 @@ const ViewOrderConcessionaire = () => {
 																			setVariationsToToggle(newState)
 																		}}
 																		color={
-																			variations.every(
-																				(v) => variationsToToggle[v.variationId]
-																			)
-																				? '#A40C2D'
-																				: undefined
+																			(
+																				variations.every(
+																					(v) =>
+																						variationsToToggle[v.variationId]
+																				)
+																			) ?
+																				'#A40C2D'
+																			:	undefined
 																		}
 																		style={styles.checkbox}
 																	/>
@@ -1039,9 +1248,9 @@ const ViewOrderConcessionaire = () => {
 																				}))
 																			}}
 																			color={
-																				variationsToToggle[v.variationId]
-																					? '#A40C2D'
-																					: undefined
+																				variationsToToggle[v.variationId] ?
+																					'#A40C2D'
+																				:	undefined
 																			}
 																			style={styles.checkbox}
 																		/>
@@ -1461,6 +1670,88 @@ const styles = StyleSheet.create({
 		alignItems: 'center',
 		flex: 1,
 		justifyContent: 'flex-end',
+	},
+	timerCard: {
+		backgroundColor: '#e8f5e9',
+		borderRadius: 8,
+		padding: 12,
+		marginBottom: 12,
+		borderWidth: 2,
+		borderColor: '#28a745',
+	},
+	timerCardExpired: {
+		backgroundColor: '#ffebee',
+		borderColor: '#dc3545',
+	},
+	timerHeader: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		marginBottom: 8,
+		gap: 8,
+	},
+	timerTitle: {
+		fontSize: 14,
+		fontWeight: '700',
+		color: '#28a745',
+	},
+	timerTitleExpired: {
+		color: '#dc3545',
+	},
+	timerCountdown: {
+		fontSize: 28,
+		fontWeight: '900',
+		color: '#28a745',
+		textAlign: 'center',
+		marginVertical: 8,
+	},
+	timerCountdownExpired: {
+		color: '#dc3545',
+	},
+	timerInstructions: {
+		fontSize: 11,
+		color: '#666',
+		textAlign: 'center',
+		marginTop: 4,
+	},
+	timerExpiredMessage: {
+		fontSize: 11,
+		color: '#dc3545',
+		textAlign: 'center',
+		marginTop: 4,
+		fontWeight: '600',
+	},
+	rejectReceiptBtn: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		justifyContent: 'center',
+		backgroundColor: '#dc3545',
+		padding: 12,
+		borderRadius: 8,
+		marginTop: 12,
+	},
+	rejectReceiptBtnDisabled: {
+		opacity: 0.6,
+	},
+	rejectReceiptText: {
+		color: '#fff',
+		fontSize: 14,
+		fontWeight: '600',
+	},
+	noReceiptContainer: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		justifyContent: 'center',
+		backgroundColor: '#fff8e1',
+		padding: 16,
+		borderRadius: 8,
+		borderWidth: 1,
+		borderColor: '#ff9800',
+		gap: 10,
+	},
+	noReceiptText: {
+		fontSize: 14,
+		color: '#ff9800',
+		fontWeight: '600',
 	},
 })
 

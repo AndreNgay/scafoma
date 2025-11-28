@@ -14,6 +14,8 @@ import {
 	getOrderById,
 	cancelOrder,
 	notifyConcessionaireForOrder,
+	rejectReceipt,
+	checkAndDeclineExpiredReceipt,
 } from '../controllers/orderController.js'
 import { upload } from './concessionRoutes.js'
 import authMiddleware from '../middleware/authMiddleware.js'
@@ -38,5 +40,7 @@ router.put('/checkout/:id', checkoutCart)
 router.put('/checkout-single', checkoutSingleOrder) // Checkout single order by order_id
 router.patch('/:id/payment-method', updatePaymentMethod)
 router.post('/:id/notify', authMiddleware, notifyConcessionaireForOrder)
+router.put('/:id/reject-receipt', rejectReceipt) // Reject receipt and restart timer
+router.post('/:id/check-expired', checkAndDeclineExpiredReceipt) // Auto-decline if receipt timer expired
 
 export default router

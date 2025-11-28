@@ -633,6 +633,130 @@ export const updatePaymentMethod = async (req, res) => {
 }
 
 // ==========================
+// Reject receipt (concessionaire only)
+// Clears the receipt screenshot and resets accepted_at to restart timer
+// ==========================
+export const rejectReceipt = async (req, res) => {
+	const { id } = req.params
+
+	try {
+		// Check if order exists and is in accepted status
+		const orderCheck = await pool.query(
+			`SELECT order_status, payment_method FROM tblorder WHERE id = $1`,
+			[id]
+		)
+
+		if (orderCheck.rowCount === 0) {
+			return res.status(404).json({ error: 'Order not found' })
+		}
+
+		const { order_status, payment_method } = orderCheck.rows[0]
+
+		// Only allow rejection for accepted GCash orders
+		if (order_status !== 'accepted') {
+			return res.status(400).json({
+				error: 'Receipt can only be rejected for accepted orders',
+			})
+		}
+
+		if (payment_method !== 'gcash') {
+			return res.status(400).json({
+				error: 'Receipt rejection only applies to GCash payments',
+			})
+		}
+
+		// Clear screenshot and reset accepted_at to restart timer
+		const result = await pool.query(
+			`UPDATE tblorder 
+       SET gcash_screenshot = NULL, 
+           accepted_at = NOW(), 
+           updated_at = NOW()
+       WHERE id = $1 
+       RETURNING *`,
+			[id]
+		)
+
+		const order = result.rows[0]
+		order.payment_proof = null
+
+		res.json(order)
+	} catch (err) {
+		console.error('Error rejecting receipt:', err)
+		res.status(500).json({ error: 'Failed to reject receipt' })
+	}
+}
+
+// ==========================
+// Auto-decline expired GCash receipt timer
+// Checks if timer expired and auto-declines the order
+// ==========================
+export const checkAndDeclineExpiredReceipt = async (req, res) => {
+	const { id } = req.params
+
+	try {
+		// Fetch order with receipt_timer from concession
+		const result = await pool.query(
+			`SELECT o.*, c.receipt_timer 
+       FROM tblorder o
+       JOIN tblconcession c ON o.concession_id = c.id
+       WHERE o.id = $1`,
+			[id]
+		)
+
+		if (result.rowCount === 0) {
+			return res.status(404).json({ error: 'Order not found' })
+		}
+
+		const order = result.rows[0]
+
+		// Only check GCash orders that are accepted and don't have receipt
+		if (
+			order.payment_method !== 'gcash' ||
+			order.order_status !== 'accepted' ||
+			order.gcash_screenshot !== null
+		) {
+			return res.json({
+				declined: false,
+				message: 'Order does not need to be declined',
+			})
+		}
+
+		// Check if timer expired
+		if (!order.accepted_at || !order.receipt_timer) {
+			return res.json({ declined: false, message: 'Missing timer data' })
+		}
+
+		const acceptedDate = new Date(order.accepted_at)
+		const [hours, minutes, seconds] = order.receipt_timer.split(':').map(Number)
+		const deadlineMs =
+			acceptedDate.getTime() + (hours * 3600 + minutes * 60 + seconds) * 1000
+		const now = Date.now()
+
+		// If expired, auto-decline
+		if (now >= deadlineMs) {
+			await pool.query(
+				`UPDATE tblorder 
+         SET order_status = 'declined', 
+             decline_reason = 'Order automatically declined: GCash receipt not uploaded within the required time.', 
+             updated_at = NOW()
+         WHERE id = $1`,
+				[id]
+			)
+
+			return res.json({
+				declined: true,
+				message: 'Order auto-declined due to expired receipt timer',
+			})
+		}
+
+		return res.json({ declined: false, message: 'Timer not expired' })
+	} catch (err) {
+		console.error(err)
+		res.status(500).json({ error: 'Failed to check receipt timer' })
+	}
+}
+
+// ==========================
 // Add a new order
 // ==========================
 export const addOrder = async (req, res) => {
