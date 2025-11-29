@@ -47,52 +47,34 @@ const ViewOrderConcessionaire = () => {
 	const [rejectingReceipt, setRejectingReceipt] = useState(false)
 	const { showToast } = useToast()
 
-	// Format dates with Asia/Manila timezone
+	// Format dates with Asia/Manila timezone (robust to plain DB timestamps)
 	const formatManila = (value: any) => {
 		if (!value) return ''
 		try {
+			let dateObj: Date
+
 			if (typeof value === 'string') {
-				if (/[zZ]|[+-]\d{2}:?\d{2}/.test(value)) {
-					const d = new Date(value)
-					return new Intl.DateTimeFormat('en-PH', {
-						timeZone: 'Asia/Manila',
-						year: 'numeric',
-						month: 'short',
-						day: '2-digit',
-						hour: 'numeric',
-						minute: '2-digit',
-					}).format(d)
+				let s = value.trim()
+
+				// If backend already includes timezone info (Z or offset), trust it
+				if (/[zZ]|[+-]\d{2}:?\d{2}/.test(s)) {
+					dateObj = new Date(s)
+				} else {
+					// Handle plain "YYYY-MM-DD HH:MM:SS[.ffffff]" from backend.
+					// Treat as UTC then render in Asia/Manila so DB times like
+					// "2025-11-29 07:21:35.822299" become Manila local time.
+					s = s.replace(' ', 'T')
+					if (!/[zZ]|[+-]\d{2}:?\d{2}$/.test(s)) {
+						s += 'Z'
+					}
+					dateObj = new Date(s)
 				}
-				const cleaned = value.replace('T', ' ')
-				const [datePart, timePartFull] = cleaned.split(' ')
-				if (!datePart || !timePartFull) return cleaned
-				const [year, month, day] = datePart
-					.split('-')
-					.map((p) => parseInt(p, 10))
-				const [hStr, mStr] = timePartFull.split(':')
-				if (!year || !month || !day || !hStr || !mStr) return cleaned
-				let hour = parseInt(hStr, 10)
-				const ampm = hour >= 12 ? 'PM' : 'AM'
-				hour = hour % 12
-				if (hour === 0) hour = 12
-				const monthNames = [
-					'Jan',
-					'Feb',
-					'Mar',
-					'Apr',
-					'May',
-					'Jun',
-					'Jul',
-					'Aug',
-					'Sep',
-					'Oct',
-					'Nov',
-					'Dec',
-				]
-				return `${
-					monthNames[month - 1]
-				} ${day}, ${year} ${hour}:${mStr} ${ampm}`
+			} else {
+				dateObj = new Date(value)
 			}
+
+			if (Number.isNaN(dateObj.getTime())) return String(value)
+
 			return new Intl.DateTimeFormat('en-PH', {
 				timeZone: 'Asia/Manila',
 				year: 'numeric',
@@ -100,11 +82,14 @@ const ViewOrderConcessionaire = () => {
 				day: '2-digit',
 				hour: 'numeric',
 				minute: '2-digit',
-			}).format(new Date(value))
+			}).format(dateObj)
 		} catch {
 			return String(value)
 		}
 	}
+
+	const formatSchedule = (value: any) => formatManila(value)
+	const formatDateTime = (value: any) => formatManila(value)
 
 	// Fetch order details from backend
 	const fetchOrderDetails = async (isRefresh = false) => {
@@ -145,20 +130,35 @@ const ViewOrderConcessionaire = () => {
 		if (
 			!order ||
 			order.payment_method !== 'gcash' ||
-			order.order_status !== 'accepted' ||
-			!order.accepted_at ||
-			!order.receipt_timer
+			order.order_status !== 'accepted'
 		) {
 			return { timeRemaining: null, isExpired: false }
 		}
 
 		try {
-			const acceptedDate = new Date(order.accepted_at)
-			const [hours, minutes, seconds] = order.receipt_timer
-				.split(':')
-				.map(Number)
-			const deadlineMs =
-				acceptedDate.getTime() + (hours * 3600 + minutes * 60 + seconds) * 1000
+			// Prefer explicit expiry timestamp from backend, fall back to accepted_at + receipt_timer
+			let deadlineMs: number | null = null
+			if (order.payment_receipt_expires_at) {
+				const expiresDate = new Date(order.payment_receipt_expires_at)
+				if (!Number.isNaN(expiresDate.getTime())) {
+					deadlineMs = expiresDate.getTime()
+				}
+			}
+
+			if (deadlineMs === null) {
+				if (!order.accepted_at || !order.receipt_timer) {
+					return { timeRemaining: null, isExpired: false }
+				}
+
+				const acceptedDate = new Date(order.accepted_at)
+				const [hours, minutes, seconds] = order.receipt_timer
+					.split(':')
+					.map(Number)
+				deadlineMs =
+					acceptedDate.getTime() +
+					(hours * 3600 + minutes * 60 + seconds) * 1000
+			}
+
 			const remainingMs = deadlineMs - currentTime
 
 			if (remainingMs <= 0) {
@@ -168,7 +168,9 @@ const ViewOrderConcessionaire = () => {
 			const remainingMinutes = Math.floor(remainingMs / 60000)
 			const remainingSeconds = Math.floor((remainingMs % 60000) / 1000)
 			return {
-				timeRemaining: `${remainingMinutes}:${remainingSeconds.toString().padStart(2, '0')}`,
+				timeRemaining: `${remainingMinutes}:${remainingSeconds
+					.toString()
+					.padStart(2, '0')}`,
 				isExpired: false,
 			}
 		} catch (e) {
@@ -468,11 +470,40 @@ const ViewOrderConcessionaire = () => {
 						<TouchableOpacity
 							style={styles.declineBtn}
 							onPress={handleDecline}>
-							<Text style={styles.btnText}>Decline</Text>
+							<Text style={styles.btnText}>Decline Order</Text>
 						</TouchableOpacity>
 					</View>
 				)
-			case 'accepted':
+			case 'accepted': {
+				const { isExpired } = calculateTimer()
+				const gcashTimeoutExpired =
+					order.payment_method === 'gcash' &&
+					!order.gcash_screenshot &&
+					isExpired
+
+				if (gcashTimeoutExpired) {
+					return (
+						<View style={styles.expiredTimerContainer}>
+							<View style={styles.expiredTimerMessage}>
+								<Ionicons
+									name="alert-circle"
+									size={24}
+									color="#dc3545"
+									style={{ marginRight: 10 }}
+								/>
+								<Text style={styles.expiredTimerText}>
+									GCash receipt upload time has expired. This order must be declined.
+								</Text>
+							</View>
+							<TouchableOpacity
+								style={styles.declineBtn}
+								onPress={handleDecline}>
+								<Text style={styles.btnText}>Decline Order</Text>
+							</TouchableOpacity>
+						</View>
+					)
+				}
+
 				return (
 					<TouchableOpacity
 						style={styles.readyBtn}
@@ -480,6 +511,7 @@ const ViewOrderConcessionaire = () => {
 						<Text style={styles.btnText}>Ready for Pick-up</Text>
 					</TouchableOpacity>
 				)
+			}
 			case 'ready for pickup':
 				return (
 					<TouchableOpacity
@@ -560,7 +592,7 @@ const ViewOrderConcessionaire = () => {
 				</View>
 				<View style={styles.infoSection}>
 					<Text style={styles.infoLabel}>Order Date:</Text>
-					<Text style={styles.infoValue}>{formatManila(order.created_at)}</Text>
+					<Text style={styles.infoValue}>{formatDateTime(order.created_at)}</Text>
 				</View>
 				{order.schedule_time && (
 					<View style={styles.infoSection}>
@@ -572,7 +604,7 @@ const ViewOrderConcessionaire = () => {
 								color="#28a745"
 								style={styles.inlineIcon}
 							/>{' '}
-							{formatManila(order.schedule_time)}
+							{formatSchedule(order.schedule_time)}
 						</Text>
 					</View>
 				)}
@@ -715,6 +747,14 @@ const ViewOrderConcessionaire = () => {
 									:	null
 							})()}
 
+						{/* Explicit expiry timestamp */}
+						{order.payment_receipt_expires_at && (
+							<Text style={styles.paymentExpiryText}>
+								Payment expires at:{' '}
+								{formatDateTime(order.payment_receipt_expires_at)}
+							</Text>
+						)}
+
 						{/* Receipt Status Indicators */}
 						{order.gcash_screenshot ?
 							<View style={styles.paymentProofSection}>
@@ -788,6 +828,7 @@ const ViewOrderConcessionaire = () => {
 					</View>
 				)}
 			</View>
+
 			{/* Decline Reason (if applicable) */}
 			{order.order_status === 'declined' && order.decline_reason && (
 				<View style={[styles.sectionCard, styles.declineCard]}>
@@ -1752,6 +1793,30 @@ const styles = StyleSheet.create({
 		fontSize: 14,
 		color: '#ff9800',
 		fontWeight: '600',
+	},
+	paymentExpiryText: {
+		marginTop: 4,
+		fontSize: 12,
+		color: '#555',
+	},
+	expiredTimerContainer: {
+		marginTop: 15,
+		padding: 12,
+		backgroundColor: '#ffebee',
+		borderRadius: 8,
+		borderWidth: 2,
+		borderColor: '#dc3545',
+	},
+	expiredTimerMessage: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		marginBottom: 12,
+	},
+	expiredTimerText: {
+		fontSize: 14,
+		fontWeight: '600',
+		color: '#dc3545',
+		flex: 1,
 	},
 })
 

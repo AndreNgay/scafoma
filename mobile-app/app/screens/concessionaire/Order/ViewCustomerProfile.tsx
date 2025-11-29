@@ -79,7 +79,12 @@ const ViewCustomerProfile = () => {
         {customer.created_at && (
           <View style={styles.memberBadge}>
             <Text style={styles.memberBadgeText}>
-              Member since {new Date(customer.created_at).toLocaleDateString()}
+              Member since {new Intl.DateTimeFormat("en-PH", {
+                timeZone: "Asia/Manila",
+                year: "numeric",
+                month: "short",
+                day: "2-digit",
+              }).format(new Date(customer.created_at))}
             </Text>
           </View>
         )}

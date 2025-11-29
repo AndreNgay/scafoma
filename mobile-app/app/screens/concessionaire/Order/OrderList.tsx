@@ -58,6 +58,48 @@ const OrderList = () => {
   const user = useStore((state: any) => state.user);
   const hasInitialized = useRef(false);
 
+  const formatManila = (value: any) => {
+    if (!value) return "";
+    try {
+      let dateObj: Date;
+
+      if (typeof value === "string") {
+        let s = value.trim();
+
+        // If backend already includes timezone info (Z or offset), trust it
+        if (/[zZ]|[+-]\d{2}:?\d{2}/.test(s)) {
+          dateObj = new Date(s);
+        } else {
+          // Handle plain "YYYY-MM-DD HH:MM:SS[.ffffff]" from backend.
+          // Treat as UTC then render in Asia/Manila so DB times like
+          // "2025-11-29 07:21:35.822299" become mid-afternoon Manila time.
+          s = s.replace(" ", "T");
+          if (!/[zZ]|[+-]\d{2}:?\d{2}$/.test(s)) {
+            s += "Z";
+          }
+          dateObj = new Date(s);
+        }
+      } else {
+        dateObj = new Date(value);
+      }
+
+      if (Number.isNaN(dateObj.getTime())) return String(value);
+
+      return new Intl.DateTimeFormat("en-PH", {
+        timeZone: "Asia/Manila",
+        year: "numeric",
+        month: "short",
+        day: "2-digit",
+        hour: "numeric",
+        minute: "2-digit",
+      }).format(dateObj);
+    } catch {
+      return String(value);
+    }
+  };
+
+  const formatDateTime = (value: any) => formatManila(value);
+
   const normalizeStatus = (value: any) =>
     String(value || "")
       .trim()
@@ -282,7 +324,7 @@ const OrderList = () => {
         ) : (
           <Text>Total: ₱{Number(item.total_price).toFixed(2)}</Text>
         )}
-        <Text>Date: {new Date(item.created_at).toLocaleString()}</Text>
+        <Text>Date: {formatDateTime(item.created_at)}</Text>
       </View>
     </TouchableOpacity>
   );

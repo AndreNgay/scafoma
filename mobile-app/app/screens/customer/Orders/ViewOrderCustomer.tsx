@@ -58,48 +58,29 @@ const ViewOrderCustomer = () => {
 	const formatManila = (value: any) => {
 		if (!value) return ''
 		try {
+			let dateObj: Date
+
 			if (typeof value === 'string') {
-				if (/[zZ]|[+-]\d{2}:?\d{2}/.test(value)) {
-					const d = new Date(value)
-					return new Intl.DateTimeFormat('en-PH', {
-						timeZone: 'Asia/Manila',
-						year: 'numeric',
-						month: 'short',
-						day: '2-digit',
-						hour: 'numeric',
-						minute: '2-digit',
-					}).format(d)
+				let s = value.trim()
+
+				if (/[zZ]|[+-]\d{2}:?\d{2}/.test(s)) {
+					dateObj = new Date(s)
+				} else {
+					// Handle plain "YYYY-MM-DD HH:MM:SS[.ffffff]" from backend.
+					// Treat as UTC then render in Asia/Manila so DB times like
+					// "2025-11-29 07:21:35.822299" become Manila local time.
+					s = s.replace(' ', 'T')
+					if (!/[zZ]|[+-]\d{2}:?\d{2}$/.test(s)) {
+						s += 'Z'
+					}
+					dateObj = new Date(s)
 				}
-				const cleaned = value.replace('T', ' ')
-				const [datePart, timePartFull] = cleaned.split(' ')
-				if (!datePart || !timePartFull) return cleaned
-				const [year, month, day] = datePart
-					.split('-')
-					.map((p) => parseInt(p, 10))
-				const [hStr, mStr] = timePartFull.split(':')
-				if (!year || !month || !day || !hStr || !mStr) return cleaned
-				let hour = parseInt(hStr, 10)
-				const ampm = hour >= 12 ? 'PM' : 'AM'
-				hour = hour % 12
-				if (hour === 0) hour = 12
-				const monthNames = [
-					'Jan',
-					'Feb',
-					'Mar',
-					'Apr',
-					'May',
-					'Jun',
-					'Jul',
-					'Aug',
-					'Sep',
-					'Oct',
-					'Nov',
-					'Dec',
-				]
-				return `${
-					monthNames[month - 1]
-				} ${day}, ${year} ${hour}:${mStr} ${ampm}`
+			} else {
+				dateObj = new Date(value)
 			}
+
+			if (Number.isNaN(dateObj.getTime())) return String(value)
+
 			return new Intl.DateTimeFormat('en-PH', {
 				timeZone: 'Asia/Manila',
 				year: 'numeric',
@@ -107,7 +88,7 @@ const ViewOrderCustomer = () => {
 				day: '2-digit',
 				hour: 'numeric',
 				minute: '2-digit',
-			}).format(new Date(value))
+			}).format(dateObj)
 		} catch {
 			return String(value)
 		}
@@ -121,20 +102,35 @@ const ViewOrderCustomer = () => {
 		if (
 			!order ||
 			order.payment_method !== 'gcash' ||
-			order.order_status !== 'accepted' ||
-			!order.accepted_at ||
-			!order.receipt_timer
+			order.order_status !== 'accepted'
 		) {
 			return { timeRemaining: null, isExpired: false }
 		}
 
 		try {
-			const acceptedDate = new Date(order.accepted_at)
-			const [hours, minutes, seconds] = order.receipt_timer
-				.split(':')
-				.map(Number)
-			const deadlineMs =
-				acceptedDate.getTime() + (hours * 3600 + minutes * 60 + seconds) * 1000
+			// Prefer explicit expiry timestamp from backend, fall back to accepted_at + receipt_timer
+			let deadlineMs: number | null = null
+			if (order.payment_receipt_expires_at) {
+				const expiresDate = new Date(order.payment_receipt_expires_at)
+				if (!Number.isNaN(expiresDate.getTime())) {
+					deadlineMs = expiresDate.getTime()
+				}
+			}
+
+			if (deadlineMs === null) {
+				if (!order.accepted_at || !order.receipt_timer) {
+					return { timeRemaining: null, isExpired: false }
+				}
+
+				const acceptedDate = new Date(order.accepted_at)
+				const [hours, minutes, seconds] = order.receipt_timer
+					.split(':')
+					.map(Number)
+				deadlineMs =
+					acceptedDate.getTime() +
+					(hours * 3600 + minutes * 60 + seconds) * 1000
+			}
+
 			const remainingMs = deadlineMs - currentTime
 
 			if (remainingMs <= 0) {
@@ -297,6 +293,13 @@ const ViewOrderCustomer = () => {
 
 	const uploadPaymentProof = async (uri: string) => {
 		if (!order) return
+
+		// Check if timer has expired before uploading
+		const { isExpired } = calculateTimer()
+		if (isExpired) {
+			showToast('error', 'Receipt upload time has expired. This order will be automatically declined.')
+			return
+		}
 
 		const formData = new FormData()
 		formData.append('gcash_screenshot', {
@@ -628,55 +631,43 @@ const ViewOrderCustomer = () => {
 												Contact Concessionaire
 											</Text>
 										</TouchableOpacity>
+										{order.payment_receipt_expires_at && (
+											<Text style={styles.paymentExpiryText}>
+												Payment expires at:{' '}
+												{formatDateTime(order.payment_receipt_expires_at)}
+											</Text>
+										)}
 									</View>
 								)
 							})()}
-						<Text style={styles.paymentLabel}>
-							Payment Screenshot{' '}
-							{order.payment_proof ? '(Uploaded)' : '(Required)'}
-						</Text>
-						{order.payment_proof ?
-							<View>
-								<TouchableOpacity
-									onPress={() => setPreviewSource(order.payment_proof || null)}>
-									<Image
-										source={{ uri: order.payment_proof }}
-										style={styles.paymentProof}
-									/>
-								</TouchableOpacity>
-								<Text style={styles.uploadedIndicator}>
-									Screenshot uploaded successfully
-								</Text>
-							</View>
-						:	<Text style={{ color: '#888', marginBottom: 10 }}>
-								No screenshot uploaded
-							</Text>
-						}
-
 						{(order.order_status === 'accepted' ||
 							order.order_status === 'ready for pickup') &&
 							(() => {
-								console.log(order.accepted_at)
-								console.log(order.receipt_timer)
-								// Check if receipt timer expired
 								let isTimerExpired = false
-								if (
-									order.order_status === 'accepted' &&
-									order.accepted_at &&
-									order.receipt_timer
-								) {
-									try {
+								try {
+									let deadlineMs: number | null = null
+									if (order.payment_receipt_expires_at) {
+										const expiresDate = new Date(order.payment_receipt_expires_at)
+										if (!Number.isNaN(expiresDate.getTime())) {
+											deadlineMs = expiresDate.getTime()
+										}
+									}
+
+									if (deadlineMs === null && order.accepted_at && order.receipt_timer) {
 										const acceptedDate = new Date(order.accepted_at)
 										const [hours, minutes, seconds] = order.receipt_timer
 											.split(':')
 											.map(Number)
-										const deadlineMs =
+										deadlineMs =
 											acceptedDate.getTime() +
 											(hours * 3600 + minutes * 60 + seconds) * 1000
-										isTimerExpired = Date.now() > deadlineMs
-									} catch (e) {
-										console.error('Error checking timer:', e)
 									}
+
+									if (deadlineMs !== null) {
+										isTimerExpired = Date.now() > deadlineMs
+									}
+								} catch (e) {
+									console.error('Error checking timer:', e)
 								}
 
 								return (
@@ -1493,6 +1484,12 @@ const styles = StyleSheet.create({
 	},
 	uploadBtnTextDisabled: {
 		color: '#666',
+	},
+	paymentExpiryText: {
+		marginTop: 8,
+		fontSize: 12,
+		color: '#555',
+		textAlign: 'center',
 	},
 })
 

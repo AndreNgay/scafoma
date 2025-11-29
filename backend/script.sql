@@ -111,14 +111,15 @@ CREATE TABLE IF NOT EXISTS public.tblorder
     in_cart boolean DEFAULT false,
     gcash_screenshot bytea,
     decline_reason text COLLATE pg_catalog."default",
-    created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
-    updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
-    accepted_at timestamp without time zone,
+    created_at timestamp without time zone DEFAULT (CURRENT_TIMESTAMP AT TIME ZONE 'UTC'::text),
+    updated_at timestamp without time zone DEFAULT (CURRENT_TIMESTAMP AT TIME ZONE 'UTC'::text),
     payer_customer_id integer,
     updated_total_price numeric(10, 2),
     price_change_reason text COLLATE pg_catalog."default",
     payment_verified boolean NOT NULL DEFAULT false,
     payment_rejected_reason text COLLATE pg_catalog."default",
+    accepted_at timestamp without time zone DEFAULT (CURRENT_TIMESTAMP AT TIME ZONE 'UTC'::text),
+    payment_receipt_expires_at timestamp without time zone DEFAULT (CURRENT_TIMESTAMP AT TIME ZONE 'UTC'::text),
     CONSTRAINT tblorder_pkey PRIMARY KEY (id)
 );
 
@@ -131,8 +132,8 @@ CREATE TABLE IF NOT EXISTS public.tblorderdetail
     item_price numeric(10, 2) NOT NULL,
     total_price numeric(10, 2) NOT NULL,
     note text COLLATE pg_catalog."default",
-    created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
-    updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
+    created_at timestamp without time zone DEFAULT (CURRENT_TIMESTAMP AT TIME ZONE 'UTC'::text),
+    updated_at timestamp without time zone DEFAULT (CURRENT_TIMESTAMP AT TIME ZONE 'UTC'::text),
     dining_option character varying(10) COLLATE pg_catalog."default" DEFAULT 'dine-in'::character varying,
     CONSTRAINT tblorderdetail_pkey PRIMARY KEY (id)
 );
@@ -142,8 +143,8 @@ CREATE TABLE IF NOT EXISTS public.tblorderitemvariation
     id serial NOT NULL,
     order_detail_id integer NOT NULL,
     variation_id integer NOT NULL,
-    created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
-    updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
+    created_at timestamp without time zone DEFAULT (CURRENT_TIMESTAMP AT TIME ZONE 'UTC'::text),
+    updated_at timestamp without time zone DEFAULT (CURRENT_TIMESTAMP AT TIME ZONE 'UTC'::text),
     quantity integer,
     CONSTRAINT tblorderitemvariation_pkey PRIMARY KEY (id)
 );

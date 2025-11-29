@@ -432,119 +432,179 @@ export const updateOrderStatus = async (req, res) => {
 	} = req.body
 
 	try {
+		// Check if trying to mark as ready/completed and GCash timer has expired
+		if (order_status === 'ready for pickup' || order_status === 'ready-for-pickup' || order_status === 'completed') {
+			const orderCheck = await pool.query(
+				`SELECT o.payment_method, o.order_status, o.accepted_at, o.gcash_screenshot, c.receipt_timer, o.payment_receipt_expires_at
+				 FROM tblorder o
+				 JOIN tblconcession c ON o.concession_id = c.id
+				 WHERE o.id = $1`,
+				[id]
+			)
+
+			if (orderCheck.rowCount > 0) {
+				const order = orderCheck.rows[0]
+				
+				// Only check for GCash orders that are currently accepted without receipt
+				if (
+					order.payment_method === 'gcash' &&
+					order.order_status === 'accepted' &&
+					!order.gcash_screenshot
+				) {
+					let deadlineMs = null
+					if (order.payment_receipt_expires_at) {
+						const expiresDate = new Date(order.payment_receipt_expires_at)
+						if (!Number.isNaN(expiresDate.getTime())) {
+							deadlineMs = expiresDate.getTime()
+						}
+					}
+
+					if (deadlineMs === null && order.accepted_at && order.receipt_timer) {
+						const acceptedDate = new Date(order.accepted_at)
+						const [hours, minutes, seconds] = order.receipt_timer
+							.split(':')
+							.map(Number)
+						deadlineMs =
+							acceptedDate.getTime() +
+							(hours * 3600 + minutes * 60 + seconds) * 1000
+					}
+
+					if (deadlineMs !== null && Date.now() > deadlineMs) {
+						return res.status(400).json({
+							error: 'Cannot mark order as ready/completed: GCash receipt upload time has expired. Please decline this order.',
+							currentStatus: order.order_status,
+							timerExpired: true,
+						})
+					}
+				}
+			}
+		}
+
 		let query, params
 
 		if (order_status === 'declined' && decline_reason) {
 			// Update with decline reason
 			query = `UPDATE tblorder 
-               SET order_status = $1, decline_reason = $2, updated_at = NOW()
+               SET order_status = $1, decline_reason = $2, updated_at = NOW() AT TIME ZONE 'UTC'
                WHERE id = $3 RETURNING *`
-			params = [order_status, decline_reason, id]
-		} else {
-			// Optional price adjustment when accepting an order
-			const hasUpdatedTotalRaw =
-				updated_total_price !== undefined &&
-				updated_total_price !== null &&
-				updated_total_price !== ''
-			const updatedTotal = hasUpdatedTotalRaw
-				? Number(updated_total_price)
-				: null
+      params = [order_status, decline_reason, id]
+    } else {
+      // Optional price adjustment when accepting an order
+      const hasUpdatedTotalRaw =
+        updated_total_price !== undefined &&
+        updated_total_price !== null &&
+        updated_total_price !== ''
+      const updatedTotal = hasUpdatedTotalRaw
+        ? Number(updated_total_price)
+        : null
 
-			if (
-				order_status === 'accepted' &&
-				updatedTotal !== null &&
-				!Number.isNaN(updatedTotal)
-			) {
-				query = `UPDATE tblorder 
+      if (
+        order_status === 'accepted' &&
+        updatedTotal !== null &&
+        !Number.isNaN(updatedTotal)
+      ) {
+        query = `UPDATE tblorder o
                  SET order_status = $1,
                      updated_total_price = $2,
                      price_change_reason = $3,
-                     accepted_at = NOW(),
-                     updated_at = NOW()
-                 WHERE id = $4 RETURNING *`
-				params = [order_status, updatedTotal, price_change_reason || null, id]
-			} else if (order_status === 'accepted') {
-				// Accepting without price change
-				query = `UPDATE tblorder 
-                 SET order_status = $1, accepted_at = NOW(), updated_at = NOW()
+                     accepted_at = NOW() AT TIME ZONE 'UTC',
+                     payment_receipt_expires_at = NOW() AT TIME ZONE 'UTC' + (
+                       SELECT c.receipt_timer::interval
+                       FROM tblconcession c
+                       WHERE c.id = o.concession_id
+                     ),
+                     updated_at = NOW() AT TIME ZONE 'UTC'
+                 WHERE o.id = $4 RETURNING *`
+        params = [order_status, updatedTotal, price_change_reason || null, id]
+      } else if (order_status === 'accepted') {
+        // Accepting without price change
+        query = `UPDATE tblorder o
+                 SET order_status = $1,
+                     accepted_at = NOW() AT TIME ZONE 'UTC',
+                     payment_receipt_expires_at = NOW() AT TIME ZONE 'UTC' + (
+                       SELECT c.receipt_timer::interval
+                       FROM tblconcession c
+                       WHERE c.id = o.concession_id
+                     ),
+                     updated_at = NOW() AT TIME ZONE 'UTC'
+                 WHERE o.id = $2 RETURNING *`
+        params = [order_status, id]
+      } else {
+        // Update without decline reason or price change
+        query = `UPDATE tblorder 
+                 SET order_status = $1, updated_at = NOW() AT TIME ZONE 'UTC'
                  WHERE id = $2 RETURNING *`
-				params = [order_status, id]
-			} else {
-				// Update without decline reason or price change
-				query = `UPDATE tblorder 
-                 SET order_status = $1, updated_at = NOW()
-                 WHERE id = $2 RETURNING *`
-				params = [order_status, id]
-			}
-		}
+        params = [order_status, id]
+      }
+    }
 
-		const result = await pool.query(query, params)
-		if (result.rowCount === 0)
-			return res.status(404).json({ error: 'Order not found' })
+    const result = await pool.query(query, params)
+    if (result.rowCount === 0)
+      return res.status(404).json({ error: 'Order not found' })
 
-		const order = result.rows[0]
+    const order = result.rows[0]
 
-		// Send notification to customer about order status change
-		try {
-			const concessionResult = await pool.query(
-				`SELECT c.concession_name FROM tblconcession c WHERE c.id = $1`,
-				[order.concession_id]
-			)
-			const concessionName = concessionResult.rows[0]?.concession_name || ''
+    // Send notification to customer about order status change
+    try {
+      const concessionResult = await pool.query(
+        `SELECT c.concession_name FROM tblconcession c WHERE c.id = $1`,
+        [order.concession_id]
+      )
+      const concessionName = concessionResult.rows[0]?.concession_name || ''
 
-			let oldTotal = null
-			let newTotal = null
-			let priceReason = ''
+      let oldTotal = null
+      let newTotal = null
+      let priceReason = ''
 
-			if (
-				order_status === 'accepted' &&
-				order.updated_total_price !== null &&
-				order.updated_total_price !== undefined &&
-				!Number.isNaN(Number(order.updated_total_price)) &&
-				!Number.isNaN(Number(order.total_price)) &&
-				Number(order.updated_total_price) !== Number(order.total_price)
-			) {
-				oldTotal = order.total_price
-				newTotal = order.updated_total_price
-				priceReason = order.price_change_reason || ''
-			}
+      if (
+        order_status === 'accepted' &&
+        order.updated_total_price !== null &&
+        order.updated_total_price !== undefined &&
+        !Number.isNaN(Number(order.updated_total_price)) &&
+        !Number.isNaN(Number(order.total_price)) &&
+        Number(order.updated_total_price) !== Number(order.total_price)
+      ) {
+        oldTotal = order.total_price
+        newTotal = order.updated_total_price
+        priceReason = order.price_change_reason || ''
+      }
 
-			await notifyOrderStatusChange(
-				order.id,
-				order.customer_id,
-				order_status,
-				concessionName,
-				decline_reason,
-				oldTotal,
-				newTotal,
-				priceReason
-			)
-		} catch (notifErr) {
-			console.error('Error creating order status notification:', notifErr)
-			// Don't fail the status update if notification fails
-		}
+      await notifyOrderStatusChange(
+        order.id,
+        order.customer_id,
+        order_status,
+        concessionName,
+        decline_reason,
+        oldTotal,
+        newTotal,
+        priceReason
+      )
+    } catch (notifErr) {
+      console.error('Error creating order status notification:', notifErr)
+      // Don't fail the status update if notification fails
+    }
 
-		res.json(order)
-	} catch (err) {
-		console.error('Error updating order status:', err)
-		res.status(500).json({ error: 'Failed to update order status' })
-	}
+    res.json(order)
+  } catch (err) {
+    console.error('Error updating order status:', err)
+    res.status(500).json({ error: 'Failed to update order status' })
+  }
 }
 
 export const updateOrderTotal = async (req, res) => {
 	const { id } = req.params // order_id
 	try {
 		const query = `
-      UPDATE tblorder
-      SET total_price = (
-        SELECT COALESCE(SUM(od.total_price), 0)
-        FROM tblorderdetail od
-        WHERE od.order_id = $1
-      ),
-      updated_at = NOW()
-      WHERE id = $1
-      RETURNING *;
-    `
+	      UPDATE tblorder
+	      SET total_price = (
+	        SELECT COALESCE(SUM(od.total_price), 0)
+	        FROM tblorderdetail od
+	        WHERE od.order_id = $1
+	      ),
+	      updated_at = NOW() AT TIME ZONE 'UTC'
+	      WHERE id = $1
+	      RETURNING *;
+	    `
 		const result = await pool.query(query, [id])
 		res.json(result.rows[0])
 	} catch (err) {
@@ -565,7 +625,10 @@ export const updatePaymentProof = async (req, res) => {
 	try {
 		// First check if the order exists and whether payment proof can be uploaded/updated
 		const orderCheck = await pool.query(
-			`SELECT order_status, gcash_screenshot FROM tblorder WHERE id = $1`,
+			`SELECT o.order_status, o.gcash_screenshot, o.payment_method, o.accepted_at, c.receipt_timer, o.payment_receipt_expires_at
+			 FROM tblorder o
+			 JOIN tblconcession c ON o.concession_id = c.id
+			 WHERE o.id = $1`,
 			[id]
 		)
 
@@ -573,14 +636,15 @@ export const updatePaymentProof = async (req, res) => {
 			return res.status(404).json({ error: 'Order not found' })
 		}
 
-		const orderStatus = orderCheck.rows[0].order_status
+		const order = orderCheck.rows[0]
+		const orderStatus = order.order_status
 
 		// Once an order is completed, the payment proof should no longer be changed
 		if (orderStatus === 'completed') {
 			return res.status(400).json({
-				error:
-					'Payment proof can no longer be changed because the order is completed',
-				currentStatus: orderStatus,
+					error:
+						'Payment proof can no longer be changed because the order is completed',
+					currentStatus: orderStatus,
 			})
 		}
 
@@ -588,24 +652,53 @@ export const updatePaymentProof = async (req, res) => {
 		// after the order has been accepted or is ready for pickup
 		if (orderStatus !== 'accepted' && orderStatus !== 'ready for pickup') {
 			return res.status(400).json({
-				error:
-					'Payment proof can only be uploaded after the order has been accepted or is ready for pickup',
-				currentStatus: orderStatus,
+					error:
+						'Payment proof can only be uploaded after the order has been accepted or is ready for pickup',
+					currentStatus: orderStatus,
 			})
+		}
+
+		// Check if receipt timer has expired for GCash orders
+		if (order.payment_method === 'gcash' && orderStatus === 'accepted') {
+			let deadlineMs = null
+			if (order.payment_receipt_expires_at) {
+				const expiresDate = new Date(order.payment_receipt_expires_at)
+				if (!Number.isNaN(expiresDate.getTime())) {
+					deadlineMs = expiresDate.getTime()
+				}
+			}
+
+			if (deadlineMs === null && order.accepted_at && order.receipt_timer) {
+				const acceptedDate = new Date(order.accepted_at)
+				const [hours, minutes, seconds] = order.receipt_timer
+					.split(':')
+					.map(Number)
+				deadlineMs =
+					acceptedDate.getTime() +
+					(hours * 3600 + minutes * 60 + seconds) * 1000
+			}
+
+			if (deadlineMs !== null && Date.now() > deadlineMs) {
+				return res.status(400).json({
+					error: 'Receipt upload time has expired. This order will be automatically declined.',
+					currentStatus: orderStatus,
+					timerExpired: true,
+				})
+			}
 		}
 
 		const result = await pool.query(
 			`UPDATE tblorder 
-       SET gcash_screenshot = $1, updated_at = NOW()
-       WHERE id = $2 RETURNING *`,
+	       SET gcash_screenshot = $1, updated_at = NOW() AT TIME ZONE 'UTC'
+	       WHERE id = $2 RETURNING *`,
 			[file.buffer, id]
 		)
 
-		const order = result.rows[0]
+		const updatedOrder = result.rows[0]
 		// Convert gcash_screenshot to base64 for frontend
-		order.payment_proof = makeImageDataUrl(order.gcash_screenshot)
+		updatedOrder.payment_proof = makeImageDataUrl(updatedOrder.gcash_screenshot)
 
-		res.json(order)
+		res.json(updatedOrder)
 	} catch (err) {
 		console.error('Error uploading payment proof:', err)
 		res.status(500).json({ error: 'Failed to upload payment proof' })
@@ -618,9 +711,9 @@ export const updatePaymentMethod = async (req, res) => {
 	try {
 		const result = await pool.query(
 			`UPDATE tblorder
-       SET payment_method = $1, updated_at = NOW()
-       WHERE id = $2
-       RETURNING *`,
+	       SET payment_method = $1, updated_at = NOW() AT TIME ZONE 'UTC'
+	       WHERE id = $2
+	       RETURNING *`,
 			[payment_method, id]
 		)
 		if (result.rowCount === 0)
@@ -655,24 +748,29 @@ export const rejectReceipt = async (req, res) => {
 		// Only allow rejection for accepted GCash orders
 		if (order_status !== 'accepted') {
 			return res.status(400).json({
-				error: 'Receipt can only be rejected for accepted orders',
+					error: 'Receipt can only be rejected for accepted orders',
 			})
 		}
 
 		if (payment_method !== 'gcash') {
 			return res.status(400).json({
-				error: 'Receipt rejection only applies to GCash payments',
+					error: 'Receipt rejection only applies to GCash payments',
 			})
 		}
 
-		// Clear screenshot and reset accepted_at to restart timer
+		// Clear screenshot and reset accepted_at (and receipt expiry) to restart timer
 		const result = await pool.query(
-			`UPDATE tblorder 
-       SET gcash_screenshot = NULL, 
-           accepted_at = NOW(), 
-           updated_at = NOW()
-       WHERE id = $1 
-       RETURNING *`,
+			`UPDATE tblorder o
+	             SET gcash_screenshot = NULL,
+	                 accepted_at = NOW() AT TIME ZONE 'UTC',
+	                 payment_receipt_expires_at = NOW() AT TIME ZONE 'UTC' + (
+	                   SELECT c.receipt_timer::interval
+	                   FROM tblconcession c
+	                   WHERE c.id = o.concession_id
+	                 ),
+	                 updated_at = NOW() AT TIME ZONE 'UTC'
+	             WHERE o.id = $1 
+	             RETURNING *`,
 			[id]
 		)
 
@@ -697,9 +795,9 @@ export const checkAndDeclineExpiredReceipt = async (req, res) => {
 		// Fetch order with receipt_timer from concession
 		const result = await pool.query(
 			`SELECT o.*, c.receipt_timer 
-       FROM tblorder o
-       JOIN tblconcession c ON o.concession_id = c.id
-       WHERE o.id = $1`,
+	       FROM tblorder o
+	       JOIN tblconcession c ON o.concession_id = c.id
+	       WHERE o.id = $1`,
 			[id]
 		)
 
@@ -721,25 +819,40 @@ export const checkAndDeclineExpiredReceipt = async (req, res) => {
 			})
 		}
 
-		// Check if timer expired
-		if (!order.accepted_at || !order.receipt_timer) {
-			return res.json({ declined: false, message: 'Missing timer data' })
+		// Determine deadline: prefer payment_receipt_expires_at, fall back to accepted_at + receipt_timer
+		let deadlineMs = null
+		if (order.payment_receipt_expires_at) {
+			const expiresDate = new Date(order.payment_receipt_expires_at)
+			if (!Number.isNaN(expiresDate.getTime())) {
+				deadlineMs = expiresDate.getTime()
+			}
 		}
 
-		const acceptedDate = new Date(order.accepted_at)
-		const [hours, minutes, seconds] = order.receipt_timer.split(':').map(Number)
-		const deadlineMs =
-			acceptedDate.getTime() + (hours * 3600 + minutes * 60 + seconds) * 1000
+		if (deadlineMs === null) {
+			// Fallback for older orders that may not have payment_receipt_expires_at set
+			if (!order.accepted_at || !order.receipt_timer) {
+				return res.json({ declined: false, message: 'Missing timer data' })
+			}
+
+			const acceptedDate = new Date(order.accepted_at)
+			const [hours, minutes, seconds] = order.receipt_timer
+				.split(':')
+				.map(Number)
+			deadlineMs =
+				acceptedDate.getTime() +
+				(hours * 3600 + minutes * 60 + seconds) * 1000
+		}
+
 		const now = Date.now()
 
 		// If expired, auto-decline
 		if (now >= deadlineMs) {
 			await pool.query(
 				`UPDATE tblorder 
-         SET order_status = 'declined', 
-             decline_reason = 'Order automatically declined: GCash receipt not uploaded within the required time.', 
-             updated_at = NOW()
-         WHERE id = $1`,
+	         SET order_status = 'declined', 
+	             decline_reason = 'Order automatically declined: GCash receipt not uploaded within the required time.', 
+	             updated_at = NOW() AT TIME ZONE 'UTC'
+	         WHERE id = $1`,
 				[id]
 			)
 
@@ -773,7 +886,7 @@ export const addOrder = async (req, res) => {
 		// Validate concession is still available and open
 		if (concession_id) {
 			const concessionCheck = await pool.query(
-				`SELECT concession_name, status FROM tblconcession WHERE id = $1`,
+				`SELECT concession_name, status, receipt_timer FROM tblconcession WHERE id = $1`,
 				[concession_id]
 			)
 
@@ -803,18 +916,71 @@ export const addOrder = async (req, res) => {
 				return res.status(200).json(existing.rows[0])
 		}
 
-		const result = await pool.query(
-			`INSERT INTO tblorder (customer_id, concession_id, order_status, total_price, in_cart, payment_method)
-       VALUES ($1,$2,COALESCE($3, 'pending'),$4,$5,$6) RETURNING *`,
-			[
+		const initialStatus = status || 'pending'
+
+		let query
+		let params
+
+		// If an order is created already accepted with GCash, start the receipt timer immediately
+		if (initialStatus === 'accepted' && payment_method === 'gcash') {
+			query = `INSERT INTO tblorder (
 				customer_id,
 				concession_id,
-				status,
+				order_status,
+				total_price,
+				in_cart,
+				payment_method,
+				accepted_at,
+				payment_receipt_expires_at
+			) VALUES (
+				$1,
+				$2,
+				$3,
+				$4,
+				$5,
+				$6,
+				NOW() AT TIME ZONE 'UTC',
+				NOW() AT TIME ZONE 'UTC' + (
+					SELECT c.receipt_timer::interval
+					FROM tblconcession c
+					WHERE c.id = $2
+				)
+			) RETURNING *`
+			params = [
+				customer_id,
+				concession_id,
+				initialStatus,
 				total_price,
 				in_cart ?? false,
 				payment_method,
 			]
-		)
+		} else {
+			query = `INSERT INTO tblorder (
+				customer_id,
+				concession_id,
+				order_status,
+				total_price,
+				in_cart,
+				payment_method
+			) VALUES (
+				$1,
+				$2,
+				$3,
+				$4,
+				$5,
+				$6
+			) RETURNING *`
+			params = [
+				customer_id,
+				concession_id,
+				initialStatus,
+				total_price,
+				in_cart ?? false,
+				payment_method,
+			]
+		}
+
+		const result = await pool.query(query, params)
 		res.status(201).json(result.rows[0])
 	} catch (err) {
 		console.error('Error adding order:', err)
@@ -1014,11 +1180,11 @@ export const checkoutCart = async (req, res) => {
 		// Update orders with schedule_time if provided
 		const updateQuery = schedule_time
 			? `UPDATE tblorder
-         SET in_cart = FALSE, order_status = 'pending', schedule_time = $2, updated_at = NOW()
+         SET in_cart = FALSE, order_status = 'pending', schedule_time = $2, updated_at = NOW() AT TIME ZONE 'UTC'
          WHERE customer_id = $1 AND in_cart = TRUE
          RETURNING *`
 			: `UPDATE tblorder
-         SET in_cart = FALSE, order_status = 'pending', updated_at = NOW()
+         SET in_cart = FALSE, order_status = 'pending', updated_at = NOW() AT TIME ZONE 'UTC'
          WHERE customer_id = $1 AND in_cart = TRUE
          RETURNING *`
 
@@ -1116,11 +1282,11 @@ export const checkoutSingleOrder = async (req, res) => {
 		// Update single order with schedule_time if provided
 		const updateQuery = schedule_time
 			? `UPDATE tblorder
-         SET in_cart = FALSE, order_status = 'pending', schedule_time = $2, updated_at = NOW()
+         SET in_cart = FALSE, order_status = 'pending', schedule_time = $2, updated_at = NOW() AT TIME ZONE 'UTC'
          WHERE id = $1 AND in_cart = TRUE
          RETURNING *`
 			: `UPDATE tblorder
-         SET in_cart = FALSE, order_status = 'pending', updated_at = NOW()
+         SET in_cart = FALSE, order_status = 'pending', updated_at = NOW() AT TIME ZONE 'UTC'
          WHERE id = $1 AND in_cart = TRUE
          RETURNING *`
 
@@ -1246,7 +1412,7 @@ export const cancelOrder = async (req, res) => {
 		// Update order status to cancelled
 		const updateResult = await pool.query(
 			`UPDATE tblorder 
-       SET order_status = 'cancelled', updated_at = NOW()
+       SET order_status = 'cancelled', updated_at = NOW() AT TIME ZONE 'UTC'
        WHERE id = $1`,
 			[id]
 		)

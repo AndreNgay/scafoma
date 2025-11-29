@@ -47,49 +47,31 @@ const CustomerOrders = () => {
 	const formatManila = (value: any) => {
 		if (!value) return ''
 		try {
+			let dateObj: Date
+
 			if (typeof value === 'string') {
+				let s = value.trim()
+
 				// If the string has timezone info, use it but render in Asia/Manila
-				if (/[zZ]|[+-]\d{2}:?\d{2}/.test(value)) {
-					const d = new Date(value)
-					return new Intl.DateTimeFormat('en-PH', {
-						timeZone: 'Asia/Manila',
-						year: 'numeric',
-						month: 'short',
-						day: '2-digit',
-						hour: 'numeric',
-						minute: '2-digit',
-					}).format(d)
+				if (/[zZ]|[+-]\d{2}:?\d{2}/.test(s)) {
+					dateObj = new Date(s)
+				} else {
+					// Handle plain "YYYY-MM-DD HH:MM:SS[.ffffff]" from backend.
+					// Treat as UTC then render in Asia/Manila so DB times like
+					// "2025-11-29 07:21:35.822299" become Manila local time.
+					s = s.replace(' ', 'T')
+					if (!/[zZ]|[+-]\d{2}:?\d{2}$/.test(s)) {
+						s += 'Z'
+					}
+					dateObj = new Date(s)
 				}
-				// No timezone info: assume it's already Asia/Manila local time; format manually
-				const cleaned = value.replace('T', ' ')
-				const [datePart, timePartFull] = cleaned.split(' ')
-				if (!datePart || !timePartFull) return cleaned
-				const [year, month, day] = datePart
-					.split('-')
-					.map((p) => parseInt(p, 10))
-				const [hStr, mStr] = timePartFull.split(':')
-				if (!year || !month || !day || !hStr || !mStr) return cleaned
-				let hour = parseInt(hStr, 10)
-				const ampm = hour >= 12 ? 'PM' : 'AM'
-				hour = hour % 12
-				if (hour === 0) hour = 12
-				const monthNames = [
-					'Jan',
-					'Feb',
-					'Mar',
-					'Apr',
-					'May',
-					'Jun',
-					'Jul',
-					'Aug',
-					'Sep',
-					'Oct',
-					'Nov',
-					'Dec',
-				]
-				return `${monthNames[month - 1]} ${day}, ${year} ${hour}:${mStr} ${ampm}`
+			} else {
+				// Non-string dates
+				dateObj = new Date(value)
 			}
-			// Non-string dates
+
+			if (Number.isNaN(dateObj.getTime())) return String(value)
+
 			return new Intl.DateTimeFormat('en-PH', {
 				timeZone: 'Asia/Manila',
 				year: 'numeric',
@@ -97,7 +79,7 @@ const CustomerOrders = () => {
 				day: '2-digit',
 				hour: 'numeric',
 				minute: '2-digit',
-			}).format(new Date(value))
+			}).format(dateObj)
 		} catch {
 			return String(value)
 		}

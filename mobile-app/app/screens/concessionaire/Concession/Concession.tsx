@@ -10,9 +10,9 @@ import {
 	TextInput,
 	Button,
 	TouchableOpacity,
+	KeyboardAvoidingView,
 	Platform,
 } from 'react-native'
-import DateTimePicker from '@react-native-community/datetimepicker'
 import * as ImagePicker from 'expo-image-picker'
 import api from '../../../libs/apiCall'
 import { z } from 'zod'
@@ -67,7 +67,8 @@ const Concession = () => {
 	const [errors, setErrors] = useState<Record<string, string>>({})
 	const [imageAsset, setImageAsset] = useState<any>(null)
 	const [imageIsNew, setImageIsNew] = useState(false)
-	const [showTimePicker, setShowTimePicker] = useState(false)
+	const [timerMinutesInput, setTimerMinutesInput] = useState('15')
+	const [timerSecondsInput, setTimerSecondsInput] = useState('00')
 	const { showToast } = useToast()
 
 	const fetchConcession = async () => {
@@ -94,46 +95,37 @@ const Concession = () => {
 		}
 	}
 
-	const handleTimeChange = (event: any, selectedDate?: Date) => {
-		if (Platform.OS === 'android') {
-			setShowTimePicker(false)
-		}
-
-		if (event.type === 'set' && selectedDate) {
-			const hours = selectedDate.getHours().toString().padStart(2, '0')
-			const minutes = selectedDate.getMinutes().toString().padStart(2, '0')
-			const seconds = selectedDate.getSeconds().toString().padStart(2, '0')
-			const timeString = `${hours}:${minutes}:${seconds}`
-			setConcession({ ...concession!, receipt_timer: timeString })
-		} else if (event.type === 'dismissed') {
-			setShowTimePicker(false)
-		}
-	}
-
-	const getTimePickerDate = () => {
-		if (!concession?.receipt_timer) {
-			const date = new Date()
-			date.setHours(0, 15, 0)
-			return date
-		}
-		try {
-			const [hours, minutes, seconds] = concession.receipt_timer
-				.split(':')
-				.map(Number)
-			const date = new Date()
-			date.setHours(hours || 0, minutes || 0, seconds || 0)
-			return date
-		} catch {
-			const date = new Date()
-			date.setHours(0, 15, 0)
-			return date
-		}
-	}
-
 	const handleSave = async () => {
 		if (!concession) return
 
-		const validation = concessionSchema.safeParse(concession)
+		// Validate timer against 30-minute maximum using current inputs
+		let mRaw = parseInt(timerMinutesInput || '0', 10)
+		let sRaw = parseInt(timerSecondsInput || '0', 10)
+
+		if (!Number.isFinite(mRaw) || mRaw < 0) mRaw = 0
+		if (!Number.isFinite(sRaw) || sRaw < 0) sRaw = 0
+
+		// If user tried to exceed 30 minutes total, show an error and abort save
+		if (mRaw > 30 || (mRaw === 30 && sRaw > 0)) {
+			showToast('error', 'Maximum allowed time is 30 minutes.')
+			return
+		}
+
+		let m = Math.min(Math.max(mRaw, 0), 30)
+		let s = Math.min(Math.max(sRaw, 0), 59)
+		if (m === 30 && s > 0) {
+			s = 0
+		}
+		const newM = String(m).padStart(2, '0')
+		const newS = String(s).padStart(2, '0')
+		const receiptTimer = `00:${newM}:${newS}`
+
+		const concessionForSave: Concession = {
+			...concession,
+			receipt_timer: receiptTimer,
+		}
+
+		const validation = concessionSchema.safeParse(concessionForSave)
 		if (!validation.success) {
 			const fieldErrors: Record<string, string> = {}
 			validation.error.issues.forEach((issue) => {
@@ -149,18 +141,21 @@ const Concession = () => {
 
 		try {
 			const formData = new FormData()
-			formData.append('concession_name', concession.concession_name)
+			formData.append('concession_name', concessionForSave.concession_name)
 			formData.append(
 				'gcash_payment_available',
-				String(concession.gcash_payment_available)
+				String(concessionForSave.gcash_payment_available)
 			)
 			formData.append(
 				'oncounter_payment_available',
-				String(concession.oncounter_payment_available)
+				String(concessionForSave.oncounter_payment_available)
 			)
-			formData.append('gcash_number', concession.gcash_number || '')
-			formData.append('receipt_timer', concession.receipt_timer || '00:15:00')
-			formData.append('status', concession.status)
+			formData.append('gcash_number', concessionForSave.gcash_number || '')
+			formData.append(
+				'receipt_timer',
+				concessionForSave.receipt_timer || '00:15:00'
+			)
+			formData.append('status', concessionForSave.status)
 
 			if (imageIsNew && imageAsset?.uri) {
 				formData.append('image', {
@@ -194,9 +189,57 @@ const Concession = () => {
 		setConcession({ ...concession, [field]: value })
 	}
 
+	const updateTime = (part: 'm' | 's', rawValue: string) => {
+		const cleaned = rawValue.replace(/[^0-9]/g, '')
+		// Only update local input state while typing; do not clamp or format yet
+		if (part === 'm') {
+			setTimerMinutesInput(cleaned)
+		} else {
+			setTimerSecondsInput(cleaned)
+		}
+	}
+
+	const normalizeAndSaveTimer = () => {
+		if (!concession) return
+
+		let mRaw = parseInt(timerMinutesInput || '0', 10)
+		let sRaw = parseInt(timerSecondsInput || '0', 10)
+
+		if (!Number.isFinite(mRaw) || mRaw < 0) mRaw = 0
+		if (!Number.isFinite(sRaw) || sRaw < 0) sRaw = 0
+
+		let m = Math.min(Math.max(mRaw, 0), 30)
+		let s = Math.min(Math.max(sRaw, 0), 59)
+
+		// Enforce 30-minute max: if minutes is 30, force seconds to 0
+		if (m === 30 && s > 0) {
+			s = 0
+		}
+
+		// If user tried to exceed 30 minutes total, show an error toast
+		if (mRaw > 30 || (mRaw === 30 && sRaw > 0)) {
+			showToast('error', 'Maximum allowed time is 30 minutes.')
+		}
+
+		const newM = String(m).padStart(2, '0')
+		const newS = String(s).padStart(2, '0')
+		setTimerMinutesInput(newM)
+		setTimerSecondsInput(newS)
+		const timeString = `00:${newM}:${newS}`
+		setConcession({ ...concession, receipt_timer: timeString })
+	}
+
 	useEffect(() => {
 		fetchConcession()
 	}, [])
+
+	useEffect(() => {
+		const [, m, s] = (concession?.receipt_timer || '00:15:00')
+			.split(':')
+			.map((v) => v.padStart(2, '0'))
+		setTimerMinutesInput(m)
+		setTimerSecondsInput(s)
+	}, [concession?.receipt_timer])
 
 	if (loading) {
 		return (
@@ -218,228 +261,201 @@ const Concession = () => {
 	}
 
 	return (
-		<ScrollView contentContainerStyle={styles.container}>
-			<TouchableOpacity onPress={pickImage}>
-				<Image
-					source={{
-						uri:
-							imageIsNew ?
-								imageAsset?.uri
-							:	concession.image_url ||
-								'https://static.thenounproject.com/png/3985543-200.png',
-					}}
-					style={styles.image}
-				/>
-				<Text style={styles.uploadText}>Tap to change image</Text>
-			</TouchableOpacity>
-
-			<View style={styles.card}>
-				<Text style={styles.label}>Concession Name</Text>
-				<TextInput
-					style={styles.input}
-					value={concession.concession_name}
-					onChangeText={(text) =>
-						setConcession({ ...concession, concession_name: text })
-					}
-				/>
-				{errors.concession_name && (
-					<Text style={styles.error}>{errors.concession_name}</Text>
-				)}
-
-				<Text style={styles.label}>Cafeteria</Text>
-				<TextInput
-					style={[styles.input, { backgroundColor: '#f0f0f0' }]}
-					value={concession.cafeteria_name}
-					editable={false}
-				/>
-
-				<Text style={styles.label}>Location</Text>
-				<TextInput
-					style={[styles.input, { backgroundColor: '#f0f0f0' }]}
-					value={concession.location}
-					editable={false}
-				/>
-
-				<View style={styles.toggleRow}>
-					<Text style={styles.toggleLabel}>
-						Status: {concession.status === 'open' ? 'Open' : 'Closed'}
-					</Text>
-					<Switch
-						value={concession.status === 'open'}
-						onValueChange={(val) =>
-							setConcession({ ...concession, status: val ? 'open' : 'closed' })
-						}
-						trackColor={{ true: 'darkred' }}
-						thumbColor={concession.status === 'open' ? '#fff' : '#f4f3f4'}
+		<KeyboardAvoidingView
+			style={{ flex: 1 }}
+			behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+			keyboardVerticalOffset={80}>
+			<ScrollView
+				contentContainerStyle={styles.container}
+				keyboardShouldPersistTaps="handled">
+				<TouchableOpacity onPress={pickImage}>
+					<Image
+						style={styles.image}
+						source={{
+							uri:
+								imageIsNew
+									? imageAsset?.uri
+									: concession.image_url ||
+									  'https://static.thenounproject.com/png/3985543-200.png',
+						}}
 					/>
-				</View>
-
-				<Text style={[styles.label, { marginTop: 16 }]}>Payment Methods</Text>
-				<View style={styles.toggleRow}>
-					<Text style={styles.toggleLabel}>GCash</Text>
-					<Switch
-						value={concession.gcash_payment_available}
-						onValueChange={(val) =>
-							setConcession({ ...concession, gcash_payment_available: val })
-						}
-						trackColor={{ true: 'darkred' }}
-						thumbColor={concession.gcash_payment_available ? '#fff' : '#f4f3f4'}
-					/>
-				</View>
-				<View style={styles.toggleRow}>
-					<Text style={styles.toggleLabel}>On-Counter</Text>
-					<Switch
-						value={concession.oncounter_payment_available}
-						onValueChange={(val) =>
-							setConcession({ ...concession, oncounter_payment_available: val })
-						}
-						trackColor={{ true: 'darkred' }}
-						thumbColor={
-							concession.oncounter_payment_available ? '#fff' : '#f4f3f4'
-						}
-					/>
-				</View>
-
-				<Text style={styles.label}>GCash Number</Text>
-				<TextInput
-					style={[
-						styles.input,
-						!concession.gcash_payment_available && {
-							backgroundColor: '#f0f0f0',
-							color: '#888',
-						},
-					]}
-					value={concession.gcash_number || ''}
-					placeholder="09XXXXXXXXX"
-					editable={concession.gcash_payment_available}
-					onChangeText={(text) =>
-						setConcession({ ...concession, gcash_number: text })
-					}
-					keyboardType="numeric"
-				/>
-				{errors.gcash_number && (
-					<Text style={styles.error}>{errors.gcash_number}</Text>
-				)}
-
-				<Text style={styles.label}>GCash Receipt Timer</Text>
-				<TouchableOpacity
-					style={[
-						styles.timePickerButton,
-						!concession.gcash_payment_available &&
-							styles.timePickerButtonDisabled,
-					]}
-					onPress={() =>
-						concession.gcash_payment_available && setShowTimePicker(true)
-					}
-					disabled={!concession.gcash_payment_available}>
-					<View style={styles.timerDisplay}>
-						{(() => {
-							const [h, m, s] = (concession.receipt_timer || '00:15:00').split(
-								':'
-							)
-							return (
-								<>
-									<View style={styles.timerUnit}>
-										<Text
-											style={[
-												styles.timerValue,
-												!concession.gcash_payment_available &&
-													styles.timerValueDisabled,
-											]}>
-											{h}
-										</Text>
-										<Text
-											style={[
-												styles.timerLabel,
-												!concession.gcash_payment_available &&
-													styles.timerLabelDisabled,
-											]}>
-											hours
-										</Text>
-									</View>
-									<Text
-										style={[
-											styles.timerColon,
-											!concession.gcash_payment_available &&
-												styles.timerColonDisabled,
-										]}>
-										:
-									</Text>
-									<View style={styles.timerUnit}>
-										<Text
-											style={[
-												styles.timerValue,
-												!concession.gcash_payment_available &&
-													styles.timerValueDisabled,
-											]}>
-											{m}
-										</Text>
-										<Text
-											style={[
-												styles.timerLabel,
-												!concession.gcash_payment_available &&
-													styles.timerLabelDisabled,
-											]}>
-											minutes
-										</Text>
-									</View>
-									<Text
-										style={[
-											styles.timerColon,
-											!concession.gcash_payment_available &&
-												styles.timerColonDisabled,
-										]}>
-										:
-									</Text>
-									<View style={styles.timerUnit}>
-										<Text
-											style={[
-												styles.timerValue,
-												!concession.gcash_payment_available &&
-													styles.timerValueDisabled,
-											]}>
-											{s}
-										</Text>
-										<Text
-											style={[
-												styles.timerLabel,
-												!concession.gcash_payment_available &&
-													styles.timerLabelDisabled,
-											]}>
-											seconds
-										</Text>
-									</View>
-								</>
-							)
-						})()}
-					</View>
+					<Text style={styles.uploadText}>Tap to change image</Text>
 				</TouchableOpacity>
-				{showTimePicker && (
-					<DateTimePicker
-						value={getTimePickerDate()}
-						mode="time"
-						is24Hour={true}
-						display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-						onChange={handleTimeChange}
+
+				<View style={styles.card}>
+					<Text style={styles.label}>Concession Name</Text>
+					<TextInput
+						style={styles.input}
+						value={concession.concession_name}
+						onChangeText={(text) =>
+							setConcession({ ...concession, concession_name: text })
+						}
 					/>
-				)}
-				<Text style={styles.helperText}>
-					Time limit for customers to upload GCash receipt after order is
-					accepted. Order will be automatically declined if time expires.
-				</Text>
-				{errors.receipt_timer && (
-					<Text style={styles.error}>{errors.receipt_timer}</Text>
-				)}
-				<View style={{ marginTop: 20 }}>
-					<Button
-						title={saving ? 'Saving...' : 'Save Changes'}
-						color="darkred"
-						onPress={handleSave}
-						disabled={saving}
+					{errors.concession_name && (
+						<Text style={styles.error}>{errors.concession_name}</Text>
+					)}
+
+					<Text style={styles.label}>Cafeteria</Text>
+					<TextInput
+						style={[styles.input, { backgroundColor: '#f0f0f0' }]}
+						value={concession.cafeteria_name}
+						editable={false}
 					/>
+
+					<Text style={styles.label}>Location</Text>
+					<TextInput
+						style={[styles.input, { backgroundColor: '#f0f0f0' }]}
+						value={concession.location}
+						editable={false}
+					/>
+
+					<View style={styles.toggleRow}>
+						<Text style={styles.toggleLabel}>
+							Status: {concession.status === 'open' ? 'Open' : 'Closed'}
+						</Text>
+						<Switch
+							value={concession.status === 'open'}
+							onValueChange={(val) =>
+								setConcession({ ...concession, status: val ? 'open' : 'closed' })
+							}
+							trackColor={{ true: 'darkred' }}
+							thumbColor={concession.status === 'open' ? '#fff' : '#f4f3f4'}
+						/>
+					</View>
+
+					<Text style={[styles.label, { marginTop: 16 }]}>Payment Methods</Text>
+					<View style={styles.toggleRow}>
+						<Text style={styles.toggleLabel}>GCash</Text>
+						<Switch
+							value={concession.gcash_payment_available}
+							onValueChange={(val) =>
+								setConcession({ ...concession, gcash_payment_available: val })
+							}
+							trackColor={{ true: 'darkred' }}
+							thumbColor={concession.gcash_payment_available ? '#fff' : '#f4f3f4'}
+						/>
+					</View>
+					<View style={styles.toggleRow}>
+						<Text style={styles.toggleLabel}>On-Counter</Text>
+						<Switch
+							value={concession.oncounter_payment_available}
+							onValueChange={(val) =>
+								setConcession({ ...concession, oncounter_payment_available: val })
+							}
+							trackColor={{ true: 'darkred' }}
+							thumbColor={
+								concession.oncounter_payment_available ? '#fff' : '#f4f3f4'
+							}
+						/>
+					</View>
+
+					<Text style={styles.label}>GCash Number</Text>
+					<TextInput
+						style={[
+							styles.input,
+							!concession.gcash_payment_available && {
+								backgroundColor: '#f0f0f0',
+								color: '#888',
+							},
+						]}
+						value={concession.gcash_number || ''}
+						placeholder="09XXXXXXXXX"
+						editable={concession.gcash_payment_available}
+						onChangeText={(text) =>
+							setConcession({ ...concession, gcash_number: text })
+						}
+						keyboardType="numeric"
+					/>
+					{errors.gcash_number && (
+						<Text style={styles.error}>{errors.gcash_number}</Text>
+					)}
+
+					<Text style={styles.label}>GCash Receipt Timer</Text>
+					<View
+						style={[
+							styles.timePickerButton,
+							!concession.gcash_payment_available &&
+								styles.timePickerButtonDisabled,
+						]}
+					>
+						<View style={styles.timerDisplay}>
+							<View style={styles.timerUnit}>
+								<TextInput
+									style={[
+										styles.timerInput,
+										!concession.gcash_payment_available &&
+											styles.timerValueDisabled,
+									]}
+									value={timerMinutesInput}
+									onChangeText={(text) => updateTime('m', text)}
+									onBlur={normalizeAndSaveTimer}
+									editable={concession.gcash_payment_available}
+									keyboardType="numeric"
+									maxLength={2}
+								/>
+								<Text
+									style={[
+										styles.timerLabel,
+										!concession.gcash_payment_available &&
+											styles.timerLabelDisabled,
+									]}
+								>
+									minutes (max 30)
+								</Text>
+							</View>
+							<Text
+								style={[
+									styles.timerColon,
+									!concession.gcash_payment_available &&
+										styles.timerColonDisabled,
+								]}
+							>
+								:
+							</Text>
+							<View style={styles.timerUnit}>
+								<TextInput
+									style={[
+										styles.timerInput,
+										!concession.gcash_payment_available &&
+											styles.timerValueDisabled,
+									]}
+									value={timerSecondsInput}
+									onChangeText={(text) => updateTime('s', text)}
+									onBlur={normalizeAndSaveTimer}
+									editable={concession.gcash_payment_available}
+									keyboardType="numeric"
+									maxLength={2}
+								/>
+								<Text
+									style={[
+										styles.timerLabel,
+										!concession.gcash_payment_available &&
+											styles.timerLabelDisabled,
+									]}
+								>
+									seconds
+								</Text>
+							</View>
+						</View>
+					</View>
+					<Text style={styles.helperText}>
+						Time limit for customers to upload GCash receipt after order is
+						accepted. Order will be automatically declined if time expires.
+					</Text>
+					{errors.receipt_timer && (
+						<Text style={styles.error}>{errors.receipt_timer}</Text>
+					)}
+					<View style={{ marginTop: 20 }}>
+						<Button
+							title={saving ? 'Saving...' : 'Save Changes'}
+							color="darkred"
+							onPress={handleSave}
+							disabled={saving}
+						/>
+					</View>
 				</View>
-			</View>
-		</ScrollView>
+			</ScrollView>
+		</KeyboardAvoidingView>
 	)
 }
 
@@ -517,6 +533,17 @@ const styles = StyleSheet.create({
 	},
 	timerValue: {
 		fontSize: 20,
+		fontWeight: '700',
+		color: '#333',
+	},
+	timerInput: {
+		width: 60,
+		borderWidth: 1,
+		borderColor: '#ccc',
+		borderRadius: 6,
+		paddingVertical: 4,
+		textAlign: 'center',
+		fontSize: 18,
 		fontWeight: '700',
 		color: '#333',
 	},
