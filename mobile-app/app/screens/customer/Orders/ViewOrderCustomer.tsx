@@ -406,6 +406,7 @@ const ViewOrderCustomer = () => {
 	return (
 		<ScrollView
 			style={styles.container}
+			contentContainerStyle={styles.scrollContent}
 			refreshControl={
 				<RefreshControl
 					refreshing={refreshing}
@@ -471,6 +472,65 @@ const ViewOrderCustomer = () => {
 					</View>
 				</View>
 			)}
+
+			{/* Order Items */}
+			<View style={styles.sectionCard}>
+				<Text style={styles.sectionTitle}>
+					<Ionicons
+						name="cart-outline"
+						size={16}
+						color="#A40C2D"
+						style={styles.inlineIcon}
+					/>{' '}
+					Order Items
+				</Text>
+				<FlatList
+					data={order.items || []}
+					keyExtractor={(item) => item.id.toString()}
+					renderItem={({ item }) => (
+						<View style={styles.itemCard}>
+							<Text style={styles.itemName}>
+								{item.item_name} x{item.quantity}
+							</Text>
+							<Text style={styles.infoLabel}>Dining Option:</Text>
+							<Text style={styles.infoValue}>
+								<Ionicons
+									name={
+										item.dining_option === 'take-out' ?
+											'cube-outline'
+										:	'restaurant-outline'
+									}
+									size={14}
+									color="#666"
+									style={styles.inlineIcon}
+								/>
+								{item.dining_option === 'take-out' ? 'Take-out' : 'Dine-in'}
+							</Text>
+							<Text>₱{Number(item.total_price).toFixed(2)}</Text>
+							{item.note && <Text>Note: {item.note}</Text>}
+							{item.variations?.length > 0 && (
+								<View style={{ marginTop: 5 }}>
+									{item.variations.map((v: any) => (
+										<Text
+											key={v.id}
+											style={styles.variation}>
+											• {v.variation_group_name}: {v.variation_name}
+											{v.quantity > 1 ? ` x${v.quantity}` : ''} (+₱
+											{Number(v.additional_price || 0).toFixed(2)})
+											{v.quantity > 1 ?
+												` = ₱${(
+													Number(v.additional_price || 0) * (v.quantity || 1)
+												).toFixed(2)}`
+											:	''}
+										</Text>
+									))}
+								</View>
+							)}
+						</View>
+					)}
+					scrollEnabled={false}
+				/>
+			</View>
 
 			{/* Payment Information */}
 			<View style={styles.sectionCard}>
@@ -544,6 +604,44 @@ const ViewOrderCustomer = () => {
 					</TouchableOpacity>
 				</View>
 
+				{/* Total Pricing Information */}
+				{(
+					order.updated_total_price !== null &&
+					order.updated_total_price !== undefined &&
+					!Number.isNaN(Number(order.updated_total_price)) &&
+					!Number.isNaN(Number(order.total_price)) &&
+					Number(order.updated_total_price) !== Number(order.total_price)
+				) ?
+					<>
+						<View style={styles.infoRow}>
+							<Text style={styles.infoLabel}>Original Total:</Text>
+							<Text style={styles.infoValue}>
+								₱{Number(order.total_price).toFixed(2)}
+							</Text>
+						</View>
+						<View style={styles.infoRow}>
+							<Text style={styles.infoLabel}>Updated Total:</Text>
+							<Text style={[styles.infoValue, styles.updatedPrice]}>
+								₱{Number(order.updated_total_price).toFixed(2)}
+							</Text>
+						</View>
+						{order.price_change_reason && (
+							<View style={styles.infoRow}>
+								<Text style={styles.infoLabel}>Reason for change:</Text>
+								<Text style={styles.infoValue}>
+									{order.price_change_reason}
+								</Text>
+							</View>
+						)}
+					</>
+				:	<View style={styles.infoRow}>
+						<Text style={styles.infoLabel}>Total:</Text>
+						<Text style={[styles.infoValue, styles.totalPrice]}>
+							₱{Number(order.total_price).toFixed(2)}
+						</Text>
+					</View>
+				}
+
 				{/* GCash Payment Details */}
 				{order.payment_method === 'gcash' && (
 					<View style={styles.gcashDetailsCard}>
@@ -581,247 +679,223 @@ const ViewOrderCustomer = () => {
 								{formatDateTime(order.payment_receipt_expires_at)}
 							</Text>
 						)}
+
+						{/* Payment Proof/Rejection Section */}
+						{order.payment_proof ? (
+							<View style={styles.paymentProofSection}>
+								<Text style={styles.paymentProofLabel}>Payment Receipt:</Text>
+								<TouchableOpacity
+									onPress={() => setPreviewSource(order.payment_proof)}>
+									<Image
+										source={{ uri: order.payment_proof }}
+										style={styles.paymentProofImage}
+									/>
+								</TouchableOpacity>
+								<View style={styles.uploadedIndicator}>
+									<Ionicons
+										name="checkmark-circle"
+										size={16}
+										color="#28a745"
+									/>
+									<Text style={styles.uploadedText}>
+										Receipt uploaded - Waiting for verification
+									</Text>
+								</View>
+							</View>
+						) : order.payment_rejected_reason ? (
+							<View style={styles.paymentRejectedSection}>
+								<View style={styles.paymentRejectedHeader}>
+									<Ionicons
+										name="close-circle"
+										size={20}
+										color="#dc3545"
+										style={{ marginRight: 8 }}
+									/>
+									<Text style={styles.paymentRejectedTitle}>
+										Payment Rejected
+									</Text>
+								</View>
+								<Text style={styles.paymentRejectedReason}>
+									Reason: {order.payment_rejected_reason}
+								</Text>
+								<Text style={styles.paymentRejectedNote}>
+									Please upload a correct receipt to proceed with your order.
+								</Text>
+								{order.order_status === 'accepted' && (
+									<TouchableOpacity
+										style={[styles.uploadButton, uploading && styles.uploadButtonDisabled]}
+										onPress={pickImage}
+										disabled={uploading}>
+										{uploading ?
+											<ActivityIndicator color="#fff" size="small" />
+										:	<>
+												<Ionicons
+													name="camera-outline"
+													size={16}
+													color="#fff"
+													style={{ marginRight: 8 }}
+												/>
+												<Text style={styles.uploadButtonText}>
+													Upload New Receipt
+												</Text>
+											</>
+										}
+									</TouchableOpacity>
+								)}
+							</View>
+						) : order.order_status === 'accepted' && (
+							<TouchableOpacity
+								style={[styles.uploadButton, uploading && styles.uploadButtonDisabled]}
+								onPress={pickImage}
+								disabled={uploading}>
+								{uploading ?
+									<ActivityIndicator color="#fff" size="small" />
+								:	<>
+										<Ionicons
+											name="camera-outline"
+											size={16}
+											color="#fff"
+											style={{ marginRight: 8 }}
+										/>
+										<Text style={styles.uploadButtonText}>
+											Upload GCash Receipt
+										</Text>
+									</>
+								}
+							</TouchableOpacity>
+						)}
 					</View>
 				)}
-			</View>
+				</View>
 
-			{/* Order Items */}
-			<View style={styles.sectionCard}>
-				<Text style={styles.sectionTitle}>
-					<Ionicons
-						name="cart-outline"
-						size={16}
-						color="#A40C2D"
-						style={styles.inlineIcon}
-					/>{' '}
-					Order Items
-				</Text>
-				<FlatList
-					data={order.items || []}
-					keyExtractor={(item) => item.id.toString()}
-					renderItem={({ item }) => (
-						<View style={styles.itemCard}>
-							<Text style={styles.itemName}>
-								{item.item_name} x{item.quantity}
-							</Text>
-							<Text style={styles.infoLabel}>Dining Option:</Text>
-							<Text style={styles.infoValue}>
-								<Ionicons
-									name={
-										item.dining_option === 'take-out' ?
-											'cube-outline'
-										:	'restaurant-outline'
-									}
-									size={14}
-									color="#666"
-									style={styles.inlineIcon}
-								/>
-								{item.dining_option === 'take-out' ? 'Take-out' : 'Dine-in'}
-							</Text>
-							<Text>₱{Number(item.total_price).toFixed(2)}</Text>
-							{item.note && <Text>Note: {item.note}</Text>}
-							{item.variations?.length > 0 && (
-								<View style={{ marginTop: 5 }}>
-									{item.variations.map((v: any) => (
-										<Text
-											key={v.id}
-											style={styles.variation}>
-											• {v.variation_group_name}: {v.variation_name}
-											{v.quantity > 1 ? ` x${v.quantity}` : ''} (+₱
-											{Number(v.additional_price || 0).toFixed(2)})
-											{v.quantity > 1 ?
-												` = ₱${(
-													Number(v.additional_price || 0) * (v.quantity || 1)
-												).toFixed(2)}`
-											:	''}
-										</Text>
-									))}
-								</View>
-							)}
-						</View>
-					)}
-					scrollEnabled={false}
-				/>
-			</View>
-
-			{/* Pricing Information */}
-			<View style={styles.sectionCard}>
-				<Text style={styles.sectionTitle}>
-					<Ionicons
-						name="pricetag-outline"
-						size={16}
-						color="#A40C2D"
-						style={styles.inlineIcon}
-					/>{' '}
-					Pricing
-				</Text>
-				{(
-					order.updated_total_price !== null &&
-					order.updated_total_price !== undefined &&
-					!Number.isNaN(Number(order.updated_total_price)) &&
-					!Number.isNaN(Number(order.total_price)) &&
-					Number(order.updated_total_price) !== Number(order.total_price)
-				) ?
-					<>
-						<View style={styles.infoRow}>
-							<Text style={styles.infoLabel}>Original Total:</Text>
-							<Text style={styles.infoValue}>
-								₱{Number(order.total_price).toFixed(2)}
-							</Text>
-						</View>
-						<View style={styles.infoRow}>
-							<Text style={styles.infoLabel}>Updated Total:</Text>
-							<Text style={[styles.infoValue, styles.updatedPrice]}>
-								₱{Number(order.updated_total_price).toFixed(2)}
-							</Text>
-						</View>
-						{order.price_change_reason && (
-							<View style={styles.infoRow}>
-								<Text style={styles.infoLabel}>Reason for change:</Text>
-								<Text style={styles.infoValue}>
-									{order.price_change_reason}
+				{/* Concessionaire Profile */}
+				<View style={styles.sectionCard}>
+					<Text style={styles.sectionTitle}>
+						<Ionicons
+							name="person-outline"
+							size={16}
+							color="#A40C2D"
+							style={styles.inlineIcon}
+						/>{' '}
+						Concessionaire Profile
+					</Text>
+					<TouchableOpacity
+						style={styles.concessionaireCard}
+						onPress={() =>
+							navigation.navigate('View Concessionaire Profile', {
+								concessionaireId: order.concessionaire_id || order.concession_id,
+								concessionaireData: {
+									first_name: order.concessionaire_first_name,
+									last_name: order.concessionaire_last_name,
+									email: order.concessionaire_email,
+									contact_number: order.concessionaire_contact_number,
+									messenger_link: order.concessionaire_messenger_link,
+									profile_image_url: order.concessionaire_profile_image_url,
+									concession_name: order.concession_name,
+									cafeteria_name: order.cafeteria_name,
+								},
+							})
+						}>
+						{order.concessionaire_profile_image_url ?
+							<Image
+								source={{ uri: order.concessionaire_profile_image_url }}
+								style={styles.concessionaireAvatar}
+							/>
+						:	<View style={styles.concessionaireAvatarPlaceholder}>
+								<Text style={styles.concessionaireInitials}>
+									{order.concessionaire_first_name?.[0]}
+									{order.concessionaire_last_name?.[0]}
 								</Text>
 							</View>
-						)}
-					</>
-				:	<View style={styles.infoRow}>
-						<Text style={styles.infoLabel}>Total:</Text>
-						<Text style={[styles.infoValue, styles.totalPrice]}>
-							₱{Number(order.total_price).toFixed(2)}
-						</Text>
-					</View>
-				}
-				{order.note && (
-					<View style={styles.noteSection}>
-						<Text style={styles.infoLabel}>Note:</Text>
-						<Text style={styles.noteText}>{order.note}</Text>
-					</View>
-				)}
-			</View>
-
-			{/* Location & Concessionaire Info */}
-			<View style={styles.sectionCard}>
-				<Text style={styles.sectionTitle}>
-					<Ionicons
-						name="location-outline"
-						size={16}
-						color="#A40C2D"
-						style={styles.inlineIcon}
-					/>{' '}
-					Location & Vendor
-				</Text>
-				<View style={styles.locationInfo}>
-					<Text style={styles.locationText}>
-						{order.cafeteria_name}
-						{order.cafeteria_location && ` • ${order.cafeteria_location}`}
-					</Text>
-					<Text style={styles.concessionText}>
-						Concession: {order.concession_name}
-					</Text>
-				</View>
-
-				<TouchableOpacity
-					style={styles.concessionaireCard}
-					onPress={() =>
-						navigation.navigate('View Concessionaire Profile', {
-							concessionaireId: order.concessionaire_id || order.concession_id,
-							concessionaireData: {
-								first_name: order.concessionaire_first_name,
-								last_name: order.concessionaire_last_name,
-								email: order.concessionaire_email,
-								contact_number: order.concessionaire_contact_number,
-								messenger_link: order.concessionaire_messenger_link,
-								profile_image_url: order.concessionaire_profile_image_url,
-								concession_name: order.concession_name,
-								cafeteria_name: order.cafeteria_name,
-							},
-						})
-					}>
-					{order.concessionaire_profile_image_url ?
-						<Image
-							source={{ uri: order.concessionaire_profile_image_url }}
-							style={styles.concessionaireAvatar}
-						/>
-					:	<View style={styles.concessionaireAvatarPlaceholder}>
-							<Text style={styles.concessionaireAvatarInitials}>
-								{order.concessionaire_first_name?.[0] || ''}
-								{order.concessionaire_last_name?.[0] || ''}
+						}
+						<View style={styles.concessionaireInfo}>
+							<Text style={styles.concessionaireName}>
+								{order.concessionaire_first_name} {order.concessionaire_last_name}
 							</Text>
+							<Text style={styles.concessionaireEmail}>
+								{order.concessionaire_email}
+							</Text>
+							{order.concessionaire_contact_number && (
+								<Text style={styles.concessionaireContact}>
+									<Ionicons
+										name="call-outline"
+										size={14}
+										color="#666"
+										style={{ marginRight: 6 }}
+									/>
+									{order.concessionaire_contact_number}
+								</Text>
+							)}
 						</View>
-					}
-					<View style={{ flex: 1 }}>
-						<Text style={styles.concessionaireLabel}>Concessionaire</Text>
-						<Text style={styles.concessionaireName}>
-							{order.concessionaire_first_name} {order.concessionaire_last_name}
-						</Text>
-					</View>
-				</TouchableOpacity>
-			</View>
-
-			{/* Cancel Order Button - Only show for pending orders */}
-			{order.order_status === 'pending' && (
-				<View style={styles.cancelButtonContainer}>
-					<TouchableOpacity
-						style={[
-							styles.cancelButton,
-							cancelling && styles.cancelButtonDisabled,
-						]}
-						onPress={cancelOrder}
-						disabled={cancelling}>
-						{cancelling ?
-							<ActivityIndicator
-								color="#fff"
-								size="small"
-							/>
-						:	<Text style={styles.cancelButtonText}>Cancel Order</Text>}
 					</TouchableOpacity>
 				</View>
-			)}
 
-			<ImagePreviewModal
-				visible={!!previewSource}
-				imageUrl={previewSource}
-				title="Payment screenshot"
-				onClose={() => setPreviewSource(null)}
-			/>
+				{/* Cancel Order Button - Only show for pending orders */}
+				{order.order_status === 'pending' && (
+					<View style={styles.cancelButtonContainer}>
+						<TouchableOpacity
+							style={[
+								styles.cancelButton,
+								cancelling && styles.cancelButtonDisabled,
+							]}
+							onPress={cancelOrder}
+							disabled={cancelling}>
+							{cancelling ?
+								<ActivityIndicator
+									color="#fff"
+									size="small"
+								/>
+							:	<Text style={styles.cancelButtonText}>Cancel Order</Text>}
+						</TouchableOpacity>
+					</View>
+				)}
 
-			<Modal
-				transparent
-				visible={cancelConfirmVisible}
-				animationType="fade"
-				onRequestClose={() => setCancelConfirmVisible(false)}>
-				<View style={styles.modalOverlay}>
-					<View style={styles.modalBox}>
-						<Text style={styles.modalTitle}>Cancel Order</Text>
-						<Text style={styles.modalMessage}>
-							Are you sure you want to cancel this order? This action cannot be
-							undone.
-						</Text>
-						<View style={styles.modalButtonsRow}>
-							<TouchableOpacity
-								style={[styles.modalButton, styles.modalCancelButton]}
-								onPress={() => setCancelConfirmVisible(false)}
-								disabled={cancelling}>
-								<Text style={styles.modalCancelText}>No</Text>
-							</TouchableOpacity>
-							<TouchableOpacity
-								style={[styles.modalButton, styles.modalConfirmButton]}
-								onPress={confirmCancelOrder}
-								disabled={cancelling}>
-								<Text style={styles.modalConfirmText}>
-									{cancelling ? 'Cancelling...' : 'Yes, Cancel'}
-								</Text>
-							</TouchableOpacity>
+				<ImagePreviewModal
+					visible={!!previewSource}
+					imageUrl={previewSource}
+					title="Payment screenshot"
+					onClose={() => setPreviewSource(null)}
+				/>
+
+				<Modal
+					transparent
+					visible={cancelConfirmVisible}
+					animationType="fade"
+					onRequestClose={() => setCancelConfirmVisible(false)}>
+					<View style={styles.modalOverlay}>
+						<View style={styles.modalBox}>
+							<Text style={styles.modalTitle}>Cancel Order</Text>
+							<Text style={styles.modalMessage}>
+								Are you sure you want to cancel this order? This action cannot be
+								undone.
+							</Text>
+							<View style={styles.modalButtonsRow}>
+								<TouchableOpacity
+									style={[styles.modalButton, styles.modalCancelButton]}
+									onPress={() => setCancelConfirmVisible(false)}
+									disabled={cancelling}>
+									<Text style={styles.modalCancelText}>No</Text>
+								</TouchableOpacity>
+								<TouchableOpacity
+									style={[styles.modalButton, styles.modalConfirmButton]}
+									onPress={confirmCancelOrder}
+									disabled={cancelling}>
+									<Text style={styles.modalConfirmText}>
+										{cancelling ? 'Cancelling...' : 'Yes, Cancel'}
+									</Text>
+								</TouchableOpacity>
+							</View>
 						</View>
 					</View>
-				</View>
-			</Modal>
-		</ScrollView>
-	)
-}
-
+				</Modal>
+			</ScrollView>
+		)
+	}
 const styles = StyleSheet.create({
 	container: { flex: 1, padding: 15, backgroundColor: '#fff' },
+	scrollContent: {
+		paddingBottom: 30,
+	},
 	header: {
 		fontSize: 20,
 		fontWeight: 'bold',
@@ -899,7 +973,7 @@ const styles = StyleSheet.create({
 		textAlign: 'center',
 		lineHeight: 20,
 	},
-	uploadedIndicator: {
+	uploadedTextIndicator: {
 		fontSize: 12,
 		color: '#28a745',
 		textAlign: 'center',
@@ -971,9 +1045,45 @@ const styles = StyleSheet.create({
 	toastInfo: {
 		backgroundColor: '#333',
 	},
-	toastText: {
-		color: '#fff',
-		fontSize: 13,
+	concessionaireAvatar: {
+		width: 50,
+		height: 50,
+		borderRadius: 25,
+		marginRight: 12,
+	},
+	concessionaireAvatarPlaceholder: {
+		width: 50,
+		height: 50,
+		borderRadius: 25,
+		backgroundColor: '#e0e0e0',
+		justifyContent: 'center',
+		alignItems: 'center',
+		marginRight: 12,
+	},
+	concessionaireInitials: {
+		fontSize: 18,
+		fontWeight: '600',
+		color: '#666',
+	},
+	concessionaireInfo: {
+		flex: 1,
+	},
+	concessionaireName: {
+		fontSize: 16,
+		fontWeight: '600',
+		color: '#333',
+	},
+	concessionaireEmail: {
+		fontSize: 14,
+		color: '#666',
+		marginTop: 2,
+	},
+	concessionaireContact: {
+		fontSize: 14,
+		color: '#666',
+		marginTop: 4,
+		flexDirection: 'row',
+		alignItems: 'center',
 	},
 	modalOverlay: {
 		flex: 1,
@@ -1114,21 +1224,6 @@ const styles = StyleSheet.create({
 		borderWidth: 1,
 		borderColor: '#e5e7eb',
 	},
-	concessionaireAvatar: {
-		width: 50,
-		height: 50,
-		borderRadius: 25,
-		marginRight: 12,
-	},
-	concessionaireAvatarPlaceholder: {
-		width: 50,
-		height: 50,
-		borderRadius: 25,
-		marginRight: 12,
-		backgroundColor: '#A40C2D',
-		alignItems: 'center',
-		justifyContent: 'center',
-	},
 	concessionaireAvatarInitials: {
 		fontSize: 16,
 		fontWeight: '600',
@@ -1138,11 +1233,6 @@ const styles = StyleSheet.create({
 		fontSize: 12,
 		color: '#6b7280',
 		marginBottom: 2,
-	},
-	concessionaireName: {
-		fontSize: 16,
-		fontWeight: '600',
-		color: '#A40C2D',
 	},
 	fullImageContainer: {
 		flex: 1,
@@ -1377,6 +1467,86 @@ const styles = StyleSheet.create({
 		fontSize: 12,
 		color: '#555',
 		textAlign: 'center',
+	},
+	paymentProofSection: {
+		marginTop: 12,
+		paddingTop: 12,
+		borderTopWidth: 1,
+		borderTopColor: '#f0f0f0',
+	},
+	paymentProofLabel: {
+		fontSize: 14,
+		fontWeight: '600',
+		color: '#333',
+		marginBottom: 8,
+	},
+	paymentProofImage: {
+		width: '100%',
+		height: 200,
+		borderRadius: 8,
+		backgroundColor: '#f0f0f0',
+	},
+	uploadedIndicator: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		marginTop: 8,
+		padding: 8,
+		backgroundColor: '#e8f5e9',
+		borderRadius: 6,
+	},
+	uploadedText: {
+		fontSize: 12,
+		color: '#28a745',
+		marginLeft: 6,
+		fontWeight: '500',
+	},
+	paymentRejectedSection: {
+		marginTop: 12,
+		padding: 12,
+		backgroundColor: '#fff5f5',
+		borderRadius: 8,
+		borderWidth: 1,
+		borderColor: '#ffebee',
+	},
+	paymentRejectedHeader: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		marginBottom: 8,
+	},
+	paymentRejectedTitle: {
+		fontSize: 16,
+		fontWeight: '600',
+		color: '#dc3545',
+	},
+	paymentRejectedReason: {
+		fontSize: 14,
+		color: '#666',
+		marginBottom: 8,
+		lineHeight: 20,
+	},
+	paymentRejectedNote: {
+		fontSize: 12,
+		color: '#999',
+		fontStyle: 'italic',
+		marginBottom: 12,
+	},
+	uploadButton: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		justifyContent: 'center',
+		backgroundColor: '#A40C2D',
+		padding: 12,
+		borderRadius: 8,
+		marginTop: 8,
+	},
+	uploadButtonDisabled: {
+		backgroundColor: '#ccc',
+		opacity: 0.6,
+	},
+	uploadButtonText: {
+		color: '#fff',
+		fontSize: 14,
+		fontWeight: '600',
 	},
 })
 

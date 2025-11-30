@@ -45,6 +45,11 @@ const ViewOrderConcessionaire = () => {
 	const [closingConcession, setClosingConcession] = useState(false)
 	const [currentTime, setCurrentTime] = useState(Date.now())
 	const [rejectingReceipt, setRejectingReceipt] = useState(false)
+	const [rejectScreenshotModalVisible, setRejectScreenshotModalVisible] = useState(false)
+	const [selectedRejectionReason, setSelectedRejectionReason] = useState<string>('')
+	const [customRejectionReason, setCustomRejectionReason] = useState<string>('')
+	const [rejectingScreenshot, setRejectingScreenshot] = useState(false)
+	const [restartTimer, setRestartTimer] = useState(false)
 	const { showToast } = useToast()
 
 	// Format dates with Asia/Manila timezone (robust to plain DB timestamps)
@@ -448,6 +453,51 @@ const ViewOrderConcessionaire = () => {
 		}
 	}
 
+	// Reject GCash screenshot with specific reason
+	const rejectGCashScreenshot = async () => {
+		if (!order) return
+
+		if (!selectedRejectionReason && !customRejectionReason.trim()) {
+			showToast('error', 'Please select a rejection reason or provide a custom reason.')
+			return
+		}
+
+		const rejectionReason = selectedRejectionReason === 'other' ? customRejectionReason.trim() : selectedRejectionReason
+
+		try {
+			setRejectingScreenshot(true)
+			await api.put(`/order/${order.id}/reject-gcash-screenshot`, {
+				rejection_reason: selectedRejectionReason,
+				custom_reason: customRejectionReason.trim() || undefined,
+				restart_timer: restartTimer
+			})
+			await fetchOrderDetails()
+			showToast('success', `GCash screenshot rejected successfully.${restartTimer ? ' Timer restarted.' : ''}`)
+			setRejectScreenshotModalVisible(false)
+			setSelectedRejectionReason('')
+			setCustomRejectionReason('')
+			setRestartTimer(false)
+		} catch (err) {
+			console.error('Error rejecting GCash screenshot:', err)
+			showToast('error', 'Failed to reject GCash screenshot')
+		} finally {
+			setRejectingScreenshot(false)
+		}
+	}
+
+	// Open reject screenshot modal
+	const openRejectScreenshotModal = () => {
+		setRejectScreenshotModalVisible(true)
+	}
+
+	// Close reject screenshot modal
+	const closeRejectScreenshotModal = () => {
+		setRejectScreenshotModalVisible(false)
+		setSelectedRejectionReason('')
+		setCustomRejectionReason('')
+		setRestartTimer(false)
+	}
+
 	if (loading)
 		return (
 			<ActivityIndicator
@@ -553,34 +603,6 @@ const ViewOrderConcessionaire = () => {
 					tintColor="#A40C2D"
 				/>
 			}>
-			{/* Customer Info Section */}
-			<TouchableOpacity
-				style={styles.customerSection}
-				onPress={() =>
-					navigation.navigate('View Customer Profile', {
-						customerId: order.customer_id,
-					})
-				}>
-				{order.customer_profile_image ?
-					<Image
-						source={{ uri: order.customer_profile_image }}
-						style={styles.customerAvatar}
-					/>
-				:	<View style={styles.customerAvatarPlaceholder}>
-						<Text style={styles.customerInitials}>
-							{order.customer_first_name?.[0]}
-							{order.customer_last_name?.[0]}
-						</Text>
-					</View>
-				}
-				<View style={styles.customerInfo}>
-					<Text style={styles.customerName}>
-						{order.customer_first_name} {order.customer_last_name}
-					</Text>
-					<Text style={styles.customerEmail}>{order.customer_email}</Text>
-				</View>
-			</TouchableOpacity>
-
 			<Text style={styles.header}>Order #{order.id}</Text>
 
 			{/* Order Status & Basic Info */}
@@ -625,187 +647,6 @@ const ViewOrderConcessionaire = () => {
 					</View>
 				)}
 			</View>
-
-			{/* Pricing Information */}
-			<View style={styles.sectionCard}>
-				<Text style={styles.sectionTitle}>
-					<Ionicons
-						name="pricetag-outline"
-						size={16}
-						color="#A40C2D"
-						style={styles.inlineIcon}
-					/>{' '}
-					Pricing
-				</Text>
-				{(
-					order.updated_total_price !== null &&
-					order.updated_total_price !== undefined &&
-					!Number.isNaN(Number(order.updated_total_price)) &&
-					!Number.isNaN(Number(order.total_price)) &&
-					Number(order.updated_total_price) !== Number(order.total_price)
-				) ?
-					<>
-						<View style={styles.infoSection}>
-							<Text style={styles.infoLabel}>Original Total:</Text>
-							<Text style={styles.infoValue}>
-								₱{Number(order.total_price).toFixed(2)}
-							</Text>
-						</View>
-						<View style={styles.infoSection}>
-							<Text style={styles.infoLabel}>Updated Total:</Text>
-							<Text style={[styles.infoValue, styles.updatedPrice]}>
-								₱{Number(order.updated_total_price).toFixed(2)}
-							</Text>
-						</View>
-						{order.price_change_reason && (
-							<View style={styles.infoSection}>
-								<Text style={styles.infoLabel}>Price Change Reason:</Text>
-								<Text style={styles.infoValue}>
-									{order.price_change_reason}
-								</Text>
-							</View>
-						)}
-					</>
-				:	<View style={styles.infoSection}>
-						<Text style={styles.infoLabel}>Total:</Text>
-						<Text style={[styles.infoValue, styles.totalPrice]}>
-							₱{Number(order.total_price).toFixed(2)}
-						</Text>
-					</View>
-				}
-			</View>
-
-			{/* Payment Information */}
-			<View style={styles.sectionCard}>
-				<Text style={styles.sectionTitle}>
-					<Ionicons
-						name="card-outline"
-						size={16}
-						color="#A40C2D"
-						style={styles.inlineIcon}
-					/>{' '}
-					Payment
-				</Text>
-				<View style={styles.infoSection}>
-					<Text style={styles.infoLabel}>Payment Method:</Text>
-					<View style={styles.paymentMethodDisplay}>
-						{order.payment_method === 'gcash' ?
-							<Text style={styles.infoValue}>GCash</Text>
-						:	<Text style={styles.infoValue}>
-								<Ionicons
-									name="cash-outline"
-									size={14}
-									color="#666"
-									style={styles.inlineIcon}
-								/>{' '}
-								On-Counter
-							</Text>
-						}
-					</View>
-				</View>
-				{order.payment_method === 'gcash' && (
-					<View style={styles.gcashSection}>
-						{order.payment_receipt_expires_at && order.order_status !== 'pending' && (
-							<Text style={styles.paymentExpiryText}>
-								Payment expires at:{' '}
-								{formatDateTime(order.payment_receipt_expires_at)}
-							</Text>
-						)}
-
-						{/* Receipt Status Indicators */}
-						{order.gcash_screenshot ?
-							<View style={styles.paymentProofSection}>
-								<View
-									style={{
-										flexDirection: 'row',
-										justifyContent: 'space-between',
-										alignItems: 'center',
-										marginBottom: 8,
-									}}>
-									<Text style={styles.infoLabel}>GCash Screenshot:</Text>
-									<View
-										style={{
-											backgroundColor: '#28a745',
-											paddingHorizontal: 8,
-											paddingVertical: 4,
-											borderRadius: 4,
-										}}>
-										<Text
-											style={{
-												color: '#fff',
-												fontSize: 12,
-												fontWeight: '600',
-											}}>
-											Uploaded
-										</Text>
-									</View>
-								</View>
-								<TouchableOpacity
-									onPress={() => setPreviewSource(order.gcash_screenshot)}>
-									<Image
-										source={{ uri: order.gcash_screenshot }}
-										style={styles.paymentProof}
-									/>
-								</TouchableOpacity>
-
-								{/* Reject Receipt Button */}
-								{order.order_status === 'accepted' && (
-									<TouchableOpacity
-										style={[
-											styles.rejectReceiptBtn,
-											rejectingReceipt && styles.rejectReceiptBtnDisabled,
-										]}
-										onPress={rejectReceipt}
-										disabled={rejectingReceipt}>
-										<Ionicons
-											name="close-circle-outline"
-											size={16}
-											color="#fff"
-											style={{ marginRight: 6 }}
-										/>
-										<Text style={styles.rejectReceiptText}>
-											{rejectingReceipt ?
-												'Rejecting...'
-											:	'Reject Receipt (Not Legitimate)'}
-										</Text>
-									</TouchableOpacity>
-								)}
-							</View>
-						:	<View style={styles.noReceiptContainer}>
-								<Ionicons
-									name="alert-circle-outline"
-									size={24}
-									color="#ff9800"
-								/>
-								<Text style={styles.noReceiptText}>
-									No GCash receipt uploaded yet
-								</Text>
-							</View>
-						}
-					</View>
-				)}
-			</View>
-
-			{/* Decline Reason (if applicable) */}
-			{order.order_status === 'declined' && order.decline_reason && (
-				<View style={[styles.sectionCard, styles.declineCard]}>
-					<Text style={styles.sectionTitle}>
-						<Ionicons
-							name="close-circle-outline"
-							size={16}
-							color="#dc3545"
-							style={styles.inlineIcon}
-						/>{' '}
-						Decline Information
-					</Text>
-					<View style={styles.infoSection}>
-						<Text style={styles.infoLabel}>Reason:</Text>
-						<Text style={[styles.infoValue, styles.declineReason]}>
-							{order.decline_reason}
-						</Text>
-					</View>
-				</View>
-			)}
 
 			{/* Order Items */}
 			<View style={styles.sectionCard}>
@@ -865,6 +706,204 @@ const ViewOrderConcessionaire = () => {
 					scrollEnabled={false}
 				/>
 			</View>
+
+			{/* Payment Information */}
+			<View style={styles.sectionCard}>
+				<Text style={styles.sectionTitle}>
+					<Ionicons
+						name="card-outline"
+						size={16}
+						color="#A40C2D"
+						style={styles.inlineIcon}
+					/>{' '}
+					Payment
+				</Text>
+				<View style={styles.infoSection}>
+					<Text style={styles.infoLabel}>Payment Method:</Text>
+					<View style={styles.paymentMethodDisplay}>
+						{order.payment_method === 'gcash' ?
+							<Text style={styles.infoValue}>GCash</Text>
+						:	<Text style={styles.infoValue}>
+								<Ionicons
+									name="cash-outline"
+									size={14}
+									color="#666"
+									style={styles.inlineIcon}
+								/>{' '}
+								On-Counter
+							</Text>
+						}
+					</View>
+				</View>
+
+				{/* Total Pricing Information */}
+				{(
+					order.updated_total_price !== null &&
+					order.updated_total_price !== undefined &&
+					!Number.isNaN(Number(order.updated_total_price)) &&
+					!Number.isNaN(Number(order.total_price)) &&
+					Number(order.updated_total_price) !== Number(order.total_price)
+				) ?
+					<>
+						<View style={styles.infoSection}>
+							<Text style={styles.infoLabel}>Original Total:</Text>
+							<Text style={styles.infoValue}>
+								₱{Number(order.total_price).toFixed(2)}
+							</Text>
+						</View>
+						<View style={styles.infoSection}>
+							<Text style={styles.infoLabel}>Updated Total:</Text>
+							<Text style={[styles.infoValue, styles.updatedPrice]}>
+								₱{Number(order.updated_total_price).toFixed(2)}
+							</Text>
+						</View>
+						{order.price_change_reason && (
+							<View style={styles.infoSection}>
+								<Text style={styles.infoLabel}>Price Change Reason:</Text>
+								<Text style={styles.infoValue}>
+									{order.price_change_reason}
+								</Text>
+							</View>
+						)}
+					</>
+				:	<View style={styles.infoSection}>
+						<Text style={styles.infoLabel}>Total:</Text>
+						<Text style={[styles.infoValue, styles.totalPrice]}>
+							₱{Number(order.total_price).toFixed(2)}
+						</Text>
+					</View>
+				}
+				{order.payment_method === 'gcash' && (
+					<View style={styles.gcashSection}>
+						{order.payment_receipt_expires_at && order.order_status !== 'pending' && (
+							<Text style={styles.paymentExpiryText}>
+								Payment expires at:{' '}
+								{formatDateTime(order.payment_receipt_expires_at)}
+							</Text>
+						)}
+
+						{/* Receipt Status Indicators */}
+						{order.gcash_screenshot ?
+							<View style={styles.paymentProofSection}>
+								<View
+									style={{
+										flexDirection: 'row',
+										justifyContent: 'space-between',
+										alignItems: 'center',
+										marginBottom: 8,
+									}}>
+									<Text style={styles.infoLabel}>GCash Screenshot:</Text>
+									<View
+										style={{
+											backgroundColor: '#28a745',
+											paddingHorizontal: 8,
+											paddingVertical: 4,
+											borderRadius: 4,
+										}}>
+										<Text
+											style={{
+												color: '#fff',
+												fontSize: 12,
+												fontWeight: '600',
+											}}>
+											Uploaded
+										</Text>
+									</View>
+								</View>
+								<TouchableOpacity
+									onPress={() => setPreviewSource(order.gcash_screenshot)}>
+									<Image
+										source={{ uri: order.gcash_screenshot }}
+										style={styles.paymentProof}
+									/>
+								</TouchableOpacity>
+
+								{/* Reject Receipt Button */}
+								{order.order_status === 'accepted' && (
+									<TouchableOpacity
+										style={[
+											styles.rejectScreenshotBtn,
+											rejectingScreenshot && styles.rejectScreenshotBtnDisabled,
+										]}
+										onPress={openRejectScreenshotModal}
+										disabled={rejectingScreenshot}>
+										<Ionicons
+											name="close-circle-outline"
+											size={16}
+											color="#fff"
+											style={{ marginRight: 6 }}
+										/>
+										<Text style={styles.rejectReceiptText}>
+											{rejectingScreenshot ?
+												'Rejecting...'
+											:	'Reject Screenshot'}
+										</Text>
+									</TouchableOpacity>
+								)}
+							</View>
+						:	<View style={styles.noReceiptContainer}>
+								<Ionicons
+									name="alert-circle-outline"
+									size={24}
+									color="#ff9800"
+								/>
+								<Text style={styles.noReceiptText}>
+									No GCash receipt uploaded yet
+								</Text>
+							</View>
+						}
+					</View>
+				)}
+			</View>
+
+			{/* Decline Reason (if applicable) */}
+			{order.order_status === 'declined' && order.decline_reason && (
+				<View style={[styles.sectionCard, styles.declineCard]}>
+					<Text style={styles.sectionTitle}>
+						<Ionicons
+							name="close-circle-outline"
+							size={16}
+							color="#dc3545"
+							style={styles.inlineIcon}
+						/>{' '}
+						Decline Information
+					</Text>
+					<View style={styles.infoSection}>
+						<Text style={styles.infoLabel}>Reason:</Text>
+						<Text style={[styles.infoValue, styles.declineReason]}>
+							{order.decline_reason}
+						</Text>
+					</View>
+				</View>
+			)}
+
+			{/* Customer Info Section */}
+			<TouchableOpacity
+				style={styles.customerSection}
+				onPress={() =>
+					navigation.navigate('View Customer Profile', {
+						customerId: order.customer_id,
+					})
+				}>
+				{order.customer_profile_image ?
+					<Image
+						source={{ uri: order.customer_profile_image }}
+						style={styles.customerAvatar}
+					/>
+				:	<View style={styles.customerAvatarPlaceholder}>
+						<Text style={styles.customerInitials}>
+							{order.customer_first_name?.[0]}
+							{order.customer_last_name?.[0]}
+						</Text>
+					</View>
+				}
+				<View style={styles.customerInfo}>
+					<Text style={styles.customerName}>
+						{order.customer_first_name} {order.customer_last_name}
+					</Text>
+					<Text style={styles.customerEmail}>{order.customer_email}</Text>
+				</View>
+			</TouchableOpacity>
 
 			{renderStatusButtons()}
 
@@ -1345,6 +1384,100 @@ const ViewOrderConcessionaire = () => {
 					</ScrollView>
 				</View>
 			</Modal>
+
+			{/* Reject GCash Screenshot Modal */}
+			<Modal
+				visible={rejectScreenshotModalVisible}
+				animationType="slide"
+				transparent={true}>
+				<View style={styles.modalOverlay}>
+					<ScrollView
+						style={styles.modalContainer}
+						contentContainerStyle={{ paddingBottom: 20 }}>
+						<Text style={styles.modalHeader}>Reject GCash Screenshot</Text>
+						<Text style={styles.modalSubtitle}>
+							Please provide a reason for rejecting this GCash screenshot:
+						</Text>
+
+						{/* Rejection Reasons */}
+						<Text style={styles.reasonLabel}>Select a rejection reason:</Text>
+						{[
+							{ key: 'insufficient_amount', label: 'Insufficient payment amount' },
+							{ key: 'wrong_image', label: 'Invalid or incorrect image uploaded' },
+							{ key: 'unclear_receipt', label: 'Receipt image is unclear or unreadable' },
+							{ key: 'mismatched_name', label: 'Account name does not match' },
+							{ key: 'other', label: 'Other (specify below)' },
+						].map((reason, index) => (
+							<TouchableOpacity
+								key={index}
+								style={[
+									styles.reasonOption,
+									selectedRejectionReason === reason.key && styles.selectedReason,
+								]}
+								onPress={() => {
+									setSelectedRejectionReason(reason.key)
+									if (reason.key !== 'other') setCustomRejectionReason('')
+								}}>
+								<Text
+									style={[
+										styles.reasonText,
+										selectedRejectionReason === reason.key && styles.selectedReasonText,
+									]}>
+									{reason.label}
+								</Text>
+							</TouchableOpacity>
+						))}
+
+						{/* Custom Reason for "Other" */}
+						{selectedRejectionReason === 'other' && (
+							<View style={styles.customReasonContainer}>
+								<Text style={styles.reasonLabel}>Custom reason:</Text>
+								<TextInput
+									style={[styles.customReasonInput]}
+									placeholder="Enter your reason for rejecting this screenshot..."
+									value={customRejectionReason}
+									onChangeText={setCustomRejectionReason}
+									multiline
+									numberOfLines={3}
+								/>
+							</View>
+						)}
+
+						{/* Restart Timer Toggle */}
+						<View style={styles.toggleContainer}>
+							<Text style={styles.toggleLabel}>Restart payment timer:</Text>
+							<View style={styles.toggleRow}>
+								<Text style={styles.toggleDescription}>
+									Enable to give the customer more time to upload a new receipt
+								</Text>
+								<Checkbox
+									value={restartTimer}
+									onValueChange={setRestartTimer}
+									color={restartTimer ? '#A40C2D' : undefined}
+									style={styles.checkbox}
+								/>
+							</View>
+						</View>
+
+						<View style={styles.modalButtonRow}>
+							<TouchableOpacity
+								style={styles.cancelModalBtn}
+								onPress={closeRejectScreenshotModal}
+								disabled={rejectingScreenshot}>
+								<Text style={styles.cancelModalText}>Cancel</Text>
+							</TouchableOpacity>
+							<TouchableOpacity
+								style={styles.submitDeclineBtn}
+								onPress={rejectGCashScreenshot}
+								disabled={rejectingScreenshot}>
+								<Text style={styles.submitDeclineText}>
+									{rejectingScreenshot ? 'Rejecting...' : 'Reject Screenshot'}
+								</Text>
+							</TouchableOpacity>
+						</View>
+					</ScrollView>
+				</View>
+			</Modal>
 		</ScrollView>
 	)
 }
@@ -1568,6 +1701,8 @@ const styles = StyleSheet.create({
 		color: '#fff',
 	},
 	checkbox: {
+		width: 20,
+		height: 20,
 		marginRight: 10,
 	},
 	customReasonContainer: {
@@ -1774,6 +1909,47 @@ const styles = StyleSheet.create({
 		fontWeight: '600',
 		color: '#dc3545',
 		flex: 1,
+	},
+	rejectButtonsContainer: {
+		flexDirection: 'column',
+		gap: 8,
+		marginTop: 12,
+	},
+	rejectScreenshotBtn: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		justifyContent: 'center',
+		backgroundColor: '#ff6b35',
+		padding: 12,
+		borderRadius: 8,
+	},
+	rejectScreenshotBtnDisabled: {
+		opacity: 0.6,
+	},
+	toggleContainer: {
+		marginTop: 20,
+		padding: 15,
+		backgroundColor: '#f8f9fa',
+		borderRadius: 8,
+		borderWidth: 1,
+		borderColor: '#e0e0e0',
+	},
+	toggleLabel: {
+		fontSize: 16,
+		fontWeight: '600',
+		marginBottom: 8,
+		color: '#333',
+	},
+	toggleRow: {
+		flexDirection: 'row',
+		justifyContent: 'space-between',
+		alignItems: 'center',
+	},
+	toggleDescription: {
+		fontSize: 14,
+		color: '#666',
+		flex: 1,
+		marginRight: 15,
 	},
 })
 

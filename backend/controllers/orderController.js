@@ -6,7 +6,10 @@ import {
 	notifyOrderCancelledForConcessionaire,
 	notifyCustomerToPay,
 	notifyConcessionaireReceiptUploaded,
+	notifyPaymentScreenshotRejected,
+	notifyAutoDeclineTimeout,
 } from '../services/notificationService.js'
+import { PAYMENT_REJECTION_REASONS, getRejectionMessage } from '../constants/paymentRejectionReasons.js'
 
 const storage = multer.memoryStorage()
 export const upload = multer({ storage })
@@ -471,7 +474,11 @@ export const updateOrderStatus = async (req, res) => {
 		// Check if trying to mark as ready/completed and GCash timer has expired
 		if (order_status === 'ready for pickup' || order_status === 'ready-for-pickup' || order_status === 'completed') {
 			const orderCheck = await pool.query(
-				`SELECT o.payment_method, o.order_status, o.accepted_at, o.gcash_screenshot, c.receipt_timer, o.payment_receipt_expires_at
+				`SELECT o.payment_method, o.order_status, 
+					(o.accepted_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Manila') as accepted_at, 
+					o.gcash_screenshot, 
+					c.receipt_timer, 
+					(o.payment_receipt_expires_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Manila') as payment_receipt_expires_at
 				 FROM tblorder o
 				 JOIN tblconcession c ON o.concession_id = c.id
 				 WHERE o.id = $1`,
@@ -679,7 +686,10 @@ export const updatePaymentProof = async (req, res) => {
 	try {
 		// First check if the order exists and whether payment proof can be uploaded/updated
 		const orderCheck = await pool.query(
-			`SELECT o.order_status, o.gcash_screenshot, o.payment_method, o.accepted_at, c.receipt_timer, o.payment_receipt_expires_at
+			`SELECT o.order_status, o.gcash_screenshot, o.payment_method, 
+				(o.accepted_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Manila') as accepted_at, 
+				c.receipt_timer, 
+				(o.payment_receipt_expires_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Manila') as payment_receipt_expires_at
 			 FROM tblorder o
 			 JOIN tblconcession c ON o.concession_id = c.id
 			 WHERE o.id = $1`,
@@ -856,11 +866,134 @@ export const rejectReceipt = async (req, res) => {
 }
 
 // ==========================
+// Reject GCash screenshot with specific reason
+// Allows concessionaire to reject payment proof with detailed reasons
+// ==========================
+export const rejectGCashScreenshot = async (req, res) => {
+	const { id } = req.params
+	const { rejection_reason, custom_reason, restart_timer } = req.body
+
+	try {
+		// Validate rejection reason
+		if (!rejection_reason || !Object.values(PAYMENT_REJECTION_REASONS).includes(rejection_reason)) {
+			return res.status(400).json({ 
+				error: 'Invalid rejection reason',
+				validReasons: Object.values(PAYMENT_REJECTION_REASONS)
+			})
+		}
+
+		// Check if order exists and has a GCash screenshot
+		const orderCheck = await pool.query(
+			`SELECT o.order_status, o.payment_method, o.gcash_screenshot, o.customer_id, c.concession_name
+			 FROM tblorder o
+			 JOIN tblconcession c ON o.concession_id = c.id
+			 WHERE o.id = $1`,
+			[id]
+		)
+
+		if (orderCheck.rowCount === 0) {
+			return res.status(404).json({ error: 'Order not found' })
+		}
+
+		const order = orderCheck.rows[0]
+
+		// Only allow rejection for orders with GCash screenshots
+		if (!order.gcash_screenshot) {
+			return res.status(400).json({
+				error: 'No GCash screenshot found to reject'
+			})
+		}
+
+		if (order.payment_method !== 'gcash') {
+			return res.status(400).json({
+				error: 'Screenshot rejection only applies to GCash payments'
+			})
+		}
+
+		// Get the rejection message
+		const rejectionMessage = rejection_reason === PAYMENT_REJECTION_REASONS.OTHER 
+			? custom_reason || getRejectionMessage(rejection_reason)
+			: getRejectionMessage(rejection_reason)
+
+		// Update order: clear screenshot and set rejection reason
+		// If restart_timer is true, also reset accepted_at and payment_receipt_expires_at
+		let updateQuery, updateParams
+		
+		if (restart_timer) {
+			updateQuery = `UPDATE tblorder o
+		             SET gcash_screenshot = NULL,
+		                 payment_rejected_reason = $1,
+		                 payment_verified = FALSE,
+		                 accepted_at = NOW() AT TIME ZONE 'UTC',
+		                 payment_receipt_expires_at = NOW() AT TIME ZONE 'UTC' + (
+		                   SELECT c.receipt_timer::interval
+		                   FROM tblconcession c
+		                   WHERE c.id = o.concession_id
+		                 ),
+		                 updated_at = NOW() AT TIME ZONE 'UTC'
+		             WHERE o.id = $2 
+		             RETURNING *`
+			updateParams = [rejectionMessage, id]
+		} else {
+			updateQuery = `UPDATE tblorder o
+		             SET gcash_screenshot = NULL,
+		                 payment_rejected_reason = $1,
+		                 payment_verified = FALSE,
+		                 updated_at = NOW() AT TIME ZONE 'UTC'
+		             WHERE o.id = $2 
+		             RETURNING *`
+			updateParams = [rejectionMessage, id]
+		}
+
+		const result = await pool.query(updateQuery, updateParams)
+
+		const updatedOrder = result.rows[0]
+		updatedOrder.payment_proof = null
+
+		// Notify customer about screenshot rejection
+		try {
+			await notifyPaymentScreenshotRejected(
+				updatedOrder.id,
+				order.customer_id,
+				order.concession_name,
+				rejectionMessage
+			)
+		} catch (notifErr) {
+			console.error('Error sending screenshot rejection notification:', notifErr)
+		}
+
+		res.json({
+			...updatedOrder,
+			rejection_reason: rejection_reason,
+			rejection_message: rejectionMessage,
+			timer_restarted: restart_timer || false
+		})
+	} catch (err) {
+		console.error('Error rejecting GCash screenshot:', err)
+		res.status(500).json({ error: 'Failed to reject GCash screenshot' })
+	}
+}
+
 // Bulk auto-decline expired GCash receipt timers
 // Declines all accepted GCash orders without receipt where timer has expired
 // ==========================
 export const bulkDeclineExpiredReceipts = async (req, res) => {
 	try {
+		// First, get the orders that will be declined to send notifications
+		const ordersToDecline = await pool.query(
+			`SELECT o.id, o.customer_id, c.concessionaire_id, c.concession_name
+			   FROM tblorder o
+			   JOIN tblconcession c ON o.concession_id = c.id
+			   WHERE o.payment_method = 'gcash'
+			     AND o.order_status = 'accepted'
+			     AND o.gcash_screenshot IS NULL
+			     AND (
+			       (o.payment_receipt_expires_at IS NOT NULL AND o.payment_receipt_expires_at <= NOW())
+			       OR
+			       (o.payment_receipt_expires_at IS NULL AND o.accepted_at IS NOT NULL AND o.accepted_at + c.receipt_timer::interval <= NOW())
+			     )`
+		)
+
 		// Update all matching orders in one query
 		const result = await pool.query(
 			`UPDATE tblorder 
@@ -883,13 +1016,24 @@ export const bulkDeclineExpiredReceipts = async (req, res) => {
 			 RETURNING id`
 		)
 
+		// Send notifications for each declined order
+		for (const order of ordersToDecline.rows) {
+			await notifyAutoDeclineTimeout(
+				order.id,
+				order.customer_id,
+				order.concessionaire_id,
+				order.concession_name
+			)
+		}
+
 		return res.json({
-			declined: result.rowCount,
 			message: `${result.rowCount} order(s) auto-declined due to expired receipt timer`,
+			declinedCount: result.rowCount,
+			notificationsSent: ordersToDecline.rowCount
 		})
 	} catch (err) {
-		console.error('bulkDeclineExpiredReceipts error:', err)
-		return res.status(500).json({ error: 'Internal server error' })
+		console.error('Bulk auto-decline error:', err)
+		res.status(500).json({ error: 'Failed to bulk auto-decline expired receipts' })
 	}
 }
 
@@ -903,7 +1047,7 @@ export const checkAndDeclineExpiredReceipt = async (req, res) => {
 	try {
 		// Fetch order with receipt_timer from concession
 		const result = await pool.query(
-			`SELECT o.*, c.receipt_timer 
+			`SELECT o.*, c.receipt_timer, c.concessionaire_id, c.concession_name
 	       FROM tblorder o
 	       JOIN tblconcession c ON o.concession_id = c.id
 	       WHERE o.id = $1`,
@@ -963,6 +1107,14 @@ export const checkAndDeclineExpiredReceipt = async (req, res) => {
 	             updated_at = NOW() AT TIME ZONE 'UTC'
 	         WHERE id = $1`,
 				[id]
+			)
+
+			// Send notifications to both customer and concessionaire
+			await notifyAutoDeclineTimeout(
+				order.id,
+				order.customer_id,
+				order.concessionaire_id,
+				order.concession_name
 			)
 
 			return res.json({

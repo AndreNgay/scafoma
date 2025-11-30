@@ -118,6 +118,29 @@ export const notifyOrderStatusChange = async (
 };
 
 /**
+ * Notify customer about GCash screenshot rejection
+ */
+export const notifyPaymentScreenshotRejected = async (orderId, customerId, concessionName, rejectionReason) => {
+  const message = `${concessionName}: Your GCash receipt for order #${orderId} was rejected.\nReason: ${rejectionReason}\nPlease upload a correct receipt to proceed with your order.`;
+  return await createNotification(customerId, 'Payment Rejected', message, { order_id: orderId });
+};
+
+/**
+ * Notify both customer and concessionaire about automatic order decline due to receipt timeout
+ */
+export const notifyAutoDeclineTimeout = async (orderId, customerId, concessionaireId, concessionName) => {
+  // Notify customer
+  const customerMessage = `${concessionName}: Your order #${orderId} was automatically declined because the GCash receipt was not uploaded within the required time.`;
+  await createNotification(customerId, 'Order Auto-Declined', customerMessage, { order_id: orderId });
+  
+  // Notify concessionaire
+  const concessionaireMessage = `Order #${orderId} was automatically declined due to customer not uploading GCash receipt within the required time.`;
+  await createNotification(concessionaireId, 'Order Auto-Declined', concessionaireMessage, { order_id: orderId });
+  
+  console.log(`📬 Auto-decline notifications sent for order ${orderId} to customer ${customerId} and concessionaire ${concessionaireId}`);
+};
+
+/**
  * Mark notification as read
  */
 export const markNotificationAsRead = async (notificationId, userId) => {

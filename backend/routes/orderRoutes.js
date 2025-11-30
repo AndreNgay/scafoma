@@ -15,6 +15,7 @@ import {
 	cancelOrder,
 	notifyConcessionaireForOrder,
 	rejectReceipt,
+	rejectGCashScreenshot,
 	checkAndDeclineExpiredReceipt,
 	bulkDeclineExpiredReceipts,
 } from '../controllers/orderController.js'
@@ -42,6 +43,7 @@ router.put('/checkout-single', checkoutSingleOrder) // Checkout single order by 
 router.patch('/:id/payment-method', updatePaymentMethod)
 router.post('/:id/notify', authMiddleware, notifyConcessionaireForOrder)
 router.put('/:id/reject-receipt', rejectReceipt) // Reject receipt and restart timer
+router.put('/:id/reject-gcash-screenshot', rejectGCashScreenshot) // Reject GCash screenshot with specific reason
 router.post('/:id/check-expired', checkAndDeclineExpiredReceipt) // Auto-decline if receipt timer expired
 router.post('/bulk-decline-expired', bulkDeclineExpiredReceipts) // Bulk auto-decline expired GCash receipts
 
