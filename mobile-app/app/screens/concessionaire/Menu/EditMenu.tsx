@@ -11,6 +11,7 @@ import {
 	Switch,
 	ActivityIndicator,
 	Modal,
+	Alert,
 } from 'react-native'
 import { useNavigation, useRoute } from '@react-navigation/native'
 import * as ImagePicker from 'expo-image-picker'
@@ -36,13 +37,14 @@ type VariationGroup = {
 	variations: Variation[]
 	required_selection: boolean
 	min_selection: number
-	max_selection: number
+	max_selection: number | null
 }
 
 const EditMenu: React.FC = () => {
 	const route = useRoute<any>()
 	const { menuItem } = route.params
 	const navigation = useNavigation<any>()
+	const [currentPage, setCurrentPage] = useState(1)
 
 	const [itemName, setItemName] = useState(menuItem?.item_name || '')
 	const initialPrice = normalizeCurrencyValue(
@@ -71,6 +73,15 @@ const EditMenu: React.FC = () => {
 	const [importSourceItems, setImportSourceItems] = useState<any[]>([])
 	const [importFromItemLoading, setImportFromItemLoading] = useState(false)
 
+	// State for selection requirements modal
+	const [requirementModalVisible, setRequirementModalVisible] = useState(false)
+	const [currentGroupIndex, setCurrentGroupIndex] = useState<number | null>(null)
+	const [currentVariationIndex, setCurrentVariationIndex] = useState<number | null>(null)
+	const [requirementModalStep, setRequirementModalStep] = useState(1) // 1 = require/optional, 2 = how many required, 3 = max selection limit, 4 = max selection amount, 5 = max amount limit, 6 = max amount value
+	const [tempMinSelection, setTempMinSelection] = useState('1')
+	const [tempMaxSelection, setTempMaxSelection] = useState('')
+	const [tempMaxAmount, setTempMaxAmount] = useState('')
+
 	const handlePriceChange = (value: string) => {
 		setPrice(sanitizeCurrencyInput(value))
 	}
@@ -87,7 +98,171 @@ const EditMenu: React.FC = () => {
 		setTakeOutAdditionalFee((prev) => normalizeCurrencyValue(prev))
 	}
 
-	// Tooltips removed
+	// Validate general details before proceeding to variations
+	const validateGeneralDetails = () => {
+		if (!itemName.trim()) {
+			showToast('error', 'Please fill in item name.')
+			return false
+		}
+		return true
+	}
+
+	// Navigate to next page
+	const goToNextPage = () => {
+		if (currentPage === 1 && !validateGeneralDetails()) {
+			return
+		}
+		setCurrentPage(currentPage + 1)
+	}
+
+	// Navigate to previous page
+	const goToPreviousPage = () => {
+		setCurrentPage(currentPage - 1)
+	}
+
+	const showRequiredSelectionDialog = (gIndex: number) => {
+		setCurrentGroupIndex(gIndex)
+		setRequirementModalStep(1)
+		setTempMinSelection('1')
+		setTempMaxSelection('')
+		setRequirementModalVisible(true)
+	}
+
+	const showMaxSelectionDialog = (gIndex: number) => {
+		setCurrentGroupIndex(gIndex)
+		setRequirementModalStep(3)
+		setTempMaxSelection('')
+		setRequirementModalVisible(true)
+	}
+
+	const showMaxAmountDialog = (gIndex: number, vIndex: number) => {
+		setCurrentGroupIndex(gIndex)
+		setCurrentVariationIndex(vIndex)
+		setRequirementModalStep(5)
+		setTempMaxAmount('')
+		setRequirementModalVisible(true)
+	}
+
+	const handleMaxAmountConfirm = (allowMultiple: boolean) => {
+		if (currentGroupIndex === null || currentVariationIndex === null) return
+		
+		if (allowMultiple) {
+			// Move to step 6 to ask for the max amount
+			setRequirementModalStep(6)
+		} else {
+			// Remove max amount limit (single order only)
+			const updated = [...variationGroups]
+			updated[currentGroupIndex].variations[currentVariationIndex].max_amount = undefined
+			setVariationGroups(updated)
+			setRequirementModalVisible(false)
+			setCurrentGroupIndex(null)
+			setCurrentVariationIndex(null)
+			setRequirementModalStep(1)
+		}
+	}
+
+	const handleMaxAmountValueConfirm = () => {
+		if (currentGroupIndex === null || currentVariationIndex === null) return
+		
+		const numValue = parseInt(tempMaxAmount) || 1
+		
+		if (numValue < 1) {
+			showToast('error', 'Maximum quantity must be at least 1')
+			return
+		}
+		
+		if (numValue > 99) {
+			showToast('error', 'Maximum quantity cannot exceed 99')
+			return
+		}
+		
+		const updated = [...variationGroups]
+		updated[currentGroupIndex].variations[currentVariationIndex].max_amount = numValue
+		setVariationGroups(updated)
+		setRequirementModalVisible(false)
+		setCurrentGroupIndex(null)
+		setCurrentVariationIndex(null)
+		setRequirementModalStep(1)
+	}
+
+	const handleRequirementSelection = (require: boolean) => {
+		if (currentGroupIndex === null) return
+		
+		if (require) {
+			// Move to step 2 to ask how many are required
+			setRequirementModalStep(2)
+		} else {
+			// Set minimum to 0 when optional
+			const updated = [...variationGroups]
+			updated[currentGroupIndex].min_selection = 0
+			setVariationGroups(updated)
+			setRequirementModalVisible(false)
+			setCurrentGroupIndex(null)
+		}
+	}
+
+	const handleMinSelectionConfirm = () => {
+		if (currentGroupIndex === null) return
+		
+		const numValue = parseInt(tempMinSelection) || 1
+		const maxSelection = variationGroups[currentGroupIndex].max_selection || 1
+		
+		if (numValue > maxSelection) {
+			showToast('error', `Minimum cannot exceed maximum (${maxSelection})`)
+			return
+		}
+		
+		const updated = [...variationGroups]
+		updated[currentGroupIndex].min_selection = Math.max(1, numValue)
+		setVariationGroups(updated)
+		setRequirementModalVisible(false)
+		setCurrentGroupIndex(null)
+		setRequirementModalStep(1)
+	}
+
+	const handleMaxSelectionConfirm = (limit: boolean) => {
+		if (currentGroupIndex === null) return
+		
+		if (limit) {
+			// Move to step 4 to ask for the limit amount
+			setRequirementModalStep(4)
+		} else {
+			// Remove max selection limit
+			const updated = [...variationGroups]
+			updated[currentGroupIndex].max_selection = null
+			setVariationGroups(updated)
+			setRequirementModalVisible(false)
+			setCurrentGroupIndex(null)
+			setRequirementModalStep(1)
+		}
+	}
+
+	const handleMaxSelectionAmountConfirm = () => {
+		if (currentGroupIndex === null) return
+		
+		const numValue = parseInt(tempMaxSelection) || 1
+		const minSelection = variationGroups[currentGroupIndex].min_selection || 0
+		const numVariations = variationGroups[currentGroupIndex].variations.filter(
+			(v) => v.available !== false
+		).length
+		
+		if (numValue < minSelection) {
+			showToast('error', `Maximum cannot be less than minimum (${minSelection})`)
+			return
+		}
+		
+		if (numValue > numVariations) {
+			showToast('error', `Maximum cannot exceed available variations (${numVariations})`)
+			return
+		}
+		
+		const updated = [...variationGroups]
+		updated[currentGroupIndex].max_selection = numValue
+		setVariationGroups(updated)
+		setRequirementModalVisible(false)
+		setCurrentGroupIndex(null)
+		setRequirementModalStep(1)
+	}
 
 	useEffect(() => {
 		const loadVariationGroups = async () => {
@@ -487,7 +662,8 @@ const EditMenu: React.FC = () => {
 			.number()
 			.int()
 			.positive()
-			.max(100, 'Max selection must be between 1 and 100'),
+			.max(100, 'Max selection must be between 1 and 100')
+			.nullable(),
 	})
 
 	const handleUpdateMenu = async () => {
@@ -514,7 +690,7 @@ const EditMenu: React.FC = () => {
 				const maxAllowed = numVariations > 0 ? numVariations : 1
 
 				// Check if max_selection exceeds number of available variations
-				if (group.max_selection > maxAllowed) {
+				if (group.max_selection && group.max_selection > maxAllowed) {
 					showToast(
 						'error',
 						`${group.label}: Max selection (${group.max_selection}) cannot exceed the number of available variations (${numVariations})`
@@ -632,356 +808,382 @@ const EditMenu: React.FC = () => {
 		}
 	}
 
-	// Tooltips removed
+	// Render page indicators
+	const renderPageIndicators = () => (
+		<View style={styles.pageIndicators}>
+			<TouchableOpacity
+				style={[styles.pageIndicator, currentPage === 1 && styles.pageIndicatorActive]}
+				onPress={() => goToPreviousPage()}
+				disabled={currentPage === 1}>
+				<Text style={[styles.pageIndicatorText, currentPage === 1 && styles.pageIndicatorTextActive]}>1</Text>
+			</TouchableOpacity>
+			<View style={styles.pageConnector} />
+			<TouchableOpacity
+				style={[styles.pageIndicator, currentPage === 2 && styles.pageIndicatorActive]}
+				onPress={() => goToNextPage()}
+				disabled={currentPage === 2}>
+				<Text style={[styles.pageIndicatorText, currentPage === 2 && styles.pageIndicatorTextActive]}>2</Text>
+			</TouchableOpacity>
+		</View>
+	)
+
+	// Render general details page
+	const renderGeneralDetails = () => (
+		<View style={styles.sectionCard}>
+			<View style={styles.sectionHeader}>
+				<Text style={styles.sectionTitle}>General Details</Text>
+				<Text style={styles.sectionHint}>* Required</Text>
+			</View>
+
+			<Text style={styles.label}>
+				Item Name <Text style={styles.required}>*</Text>
+			</Text>
+			<TextInput
+				style={styles.input}
+				value={itemName}
+				onChangeText={setItemName}
+				placeholder="Enter menu item name"
+			/>
+
+			<Text style={styles.label}>
+				Base Price <Text style={styles.required}>*</Text>
+			</Text>
+			<View style={styles.currencyInputWrapper}>
+				<Text style={styles.currencyPrefix}>₱</Text>
+				<TextInput
+					style={styles.currencyInput}
+					value={price}
+					keyboardType="numeric"
+					onChangeText={handlePriceChange}
+					onBlur={ensurePriceFallback}
+					placeholder="0.00"
+				/>
+			</View>
+			<Text style={styles.helperText}>
+				Leaving this blank automatically sets the price to ₱0.00.
+			</Text>
+
+			<Text style={styles.label}>
+				Take Out Additional Fee
+			</Text>
+			<View style={styles.currencyInputWrapper}>
+				<Text style={styles.currencyPrefix}>₱</Text>
+				<TextInput
+					style={styles.currencyInput}
+					value={takeOutAdditionalFee}
+					keyboardType="numeric"
+					onChangeText={handleTakeOutFeeChange}
+					onBlur={ensureTakeOutFeeFallback}
+					placeholder="0.00"
+				/>
+			</View>
+			<Text style={styles.helperText}>
+				Additional fee for take-out orders (optional).
+			</Text>
+
+			<Text style={styles.label}>Image</Text>
+			<TouchableOpacity
+				style={styles.imagePicker}
+				onPress={pickImage}>
+				{image ?
+					<Image
+						source={{ uri: image.uri }}
+						style={styles.previewImage}
+					/>
+				: <Text style={{ color: '#555' }}>Pick an image</Text>}
+			</TouchableOpacity>
+
+			<Text style={styles.label}>Category</Text>
+			<TextInput
+				style={styles.input}
+				placeholder="e.g. Beverage, Snack, Meal..."
+				value={category}
+				onChangeText={setCategory}
+			/>
+			{existingCategories.length > 0 && (
+				<View style={styles.categoryChipsContainer}>
+					{existingCategories.map((cat) => (
+						<TouchableOpacity
+							key={cat}
+							style={[
+								styles.categoryChip,
+								category === cat && styles.categoryChipSelected,
+							]}
+							onPress={() => setCategory(cat)}>
+							<Text
+								style={[
+									styles.categoryChipText,
+									category === cat && styles.categoryChipTextSelected,
+								]}>
+								{cat}
+							</Text>
+						</TouchableOpacity>
+					))}
+				</View>
+			)}
+
+			<View style={[styles.labelRow, { marginTop: 18 }]}>
+				<Text style={styles.label}>Availability</Text>
+			</View>
+			<View style={styles.toggleRow}>
+				<Switch
+					value={availability}
+					onValueChange={setAvailability}
+					trackColor={{ false: '#ccc', true: '#A40C2D' }}
+					thumbColor="#fff"
+				/>
+				<Text style={styles.helperText}>
+					Toggle off to temporarily hide this menu item.
+				</Text>
+			</View>
+		</View>
+	)
+
+	// Render variations page
+	const renderVariations = () => (
+		<View style={styles.sectionCard}>
+			<View style={styles.labelRow}>
+				<Text style={styles.sectionTitle}>Variations</Text>
+				<TouchableOpacity
+					style={styles.importButton}
+					onPress={openImportModal}
+					disabled={variationGroupsLoading}>
+					<Text style={styles.importButtonText}>Import from item</Text>
+				</TouchableOpacity>
+			</View>
+			<Text style={[styles.helperText, { marginBottom: 12 }]}>
+				Optional: Add variation groups for sizes, add-ons, or combos.
+			</Text>
+
+			{variationGroupsLoading && variationGroups.length === 0 ?
+				<View style={styles.variationLoadingRow}>
+					<ActivityIndicator
+						size="small"
+						color="#A40C2D"
+					/>
+					<Text style={styles.variationLoadingText}>Loading options...</Text>
+				</View>
+			: null}
+
+			{variationGroups.map((group, gIndex) => (
+				<View
+					key={gIndex}
+					style={styles.groupBox}>
+					<TextInput
+						style={styles.input}
+						placeholder="Group label (e.g. Size)"
+						value={group.label}
+						onChangeText={(t) => updateGroupLabel(gIndex, t)}
+					/>
+
+					{/* Selection Requirements */}
+					<View style={styles.selectionRequirementsContainer}>
+						<Text style={styles.label}>Selection Requirements</Text>
+						<TouchableOpacity
+							style={styles.requirementButton}
+							onPress={() => showRequiredSelectionDialog(gIndex)}>
+							<Text style={styles.requirementButtonText}>
+								{group.min_selection > 0 ?
+									`Required: Select at least ${group.min_selection}`
+								: 'Optional: Customers can skip this group'}
+							</Text>
+						</TouchableOpacity>
+					</View>
+
+					{/* Max Selection */}
+					<View style={styles.selectionRequirementsContainer}>
+						<Text style={styles.label}>Max Selection</Text>
+						<TouchableOpacity
+							style={styles.requirementButton}
+							onPress={() => showMaxSelectionDialog(gIndex)}>
+							<Text style={styles.requirementButtonText}>
+								{group.max_selection ?
+									`Maximum: ${group.max_selection} variation(s)`
+								: 'No limit: Customers can select all variations'}
+							</Text>
+						</TouchableOpacity>
+					</View>
+
+					{/* Variations */}
+					{group.variations.map((v, vIndex) => (
+						<View
+							key={vIndex}
+							style={styles.variationCard}>
+							<TouchableOpacity
+								style={styles.removeVariationIcon}
+								onPress={() => removeVariation(gIndex, vIndex)}>
+								<Text style={styles.removeVariationButtonText}>✕</Text>
+							</TouchableOpacity>
+
+							<View style={styles.variationColumn}>
+								{/* Image row */}
+								<View style={styles.variationImageRow}>
+									<TouchableOpacity
+										style={styles.variationImageButton}
+										onPress={() => pickVariationImage(gIndex, vIndex)}>
+										{v.image || v.image_url ?
+											<Image
+												source={{ uri: v.image?.uri || v.image_url }}
+												style={styles.variationImagePreview}
+											/>
+										: <View style={styles.variationImagePlaceholder}>
+												<Text style={styles.variationImagePlaceholderText}>
+													📷
+												</Text>
+											</View>
+										}
+									</TouchableOpacity>
+								</View>
+
+								{/* Separator line */}
+								<View style={styles.variationSeparator} />
+
+								{/* Input fields row */}
+								<View style={styles.variationFields}>
+									<View style={styles.variationRowLine}>
+										<View style={styles.fieldColWide}>
+											<Text style={styles.smallLabel}>Name</Text>
+											<TextInput
+												style={[styles.input, styles.variationNameInput]}
+												placeholder="Name"
+												value={v.name}
+												onChangeText={(t) =>
+													updateVariation(gIndex, vIndex, 'name', t)
+												}
+											/>
+										</View>
+										<View style={styles.fieldColNarrow}>
+											<Text style={styles.smallLabel}>Price</Text>
+											<TextInput
+												style={[
+													styles.input,
+													styles.variationPriceInput,
+													{ width: 110 },
+												]}
+												placeholder="Price"
+												keyboardType="numeric"
+												value={v.price}
+												onChangeText={(t) =>
+													updateVariation(gIndex, vIndex, 'price', t)
+												}
+											/>
+										</View>
+									</View>
+
+									<View style={styles.variationRowLine}>
+										<View style={[styles.availableRow, { flex: 1 }]}>
+											<Text style={styles.smallLabel}>Available</Text>
+											<Switch
+												value={v.available !== false}
+												onValueChange={(val) => {
+													const updated = [...variationGroups]
+													const group = updated[gIndex]
+
+													const prevAvailable = group.variations.filter(
+														(v2) => v2.available !== false
+													).length
+
+													group.variations[vIndex].available = val
+
+													const nextAvailable = group.variations.filter(
+														(v2) => v2.available !== false
+													).length
+
+													if (group.max_selection === prevAvailable) {
+														group.max_selection = nextAvailable
+														if (group.min_selection > group.max_selection) {
+															group.min_selection = group.max_selection
+														}
+													}
+
+													setVariationGroups(updated)
+												}}
+												trackColor={{ false: '#ccc', true: '#A40C2D' }}
+												thumbColor="#fff"
+											/>
+										</View>
+										<View style={styles.fieldColTiny}>
+											<Text style={styles.smallLabel}>Max Quantity</Text>
+											<TouchableOpacity
+												style={styles.requirementButton}
+												onPress={() => showMaxAmountDialog(gIndex, vIndex)}>
+												<Text style={styles.requirementButtonText}>
+													{v.max_amount ?
+														`Max: ${v.max_amount} order(s)`
+													: 'Single order only'}
+												</Text>
+											</TouchableOpacity>
+										</View>
+									</View>
+								</View>
+							</View>
+						</View>
+					))}
+
+					<View
+						style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+						<TouchableOpacity
+							style={styles.smallButton}
+							onPress={() => addVariation(gIndex)}>
+							<Text style={styles.smallButtonText}>+ Add Variation</Text>
+						</TouchableOpacity>
+						<TouchableOpacity
+							style={styles.removeGroupButton}
+							onPress={() => removeVariationGroup(gIndex)}>
+							<Text style={styles.removeGroupButtonText}>Remove Group</Text>
+						</TouchableOpacity>
+					</View>
+				</View>
+			))}
+
+			<TouchableOpacity
+				style={styles.buttonOutline}
+				onPress={addVariationGroup}>
+				<Text style={styles.buttonOutlineText}>+ Add Variation Group</Text>
+			</TouchableOpacity>
+		</View>
+	)
 
 	return (
 		<ScrollView
 			style={styles.container}
 			contentContainerStyle={{ paddingBottom: 120 }}>
-			<View style={styles.sectionCard}>
-				<View style={styles.sectionHeader}>
-					<Text style={styles.sectionTitle}>General Details</Text>
-					<Text style={styles.sectionHint}>* Required</Text>
-				</View>
+			
+			{/* Page Indicators */}
+			{renderPageIndicators()}
 
-				<Text style={styles.label}>
-					Item Name <Text style={styles.required}>*</Text>
-				</Text>
-				<TextInput
-					style={styles.input}
-					value={itemName}
-					onChangeText={setItemName}
-					placeholder="Enter menu item name"
-				/>
+			{/* Page Content */}
+			{currentPage === 1 ? renderGeneralDetails() : renderVariations()}
 
-				<Text style={styles.label}>
-					Base Price <Text style={styles.required}>*</Text>
-				</Text>
-				<View style={styles.currencyInputWrapper}>
-					<Text style={styles.currencyPrefix}>₱</Text>
-					<TextInput
-						style={styles.currencyInput}
-						value={price}
-						keyboardType="numeric"
-						onChangeText={handlePriceChange}
-						onBlur={ensurePriceFallback}
-						placeholder="0.00"
-					/>
-				</View>
-				<Text style={styles.helperText}>
-					Leaving this blank automatically sets the price to ₱0.00.
-				</Text>
-
-				<Text style={styles.label}>
-					Take Out Additional Fee
-				</Text>
-				<View style={styles.currencyInputWrapper}>
-					<Text style={styles.currencyPrefix}>₱</Text>
-					<TextInput
-						style={styles.currencyInput}
-						value={takeOutAdditionalFee}
-						keyboardType="numeric"
-						onChangeText={handleTakeOutFeeChange}
-						onBlur={ensureTakeOutFeeFallback}
-						placeholder="0.00"
-					/>
-				</View>
-				<Text style={styles.helperText}>
-					Additional fee for take-out orders (optional).
-				</Text>
-
-				<Text style={styles.label}>Image</Text>
-				<TouchableOpacity
-					style={styles.imagePicker}
-					onPress={pickImage}>
-					{image ?
-						<Image
-							source={{ uri: image.uri }}
-							style={styles.previewImage}
-						/>
-					:	<Text style={{ color: '#555' }}>Pick an image</Text>}
-				</TouchableOpacity>
-
-				<Text style={styles.label}>Category</Text>
-				<TextInput
-					style={styles.input}
-					placeholder="e.g. Beverage, Snack, Meal..."
-					value={category}
-					onChangeText={setCategory}
-				/>
-				{existingCategories.length > 0 && (
-					<View style={styles.categoryChipsContainer}>
-						{existingCategories.map((cat) => (
-							<TouchableOpacity
-								key={cat}
-								style={[
-									styles.categoryChip,
-									category === cat && styles.categoryChipSelected,
-								]}
-								onPress={() => setCategory(cat)}>
-								<Text
-									style={[
-										styles.categoryChipText,
-										category === cat && styles.categoryChipTextSelected,
-									]}>
-									{cat}
-								</Text>
-							</TouchableOpacity>
-						))}
-					</View>
-				)}
-
-				<View style={[styles.labelRow, { marginTop: 18 }]}>
-					<Text style={styles.label}>Availability</Text>
-				</View>
-				<View style={styles.toggleRow}>
-					<Switch
-						value={availability}
-						onValueChange={setAvailability}
-						trackColor={{ false: '#ccc', true: '#A40C2D' }}
-						thumbColor="#fff"
-					/>
-					<Text style={styles.helperText}>
-						Toggle off to temporarily hide this menu item.
-					</Text>
-				</View>
-			</View>
-
-			<View style={styles.sectionCard}>
-				<View style={styles.labelRow}>
-					<Text style={styles.sectionTitle}>Variations</Text>
+			{/* Navigation Buttons */}
+			<View style={styles.navigationButtons}>
+				{currentPage > 1 && (
 					<TouchableOpacity
-						style={styles.importButton}
-						onPress={openImportModal}
-						disabled={variationGroupsLoading}>
-						<Text style={styles.importButtonText}>Import from item</Text>
+						style={[styles.buttonOutline, styles.secondaryButton]}
+						onPress={goToPreviousPage}
+						disabled={loading}>
+						<Text style={styles.buttonOutlineText}>Previous</Text>
 					</TouchableOpacity>
-				</View>
-				<Text style={[styles.helperText, { marginBottom: 12 }]}>
-					Optional: Add variation groups for sizes, add-ons, or combos.
-				</Text>
-
-				{variationGroupsLoading && variationGroups.length === 0 ?
-					<View style={styles.variationLoadingRow}>
-						<ActivityIndicator
-							size="small"
-							color="#A40C2D"
-						/>
-						<Text style={styles.variationLoadingText}>Loading options...</Text>
-					</View>
-				:	null}
-
-				{variationGroups.map((group, gIndex) => (
-					<View
-						key={gIndex}
-						style={styles.groupBox}>
-						<TextInput
-							style={styles.input}
-							placeholder="Group label (e.g. Size)"
-							value={group.label}
-							onChangeText={(t) => updateGroupLabel(gIndex, t)}
-						/>
-
-						{/* Group Options */}
-						{/* Required Selection removed; derived by min_selection > 0 */}
-
-						{/* Min Selection */}
-						<View style={styles.selectionRow}>
-							<View style={styles.selectionLabelContainer}>
-								<Text style={styles.label}>Min Selection</Text>
-							</View>
-							<TouchableOpacity
-								style={styles.maxSelectionButton}
-								onPress={() => decrementMinSelection(gIndex)}>
-								<Text style={styles.maxSelectionButtonText}>−</Text>
-							</TouchableOpacity>
-							<TextInput
-								style={styles.selectionInput}
-								keyboardType="numeric"
-								value={group.min_selection?.toString() || '0'}
-								onChangeText={(t) => updateMinSelection(gIndex, t)}
-							/>
-							<TouchableOpacity
-								style={styles.maxSelectionButton}
-								onPress={() => incrementMinSelection(gIndex)}>
-								<Text style={styles.maxSelectionButtonText}>+</Text>
-							</TouchableOpacity>
-						</View>
-
-						{/* Max Selection */}
-						<View style={styles.selectionRow}>
-							<View style={styles.selectionLabelContainer}>
-								<Text style={styles.label}>Max Selection</Text>
-							</View>
-							<TouchableOpacity
-								style={styles.maxSelectionButton}
-								onPress={() => decrementMaxSelection(gIndex)}>
-								<Text style={styles.maxSelectionButtonText}>−</Text>
-							</TouchableOpacity>
-							<TextInput
-								style={styles.selectionInput}
-								keyboardType="numeric"
-								value={group.max_selection?.toString() || '1'}
-								onChangeText={(t) => updateMaxSelection(gIndex, t)}
-							/>
-							<TouchableOpacity
-								style={styles.maxSelectionButton}
-								onPress={() => incrementMaxSelection(gIndex)}>
-								<Text style={styles.maxSelectionButtonText}>+</Text>
-							</TouchableOpacity>
-						</View>
-						<Text style={styles.maxSelectionHint}>
-							Max:{' '}
-							{group.variations.filter((v) => v.available !== false).length ||
-								0}{' '}
-							(based on number of available variations)
+				)}
+				
+				{currentPage < 2 ? (
+					<TouchableOpacity
+						style={[styles.button, styles.primaryButton]}
+						onPress={goToNextPage}
+						disabled={loading}>
+						<Text style={styles.buttonText}>Next: Variations</Text>
+					</TouchableOpacity>
+				) : (
+					<TouchableOpacity
+						style={[styles.button, styles.primaryButton]}
+						onPress={handleUpdateMenu}
+						disabled={loading}>
+						<Text style={styles.buttonText}>
+							{loading ? 'Saving...' : 'Save Changes'}
 						</Text>
-
-						{/* Variations */}
-						{group.variations.map((v, vIndex) => (
-							<View
-								key={vIndex}
-								style={styles.variationCard}>
-								<TouchableOpacity
-									style={styles.removeVariationIcon}
-									onPress={() => removeVariation(gIndex, vIndex)}>
-									<Text style={styles.removeVariationButtonText}>✕</Text>
-								</TouchableOpacity>
-
-								<View style={styles.variationColumn}>
-									{/* Image row */}
-									<View style={styles.variationImageRow}>
-										<Text style={styles.smallLabel}>Image</Text>
-										<TouchableOpacity
-											style={styles.variationImageButton}
-											onPress={() => pickVariationImage(gIndex, vIndex)}>
-											{v.image || v.image_url ?
-												<Image
-													source={{ uri: v.image?.uri || v.image_url }}
-													style={styles.variationImagePreview}
-												/>
-											:	<View style={styles.variationImagePlaceholder}>
-													<Text style={styles.variationImagePlaceholderText}>
-														📷
-													</Text>
-												</View>
-											}
-										</TouchableOpacity>
-									</View>
-
-									{/* Input fields row */}
-									<View style={styles.variationFields}>
-										<View style={styles.variationRowLine}>
-											<View style={styles.fieldColWide}>
-												<Text style={styles.smallLabel}>Name</Text>
-												<TextInput
-													style={[styles.input, styles.variationNameInput]}
-													placeholder="Name"
-													value={v.name}
-													onChangeText={(t) =>
-														updateVariation(gIndex, vIndex, 'name', t)
-													}
-												/>
-											</View>
-											<View style={styles.fieldColNarrow}>
-												<Text style={styles.smallLabel}>Price</Text>
-												<TextInput
-													style={[
-														styles.input,
-														styles.variationPriceInput,
-														{ width: 110 },
-													]}
-													placeholder="Price"
-													keyboardType="numeric"
-													value={v.price}
-													onChangeText={(t) =>
-														updateVariation(gIndex, vIndex, 'price', t)
-													}
-												/>
-											</View>
-										</View>
-
-										<View style={styles.variationRowLine}>
-											<View style={[styles.availableRow, { flex: 1 }]}>
-												<Text style={styles.smallLabel}>Available</Text>
-												<Switch
-													value={v.available !== false}
-													onValueChange={(val) => {
-														const updated = [...variationGroups]
-														const group = updated[gIndex]
-
-														const prevAvailable = group.variations.filter(
-															(v2) => v2.available !== false
-														).length
-
-														group.variations[vIndex].available = val
-
-														const nextAvailable = group.variations.filter(
-															(v2) => v2.available !== false
-														).length
-
-														if (group.max_selection === prevAvailable) {
-															group.max_selection = nextAvailable
-															if (group.min_selection > group.max_selection) {
-																group.min_selection = group.max_selection
-															}
-														}
-
-														setVariationGroups(updated)
-													}}
-													trackColor={{ false: '#ccc', true: '#A40C2D' }}
-													thumbColor="#fff"
-												/>
-											</View>
-											<View style={styles.fieldColTiny}>
-												<Text style={styles.smallLabel}>Max Quantity</Text>
-												<TextInput
-													style={[styles.input, styles.variationMaxAmountInput]}
-													placeholder="Max"
-													keyboardType="numeric"
-													value={v.max_amount?.toString() || ''}
-													onChangeText={(t) =>
-														updateVariation(gIndex, vIndex, 'max_amount', t)
-													}
-												/>
-											</View>
-										</View>
-									</View>
-								</View>
-							</View>
-						))}
-
-						<View
-							style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-							<TouchableOpacity
-								style={styles.smallButton}
-								onPress={() => addVariation(gIndex)}>
-								<Text style={styles.smallButtonText}>+ Add Variation</Text>
-							</TouchableOpacity>
-							<TouchableOpacity
-								style={styles.removeGroupButton}
-								onPress={() => removeVariationGroup(gIndex)}>
-								<Text style={styles.removeGroupButtonText}>Remove Group</Text>
-							</TouchableOpacity>
-						</View>
-					</View>
-				))}
-
-				<TouchableOpacity
-					style={styles.buttonOutline}
-					onPress={addVariationGroup}>
-					<Text style={styles.buttonOutlineText}>+ Add Variation Group</Text>
-				</TouchableOpacity>
+					</TouchableOpacity>
+				)}
 			</View>
-
-			<TouchableOpacity
-				style={styles.button}
-				onPress={handleUpdateMenu}
-				disabled={loading}>
-				<Text style={styles.buttonText}>
-					{loading ? 'Saving...' : 'Save Changes'}
-				</Text>
-			</TouchableOpacity>
 
 			{importModalVisible && (
 				<Modal
@@ -1039,6 +1241,211 @@ const EditMenu: React.FC = () => {
 									Importing variations...
 								</Text>
 							:	null}
+						</TouchableOpacity>
+					</TouchableOpacity>
+				</Modal>
+			)}
+
+			{/* Selection Requirements Modal */}
+			{requirementModalVisible && (
+				<Modal
+					visible={requirementModalVisible}
+					transparent
+					animationType="fade"
+					onRequestClose={() => {
+						setRequirementModalVisible(false)
+						setRequirementModalStep(1)
+						setCurrentGroupIndex(null)
+						setCurrentVariationIndex(null)
+					}}>
+					<TouchableOpacity
+						style={styles.modalBackdrop}
+						activeOpacity={1}
+						onPress={() => {
+							setRequirementModalVisible(false)
+							setRequirementModalStep(1)
+							setCurrentGroupIndex(null)
+							setCurrentVariationIndex(null)
+						}}>
+						<TouchableOpacity
+							style={styles.requirementModalSheet}
+							activeOpacity={1}
+							onPress={(e) => e.stopPropagation()}>
+							{requirementModalStep === 1 ? (
+								<>
+									<Text style={styles.modalTitle}>Require Selection</Text>
+									<Text style={styles.modalSubtitle}>
+										Do you want to require customers to select at least one of the variations in this group?
+									</Text>
+									
+									<View style={styles.requirementModalButtons}>
+										<TouchableOpacity
+											style={[styles.requirementModalButton, styles.requirementModalButtonNo]}
+											onPress={() => handleRequirementSelection(false)}>
+											<Text style={styles.requirementModalButtonTextNo}>No, Optional</Text>
+										</TouchableOpacity>
+										<TouchableOpacity
+											style={[styles.requirementModalButton, styles.requirementModalButtonYes]}
+											onPress={() => handleRequirementSelection(true)}>
+											<Text style={styles.requirementModalButtonTextYes}>Yes, Required</Text>
+										</TouchableOpacity>
+									</View>
+								</>
+							) : requirementModalStep === 2 ? (
+								<>
+									<Text style={styles.modalTitle}>How Many Required?</Text>
+									<Text style={styles.modalSubtitle}>
+										How many variations must customers select at minimum?
+									</Text>
+									
+									<View style={styles.requirementInputContainer}>
+										<Text style={styles.requirementInputLabel}>Minimum Selection</Text>
+										<TextInput
+											style={styles.requirementInput}
+											keyboardType="numeric"
+											value={tempMinSelection}
+											onChangeText={setTempMinSelection}
+											placeholder="1"
+										/>
+									</View>
+									
+									<View style={styles.requirementModalButtons}>
+										<TouchableOpacity
+											style={[styles.requirementModalButton, styles.requirementModalButtonBack]}
+											onPress={() => setRequirementModalStep(1)}>
+											<Text style={styles.requirementModalButtonTextBack}>Back</Text>
+										</TouchableOpacity>
+										<TouchableOpacity
+											style={[styles.requirementModalButton, styles.requirementModalButtonConfirm]}
+											onPress={handleMinSelectionConfirm}>
+											<Text style={styles.requirementModalButtonTextConfirm}>Confirm</Text>
+										</TouchableOpacity>
+									</View>
+								</>
+							) : requirementModalStep === 3 ? (
+								<>
+									<Text style={styles.modalTitle}>Limit Maximum Selection</Text>
+									<Text style={styles.modalSubtitle}>
+										Do you want to limit how many variations customers can select from this group?
+									</Text>
+									
+									<View style={styles.requirementModalButtons}>
+										<TouchableOpacity
+											style={[styles.requirementModalButton, styles.requirementModalButtonNo]}
+											onPress={() => handleMaxSelectionConfirm(false)}>
+											<Text style={styles.requirementModalButtonTextNo}>No Limit</Text>
+										</TouchableOpacity>
+										<TouchableOpacity
+											style={[styles.requirementModalButton, styles.requirementModalButtonYes]}
+											onPress={() => handleMaxSelectionConfirm(true)}>
+											<Text style={styles.requirementModalButtonTextYes}>Set Limit</Text>
+										</TouchableOpacity>
+									</View>
+								</>
+							) : requirementModalStep === 4 ? (
+								<>
+									<Text style={styles.modalTitle}>Maximum Selection</Text>
+									<Text style={styles.modalSubtitle}>
+										What is the maximum number of variations customers can select?
+									</Text>
+									
+									<View style={styles.requirementInputContainer}>
+										<Text style={styles.requirementInputLabel}>Maximum Selection</Text>
+										<TextInput
+											style={styles.requirementInput}
+											keyboardType="numeric"
+											value={tempMaxSelection}
+											onChangeText={setTempMaxSelection}
+											placeholder="1"
+										/>
+									</View>
+									
+									<View style={styles.requirementModalButtons}>
+										<TouchableOpacity
+											style={[styles.requirementModalButton, styles.requirementModalButtonBack]}
+											onPress={() => setRequirementModalStep(3)}>
+											<Text style={styles.requirementModalButtonTextBack}>Back</Text>
+										</TouchableOpacity>
+										<TouchableOpacity
+											style={[styles.requirementModalButton, styles.requirementModalButtonConfirm]}
+											onPress={handleMaxSelectionAmountConfirm}>
+											<Text style={styles.requirementModalButtonTextConfirm}>Confirm</Text>
+										</TouchableOpacity>
+									</View>
+								</>
+							) : requirementModalStep === 5 ? (
+								<>
+									<Text style={styles.modalTitle}>Allow Multiple Orders</Text>
+									<Text style={styles.modalSubtitle}>
+										Do you want to allow customers to order this variation multiple times in a single order?
+									</Text>
+									
+									<View style={styles.requirementModalButtons}>
+										<TouchableOpacity
+											style={[styles.requirementModalButton, styles.requirementModalButtonNo]}
+											onPress={() => handleMaxAmountConfirm(false)}>
+											<Text style={styles.requirementModalButtonTextNo}>Single Order Only</Text>
+										</TouchableOpacity>
+										<TouchableOpacity
+											style={[styles.requirementModalButton, styles.requirementModalButtonYes]}
+											onPress={() => handleMaxAmountConfirm(true)}>
+											<Text style={styles.requirementModalButtonTextYes}>Allow Multiple</Text>
+										</TouchableOpacity>
+									</View>
+								</>
+							) : (
+								<>
+									<Text style={styles.modalTitle}>Maximum Quantity</Text>
+									<Text style={styles.modalSubtitle}>
+										What is the maximum number of times a customer can order this variation?
+									</Text>
+									
+									<View style={styles.requirementInputContainer}>
+										<Text style={styles.requirementInputLabel}>Maximum Quantity</Text>
+										<TextInput
+											style={styles.requirementInput}
+											keyboardType="numeric"
+											value={tempMaxAmount}
+											onChangeText={setTempMaxAmount}
+											placeholder="3"
+										/>
+									</View>
+									
+									<View style={styles.requirementModalButtons}>
+										<TouchableOpacity
+											style={[styles.requirementModalButton, styles.requirementModalButtonBack]}
+											onPress={() => setRequirementModalStep(5)}>
+											<Text style={styles.requirementModalButtonTextBack}>Back</Text>
+										</TouchableOpacity>
+										<TouchableOpacity
+											style={[styles.requirementModalButton, styles.requirementModalButtonConfirm]}
+											onPress={handleMaxAmountValueConfirm}>
+											<Text style={styles.requirementModalButtonTextConfirm}>Confirm</Text>
+										</TouchableOpacity>
+									</View>
+								</>
+							)}
+							
+							<Text style={styles.requirementModalHelper}>
+								{requirementModalStep === 1 ?
+									(currentGroupIndex !== null && variationGroups[currentGroupIndex]?.min_selection > 0 ?
+										"Currently required: customers must select at least " + variationGroups[currentGroupIndex].min_selection + " variation(s)"
+									: "Currently optional: customers can skip this variation group")
+								: requirementModalStep === 2 ?
+									`Maximum allowed: ${currentGroupIndex !== null ? (variationGroups[currentGroupIndex]?.max_selection || variationGroups[currentGroupIndex]?.variations.filter((v) => v.available !== false).length || 1) : 1} variation(s)`
+								: requirementModalStep === 3 ?
+									(currentGroupIndex !== null && variationGroups[currentGroupIndex]?.max_selection ?
+										`Currently limited: customers can select up to ${variationGroups[currentGroupIndex].max_selection} variation(s)`
+									: "Currently unlimited: customers can select all variations")
+								: requirementModalStep === 4 ?
+									`Minimum required: ${currentGroupIndex !== null ? (variationGroups[currentGroupIndex]?.min_selection || 0) : 0} variation(s)`
+								: requirementModalStep === 5 ?
+									(currentGroupIndex !== null && currentVariationIndex !== null && variationGroups[currentGroupIndex]?.variations[currentVariationIndex]?.max_amount ?
+										`Currently limited: customers can order up to ${variationGroups[currentGroupIndex].variations[currentVariationIndex].max_amount} time(s)`
+									: "Currently single order: customers can only order this once")
+								: `Example: Rice can be ordered multiple times, while special items may be limited`
+								}
+							</Text>
 						</TouchableOpacity>
 					</TouchableOpacity>
 				</Modal>
@@ -1188,9 +1595,9 @@ const styles = StyleSheet.create({
 		gap: 12,
 	},
 	variationImageRow: {
-		flexDirection: 'row',
 		alignItems: 'center',
-		gap: 8,
+		justifyContent: 'center',
+		paddingBottom: 12,
 	},
 	variationImageButton: {
 		width: 60,
@@ -1213,6 +1620,12 @@ const styles = StyleSheet.create({
 	},
 	variationImagePlaceholderText: {
 		fontSize: 20,
+	},
+	variationSeparator: {
+		height: 1,
+		backgroundColor: '#e0e0e0',
+		marginHorizontal: 0,
+		marginBottom: 12,
 	},
 	removeVariationIcon: {
 		position: 'absolute',
@@ -1382,8 +1795,94 @@ const styles = StyleSheet.create({
 	modalBackdrop: {
 		flex: 1,
 		backgroundColor: 'rgba(0,0,0,0.4)',
-		justifyContent: 'flex-end',
+		justifyContent: 'center',
+		alignItems: 'center',
 	},
+	// Styles for requirement modal
+	requirementModalSheet: {
+		backgroundColor: '#fff',
+		paddingHorizontal: 24,
+		paddingTop: 20,
+		paddingBottom: 24,
+		borderRadius: 16,
+		minWidth: 320,
+		maxWidth: 400,
+		alignSelf: 'center',
+	},
+	requirementModalButtons: {
+		flexDirection: 'row',
+		gap: 12,
+		marginTop: 20,
+	},
+	requirementModalButton: {
+		flex: 1,
+		paddingVertical: 12,
+		paddingHorizontal: 16,
+		borderRadius: 8,
+		alignItems: 'center',
+		justifyContent: 'center',
+	},
+	requirementModalButtonNo: {
+		borderWidth: 1,
+		borderColor: '#ddd',
+		backgroundColor: '#f8f8f8',
+	},
+	requirementModalButtonYes: {
+		backgroundColor: '#A40C2D',
+	},
+	requirementModalButtonBack: {
+		borderWidth: 1,
+		borderColor: '#ddd',
+		backgroundColor: '#f8f8f8',
+	},
+	requirementModalButtonConfirm: {
+		backgroundColor: '#A40C2D',
+	},
+	requirementModalButtonTextNo: {
+		fontSize: 14,
+		fontWeight: '600',
+		color: '#666',
+	},
+	requirementModalButtonTextYes: {
+		fontSize: 14,
+		fontWeight: '600',
+		color: '#fff',
+	},
+	requirementModalButtonTextBack: {
+		fontSize: 14,
+		fontWeight: '600',
+		color: '#666',
+	},
+	requirementModalButtonTextConfirm: {
+		fontSize: 14,
+		fontWeight: '600',
+		color: '#fff',
+	},
+	requirementModalHelper: {
+		fontSize: 12,
+		color: '#666',
+		textAlign: 'center',
+		marginTop: 12,
+		lineHeight: 16,
+	},
+	requirementInputContainer: {
+		marginTop: 16,
+	},
+	requirementInputLabel: {
+		fontSize: 14,
+		fontWeight: '600',
+		marginBottom: 8,
+	},
+	requirementInput: {
+		borderWidth: 1,
+		borderColor: '#ccc',
+		padding: 12,
+		borderRadius: 8,
+		fontSize: 16,
+		textAlign: 'center',
+		backgroundColor: '#fff',
+	},
+	// Add missing styles that were accidentally removed
 	modalSheet: {
 		backgroundColor: '#fff',
 		paddingHorizontal: 20,
@@ -1504,4 +2003,73 @@ const styles = StyleSheet.create({
 		alignItems: 'center',
 	},
 	buttonText: { color: 'white', fontWeight: '600', fontSize: 16 },
+	// New styles for multi-page form
+	pageIndicators: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		justifyContent: 'center',
+		marginBottom: 20,
+		gap: 8,
+	},
+	pageIndicator: {
+		width: 32,
+		height: 32,
+		borderRadius: 16,
+		borderWidth: 2,
+		borderColor: '#ccc',
+		backgroundColor: '#f8f8f8',
+		justifyContent: 'center',
+		alignItems: 'center',
+	},
+	pageIndicatorActive: {
+		borderColor: '#A40C2D',
+		backgroundColor: '#A40C2D',
+	},
+	pageIndicatorText: {
+		fontSize: 14,
+		fontWeight: '600',
+		color: '#666',
+	},
+	pageIndicatorTextActive: {
+		color: '#fff',
+	},
+	pageConnector: {
+		width: 40,
+		height: 2,
+		backgroundColor: '#ccc',
+	},
+	navigationButtons: {
+		flexDirection: 'row',
+		justifyContent: 'space-between',
+		gap: 12,
+		marginTop: 20,
+	},
+	primaryButton: {
+		flex: 1,
+	},
+	secondaryButton: {
+		flex: 1,
+	},
+	selectionRequirementsContainer: {
+		marginTop: 12,
+		marginBottom: 8,
+	},
+	requirementButton: {
+		borderWidth: 1,
+		borderColor: '#ddd',
+		borderRadius: 8,
+		padding: 12,
+		backgroundColor: '#f9f9f9',
+		marginTop: 6,
+	},
+	requirementButtonText: {
+		fontSize: 14,
+		color: '#333',
+		fontWeight: '500',
+	},
+	selectionHelper: {
+		fontSize: 12,
+		color: '#666',
+		marginTop: 2,
+	},
 })
