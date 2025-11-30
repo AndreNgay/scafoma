@@ -55,11 +55,11 @@ export const getOrdersByConcessionaireId = async (req, res) => {
                 (
                   SELECT COUNT(*)::int FROM tblorderdetail d2 WHERE d2.order_id = o.id
                 ) AS item_count,
-                -- Convert UTC to Asia/Manila and add 8 hours
-                (o.created_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Manila' + INTERVAL '8 hours') as created_at,
-                (o.updated_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Manila' + INTERVAL '8 hours') as updated_at,
-                (o.accepted_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Manila' + INTERVAL '8 hours') as accepted_at,
-                (o.payment_receipt_expires_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Manila' + INTERVAL '8 hours') as payment_receipt_expires_at
+                -- Convert UTC to Asia/Manila
+                (o.created_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Manila') as created_at,
+                (o.updated_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Manila') as updated_at,
+                (o.accepted_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Manila') as accepted_at,
+                (o.payment_receipt_expires_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Manila') as payment_receipt_expires_at
          FROM tblorder o
          JOIN tbluser u ON o.customer_id = u.id
          JOIN tblconcession c ON o.concession_id = c.id
@@ -101,11 +101,11 @@ export const getOrdersByConcessionaireId = async (req, res) => {
               (
                 SELECT COUNT(*)::int FROM tblorderdetail d2 WHERE d2.order_id = o.id
               ) AS item_count,
-              -- Convert UTC to Asia/Manila and add 8 hours
-              (o.created_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Manila' + INTERVAL '8 hours') as created_at,
-              (o.updated_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Manila' + INTERVAL '8 hours') as updated_at,
-              (o.accepted_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Manila' + INTERVAL '8 hours') as accepted_at,
-              (o.payment_receipt_expires_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Manila' + INTERVAL '8 hours') as payment_receipt_expires_at
+              -- Convert UTC to Asia/Manila
+              (o.created_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Manila') as created_at,
+              (o.updated_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Manila') as updated_at,
+              (o.accepted_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Manila') as accepted_at,
+              (o.payment_receipt_expires_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Manila') as payment_receipt_expires_at
        FROM tblorder o
        JOIN tbluser u ON o.customer_id = u.id
        JOIN tblconcession c ON o.concession_id = c.id
@@ -193,12 +193,12 @@ export const getOrdersByCustomerId = async (req, res) => {
                 (
                   SELECT COUNT(*)::int FROM tblorderdetail d2 WHERE d2.order_id = o.id
                 ) AS item_count,
-                -- Convert UTC to Asia/Manila and add 8 hours
-                (o.created_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Manila' + INTERVAL '8 hours') as created_at,
-                (o.updated_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Manila' + INTERVAL '8 hours') as updated_at,
-                (o.accepted_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Manila' + INTERVAL '8 hours') as accepted_at,
-                (o.payment_receipt_expires_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Manila' + INTERVAL '8 hours') as payment_receipt_expires_at,
-                (o.schedule_time AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Manila' + INTERVAL '8 hours') as schedule_time
+                -- Convert UTC to Asia/Manila
+                (o.created_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Manila') as created_at,
+                (o.updated_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Manila') as updated_at,
+                (o.accepted_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Manila') as accepted_at,
+                (o.payment_receipt_expires_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Manila') as payment_receipt_expires_at,
+                (o.schedule_time AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Manila') as schedule_time
          FROM tblorder o
          JOIN tblconcession c ON o.concession_id = c.id
          JOIN tblcafeteria caf ON c.cafeteria_id = caf.id
@@ -247,12 +247,12 @@ export const getOrdersByCustomerId = async (req, res) => {
                 (
                   SELECT COUNT(*)::int FROM tblorderdetail d2 WHERE d2.order_id = o.id
                 ) AS item_count,
-                -- Convert UTC to Asia/Manila and add 8 hours
-                (o.created_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Manila' + INTERVAL '8 hours') as created_at,
-                (o.updated_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Manila' + INTERVAL '8 hours') as updated_at,
-                (o.accepted_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Manila' + INTERVAL '8 hours') as accepted_at,
-                (o.payment_receipt_expires_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Manila' + INTERVAL '8 hours') as payment_receipt_expires_at,
-                (o.schedule_time AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Manila' + INTERVAL '8 hours') as schedule_time
+                -- Convert UTC to Asia/Manila
+                (o.created_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Manila') as created_at,
+                (o.updated_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Manila') as updated_at,
+                (o.accepted_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Manila') as accepted_at,
+                (o.payment_receipt_expires_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Manila') as payment_receipt_expires_at,
+                (o.schedule_time AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Manila') as schedule_time
          FROM tblorder o
          JOIN tblconcession c ON o.concession_id = c.id
          JOIN tblcafeteria caf ON c.cafeteria_id = caf.id
@@ -310,12 +310,12 @@ export const getOrdersByCustomerId = async (req, res) => {
               (
                 SELECT COUNT(*)::int FROM tblorderdetail d2 WHERE d2.order_id = o.id
               ) AS item_count,
-              -- Convert UTC to Asia/Manila and add 8 hours
-              (o.created_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Manila' + INTERVAL '8 hours') as created_at,
-              (o.updated_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Manila' + INTERVAL '8 hours') as updated_at,
-              (o.accepted_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Manila' + INTERVAL '8 hours') as accepted_at,
-              (o.payment_receipt_expires_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Manila' + INTERVAL '8 hours') as payment_receipt_expires_at,
-              (o.schedule_time AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Manila' + INTERVAL '8 hours') as schedule_time
+              -- Convert UTC to Asia/Manila
+              (o.created_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Manila') as created_at,
+              (o.updated_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Manila') as updated_at,
+              (o.accepted_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Manila') as accepted_at,
+              (o.payment_receipt_expires_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Manila') as payment_receipt_expires_at,
+              (o.schedule_time AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Manila') as schedule_time
        FROM tblorder o
        JOIN tblconcession c ON o.concession_id = c.id
        JOIN tblcafeteria caf ON c.cafeteria_id = caf.id
@@ -387,12 +387,12 @@ export const getOrderById = async (req, res) => {
                 ORDER BY od.id
                 LIMIT 1
               ) AS dining_option,
-              -- Convert UTC to Asia/Manila and add 8 hours
-              (o.created_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Manila' + INTERVAL '8 hours') as created_at,
-              (o.updated_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Manila' + INTERVAL '8 hours') as updated_at,
-              (o.accepted_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Manila' + INTERVAL '8 hours') as accepted_at,
-              (o.payment_receipt_expires_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Manila' + INTERVAL '8 hours') as payment_receipt_expires_at,
-              (o.schedule_time AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Manila' + INTERVAL '8 hours') as schedule_time
+              -- Convert UTC to Asia/Manila
+              (o.created_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Manila') as created_at,
+              (o.updated_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Manila') as updated_at,
+              (o.accepted_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Manila') as accepted_at,
+              (o.payment_receipt_expires_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Manila') as payment_receipt_expires_at,
+              (o.schedule_time AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Manila') as schedule_time
        FROM tblorder o
        JOIN tbluser customer ON o.customer_id = customer.id
        JOIN tblconcession c ON o.concession_id = c.id
