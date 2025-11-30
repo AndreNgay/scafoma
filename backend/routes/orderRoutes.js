@@ -16,6 +16,7 @@ import {
 	notifyConcessionaireForOrder,
 	rejectReceipt,
 	checkAndDeclineExpiredReceipt,
+	bulkDeclineExpiredReceipts,
 } from '../controllers/orderController.js'
 import { upload } from './concessionRoutes.js'
 import authMiddleware from '../middleware/authMiddleware.js'
@@ -42,5 +43,6 @@ router.patch('/:id/payment-method', updatePaymentMethod)
 router.post('/:id/notify', authMiddleware, notifyConcessionaireForOrder)
 router.put('/:id/reject-receipt', rejectReceipt) // Reject receipt and restart timer
 router.post('/:id/check-expired', checkAndDeclineExpiredReceipt) // Auto-decline if receipt timer expired
+router.post('/bulk-decline-expired', bulkDeclineExpiredReceipts) // Bulk auto-decline expired GCash receipts
 
 export default router

@@ -81,7 +81,14 @@ const ViewOrderConcessionaire = () => {
 		try {
 			if (isRefresh) {
 				setRefreshing(true)
-			} else {
+			}
+			// Auto-decline any expired GCash receipts in bulk before fetching order details
+			try {
+				await api.post('/order/bulk-decline-expired')
+			} catch (e) {
+				console.warn('Bulk decline expired receipts failed:', e)
+			}
+			if (!isRefresh) {
 				setLoading(true)
 			}
 			const res = await api.get(`/order/${orderId}`) // Backend route /order/:id
@@ -121,38 +128,46 @@ const ViewOrderConcessionaire = () => {
 		}
 
 		try {
-			// Prefer explicit expiry timestamp from backend, fall back to accepted_at + receipt_timer
-			let deadlineMs: number | null = null
+			// Strictly prefer backend's expiry timestamp; do not add timer again
 			if (order.payment_receipt_expires_at) {
-				// Backend sets this as UTC; ensure we parse it as UTC
 				let s = order.payment_receipt_expires_at.trim()
 				if (!/[zZ]|[+-]\d{2}:?\d{2}$/.test(s)) {
 					s = s.replace(' ', 'T') + 'Z'
 				}
 				const expiresDate = new Date(s)
 				if (!Number.isNaN(expiresDate.getTime())) {
-					deadlineMs = expiresDate.getTime()
+					const deadlineMs = expiresDate.getTime()
+					const remainingMs = deadlineMs - currentTime
+					if (remainingMs <= 0) {
+						return { timeRemaining: 'Expired', isExpired: true }
+					}
+					const totalSeconds = Math.floor(remainingMs / 1000)
+					const hours = Math.floor(totalSeconds / 3600)
+					const minutes = Math.floor((totalSeconds % 3600) / 60)
+					const seconds = totalSeconds % 60
+					const timeRemaining = `${hours.toString().padStart(2, '0')}:${minutes
+						.toString()
+						.padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`
+					return { timeRemaining, isExpired: false }
 				}
 			}
 
-			if (deadlineMs === null) {
-				if (!order.accepted_at || !order.receipt_timer) {
-					return { timeRemaining: null, isExpired: false }
-				}
-
-				// Backend accepted_at is UTC; parse as UTC
-				let s = order.accepted_at.trim()
-				if (!/[zZ]|[+-]\d{2}:?\d{2}$/.test(s)) {
-					s = s.replace(' ', 'T') + 'Z'
-				}
-				const acceptedDate = new Date(s)
-				const [hours, minutes, seconds] = order.receipt_timer
-					.split(':')
-					.map(Number)
-				deadlineMs =
-					acceptedDate.getTime() +
-					(hours * 3600 + minutes * 60 + seconds) * 1000
+			// Fallback: calculate locally only if backend did not provide expiry
+			if (!order.accepted_at || !order.receipt_timer) {
+				return { timeRemaining: null, isExpired: false }
 			}
+
+			let s = order.accepted_at.trim()
+			if (!/[zZ]|[+-]\d{2}:?\d{2}$/.test(s)) {
+				s = s.replace(' ', 'T') + 'Z'
+			}
+			const acceptedDate = new Date(s)
+			const [hours, minutes, seconds] = order.receipt_timer
+				.split(':')
+				.map(Number)
+			const deadlineMs =
+				acceptedDate.getTime() +
+				(hours * 3600 + minutes * 60 + seconds) * 1000
 
 			const remainingMs = deadlineMs - currentTime
 
@@ -690,59 +705,6 @@ const ViewOrderConcessionaire = () => {
 				</View>
 				{order.payment_method === 'gcash' && (
 					<View style={styles.gcashSection}>
-						{/* Receipt Timer - only show when accepted */}
-						{order.order_status === 'accepted' &&
-							order.accepted_at &&
-							order.receipt_timer &&
-							(() => {
-								const { timeRemaining, isExpired } = calculateTimer()
-
-								return timeRemaining ?
-										<View
-											style={[
-												styles.timerCard,
-												isExpired && styles.timerCardExpired,
-											]}>
-											<View style={styles.timerHeader}>
-												<Ionicons
-													name={isExpired ? 'alert-circle' : 'time'}
-													size={20}
-													color={isExpired ? '#dc3545' : '#28a745'}
-												/>
-												<Text
-													style={[
-														styles.timerTitle,
-														isExpired && styles.timerTitleExpired,
-													]}>
-													{isExpired ?
-														'Receipt Upload Expired'
-													:	'Time Remaining for Receipt'}
-												</Text>
-											</View>
-											<Text
-												style={[
-													styles.timerCountdown,
-													isExpired && styles.timerCountdownExpired,
-												]}>
-												{timeRemaining}
-											</Text>
-											{!isExpired && (
-												<Text style={styles.timerInstructions}>
-													⏳ Customer must upload GCash receipt before timer
-													expires
-												</Text>
-											)}
-											{isExpired && (
-												<Text style={styles.timerExpiredMessage}>
-													⏰ Upload time has expired. Consider declining this
-													order.
-												</Text>
-											)}
-										</View>
-									:	null
-							})()}
-
-						{/* Explicit expiry timestamp */}
 						{order.payment_receipt_expires_at && order.order_status !== 'pending' && (
 							<Text style={styles.paymentExpiryText}>
 								Payment expires at:{' '}

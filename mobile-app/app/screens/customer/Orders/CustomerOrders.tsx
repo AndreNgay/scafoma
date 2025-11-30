@@ -88,6 +88,13 @@ const CustomerOrders = () => {
 					setInitialLoading(true) // full screen loader
 				}
 
+				// Auto-decline any expired GCash receipts in bulk before fetching
+				try {
+					await api.post('/order/bulk-decline-expired')
+				} catch (e) {
+					console.warn('Bulk decline expired receipts failed:', e)
+				}
+
 				const res = await api.get(
 					`/order/customer/${user.id}?segment=active&limit=${PAGE_SIZE}`
 				)

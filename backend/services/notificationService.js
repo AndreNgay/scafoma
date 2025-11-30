@@ -46,6 +46,30 @@ export const notifyOrderCancelledForConcessionaire = async (orderId, concessiona
 };
 
 /**
+ * Notify customer to pay within the receipt timer when order is accepted (GCash only)
+ */
+export const notifyCustomerToPay = async (orderId, customerId, concessionName, receiptTimer) => {
+  // Parse HH:MM:SS to total minutes for a friendly message
+  const [hours, minutes] = receiptTimer.split(':').map(Number)
+  let timeText = ''
+  if (hours > 0) {
+    timeText = `${hours} hour${hours > 1 ? 's' : ''}${minutes > 0 ? ` ${minutes} minute${minutes > 1 ? 's' : ''}` : ''}`
+  } else {
+    timeText = `${minutes} minute${minutes > 1 ? 's' : ''}`
+  }
+  const message = `${concessionName}: Your order #${orderId} was accepted! Please pay via GCash and upload your receipt within ${timeText}.`;
+  return await createNotification(customerId, 'Payment Reminder', message, { order_id: orderId });
+};
+
+/**
+ * Notify concessionaire when a customer uploads a GCash receipt
+ */
+export const notifyConcessionaireReceiptUploaded = async (orderId, concessionaireId, customerName) => {
+  const message = `GCash receipt uploaded for order #${orderId} by ${customerName}. Please review and confirm.`;
+  return await createNotification(concessionaireId, 'Receipt Uploaded', message, { order_id: orderId });
+};
+
+/**
  * Notify customer about order status change
  */
 export const notifyOrderStatusChange = async (

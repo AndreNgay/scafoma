@@ -4,6 +4,8 @@ import {
 	notifyNewOrder,
 	notifyOrderStatusChange,
 	notifyOrderCancelledForConcessionaire,
+	notifyCustomerToPay,
+	notifyConcessionaireReceiptUploaded,
 } from '../services/notificationService.js'
 
 const storage = multer.memoryStorage()
@@ -613,6 +615,24 @@ export const updateOrderStatus = async (req, res) => {
         newTotal,
         priceReason
       )
+
+      // If order is accepted and payment method is GCash, send payment reminder with receipt timer
+      if (order_status === 'accepted' && order.payment_method === 'gcash') {
+        try {
+          const timerResult = await pool.query(
+            `SELECT c.receipt_timer 
+             FROM tblconcession c
+             WHERE c.id = $1`,
+            [order.concession_id]
+          )
+          const receiptTimer = timerResult.rows[0]?.receipt_timer
+          if (receiptTimer) {
+            await notifyCustomerToPay(order.id, order.customer_id, concessionName, receiptTimer)
+          }
+        } catch (timerErr) {
+          console.error('Error sending payment reminder notification:', timerErr)
+        }
+      }
     } catch (notifErr) {
       console.error('Error creating order status notification:', notifErr)
       // Don't fail the status update if notification fails
@@ -732,6 +752,23 @@ export const updatePaymentProof = async (req, res) => {
 		// Convert gcash_screenshot to base64 for frontend
 		updatedOrder.payment_proof = makeImageDataUrl(updatedOrder.gcash_screenshot)
 
+		// Notify concessionaire that a receipt was uploaded
+		try {
+			const customerRes = await pool.query(
+				`SELECT CONCAT(c.first_name, ' ', c.last_name) AS customer_name, o.concessionaire_id
+				 FROM tblorder o
+				 JOIN tblcustomer c ON o.customer_id = c.id
+				 WHERE o.id = $1`,
+				[id]
+			)
+			const { customer_name, concessionaire_id } = customerRes.rows[0] || {}
+			if (customer_name && concessionaire_id) {
+				await notifyConcessionaireReceiptUploaded(Number(id), concessionaire_id, customer_name)
+			}
+		} catch (notifErr) {
+			console.error('Error sending receipt uploaded notification:', notifErr)
+		}
+
 		res.json(updatedOrder)
 	} catch (err) {
 		console.error('Error uploading payment proof:', err)
@@ -815,6 +852,44 @@ export const rejectReceipt = async (req, res) => {
 	} catch (err) {
 		console.error('Error rejecting receipt:', err)
 		res.status(500).json({ error: 'Failed to reject receipt' })
+	}
+}
+
+// ==========================
+// Bulk auto-decline expired GCash receipt timers
+// Declines all accepted GCash orders without receipt where timer has expired
+// ==========================
+export const bulkDeclineExpiredReceipts = async (req, res) => {
+	try {
+		// Update all matching orders in one query
+		const result = await pool.query(
+			`UPDATE tblorder 
+			 SET order_status = 'declined', 
+			     decline_reason = 'Order automatically declined: GCash receipt not uploaded within the required time.', 
+			     updated_at = NOW() AT TIME ZONE 'UTC'
+			 WHERE id IN (
+			   SELECT o.id
+			   FROM tblorder o
+			   JOIN tblconcession c ON o.concession_id = c.id
+			   WHERE o.payment_method = 'gcash'
+			     AND o.order_status = 'accepted'
+			     AND o.gcash_screenshot IS NULL
+			     AND (
+			       (o.payment_receipt_expires_at IS NOT NULL AND o.payment_receipt_expires_at <= NOW())
+			       OR
+			       (o.payment_receipt_expires_at IS NULL AND o.accepted_at IS NOT NULL AND o.accepted_at + c.receipt_timer::interval <= NOW())
+			     )
+			 )
+			 RETURNING id`
+		)
+
+		return res.json({
+			declined: result.rowCount,
+			message: `${result.rowCount} order(s) auto-declined due to expired receipt timer`,
+		})
+	} catch (err) {
+		console.error('bulkDeclineExpiredReceipts error:', err)
+		return res.status(500).json({ error: 'Internal server error' })
 	}
 }
 

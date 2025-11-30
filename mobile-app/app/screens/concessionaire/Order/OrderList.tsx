@@ -100,6 +100,13 @@ const OrderList = () => {
 
         // Initial load/refresh: only fetch active orders, do NOT fetch history yet
         if (refresh || pageNum === 1) {
+          // Auto-decline any expired GCash receipts in bulk before fetching
+          try {
+            await api.post('/order/bulk-decline-expired')
+          } catch (e) {
+            console.warn('Bulk decline expired receipts failed:', e)
+          }
+
           const activeRes = await api.get(
             `/order/concessionare/${user.id}?segment=active&limit=${PAGE_SIZE}`
           );
