@@ -47,39 +47,23 @@ const CustomerOrders = () => {
 	const formatManila = (value: any) => {
 		if (!value) return ''
 		try {
-			let dateObj: Date
-
-			if (typeof value === 'string') {
-				let s = value.trim()
-
-				// If the string has timezone info, use it but render in Asia/Manila
-				if (/[zZ]|[+-]\d{2}:?\d{2}/.test(s)) {
-					dateObj = new Date(s)
-				} else {
-					// Handle plain "YYYY-MM-DD HH:MM:SS[.ffffff]" from backend.
-					// Treat as UTC then render in Asia/Manila so DB times like
-					// "2025-11-29 07:21:35.822299" become Manila local time.
-					s = s.replace(' ', 'T')
-					if (!/[zZ]|[+-]\d{2}:?\d{2}$/.test(s)) {
-						s += 'Z'
-					}
-					dateObj = new Date(s)
-				}
-			} else {
-				// Non-string dates
-				dateObj = new Date(value)
-			}
-
+			// Just parse and format the timestamp as-is (backend will handle timezone conversion)
+			const dateObj = new Date(value)
 			if (Number.isNaN(dateObj.getTime())) return String(value)
 
-			return new Intl.DateTimeFormat('en-PH', {
-				timeZone: 'Asia/Manila',
-				year: 'numeric',
-				month: 'short',
-				day: '2-digit',
-				hour: 'numeric',
-				minute: '2-digit',
-			}).format(dateObj)
+			// Manual formatting
+			const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+			const month = months[dateObj.getMonth()];
+			const day = String(dateObj.getDate()).padStart(2, '0');
+			const year = dateObj.getFullYear();
+			
+			let hours = dateObj.getHours();
+			const minutes = String(dateObj.getMinutes()).padStart(2, '0');
+			const ampm = hours >= 12 ? 'PM' : 'AM';
+			hours = hours % 12;
+			hours = hours ? hours : 12; // 0 should be 12
+			
+			return `${month} ${day}, ${year}, ${hours}:${minutes} ${ampm}`;
 		} catch {
 			return String(value)
 		}
@@ -327,7 +311,7 @@ const CustomerOrders = () => {
 			item.receipt_timer
 		) {
 			try {
-				const acceptedDate = new Date(item.accepted_at)
+				const acceptedDate = new Date(item.accepted_at.replace(' ', 'T') + 'Z')
 				const [hours, minutes, seconds] = item.receipt_timer
 					.split(':')
 					.map(Number)

@@ -58,37 +58,23 @@ const ViewOrderCustomer = () => {
 	const formatManila = (value: any) => {
 		if (!value) return ''
 		try {
-			let dateObj: Date
-
-			if (typeof value === 'string') {
-				let s = value.trim()
-
-				if (/[zZ]|[+-]\d{2}:?\d{2}/.test(s)) {
-					dateObj = new Date(s)
-				} else {
-					// Handle plain "YYYY-MM-DD HH:MM:SS[.ffffff]" from backend.
-					// Treat as UTC then render in Asia/Manila so DB times like
-					// "2025-11-29 07:21:35.822299" become Manila local time.
-					s = s.replace(' ', 'T')
-					if (!/[zZ]|[+-]\d{2}:?\d{2}$/.test(s)) {
-						s += 'Z'
-					}
-					dateObj = new Date(s)
-				}
-			} else {
-				dateObj = new Date(value)
-			}
-
+			// Just parse and format the timestamp as-is (backend will handle timezone conversion)
+			const dateObj = new Date(value)
 			if (Number.isNaN(dateObj.getTime())) return String(value)
 
-			return new Intl.DateTimeFormat('en-PH', {
-				timeZone: 'Asia/Manila',
-				year: 'numeric',
-				month: 'short',
-				day: '2-digit',
-				hour: 'numeric',
-				minute: '2-digit',
-			}).format(dateObj)
+			// Manual formatting
+			const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+			const month = months[dateObj.getMonth()];
+			const day = String(dateObj.getDate()).padStart(2, '0');
+			const year = dateObj.getFullYear();
+			
+			let hours = dateObj.getHours();
+			const minutes = String(dateObj.getMinutes()).padStart(2, '0');
+			const ampm = hours >= 12 ? 'PM' : 'AM';
+			hours = hours % 12;
+			hours = hours ? hours : 12; // 0 should be 12
+			
+			return `${month} ${day}, ${year}, ${hours}:${minutes} ${ampm}`;
 		} catch {
 			return String(value)
 		}
@@ -111,7 +97,12 @@ const ViewOrderCustomer = () => {
 			// Prefer explicit expiry timestamp from backend, fall back to accepted_at + receipt_timer
 			let deadlineMs: number | null = null
 			if (order.payment_receipt_expires_at) {
-				const expiresDate = new Date(order.payment_receipt_expires_at)
+				// Backend sets this as UTC; ensure we parse it as UTC
+				let s = order.payment_receipt_expires_at.trim()
+				if (!/[zZ]|[+-]\d{2}:?\d{2}$/.test(s)) {
+					s = s.replace(' ', 'T') + 'Z'
+				}
+				const expiresDate = new Date(s)
 				if (!Number.isNaN(expiresDate.getTime())) {
 					deadlineMs = expiresDate.getTime()
 				}
@@ -122,7 +113,12 @@ const ViewOrderCustomer = () => {
 					return { timeRemaining: null, isExpired: false }
 				}
 
-				const acceptedDate = new Date(order.accepted_at)
+				// Backend accepted_at is UTC; parse as UTC
+				let s = order.accepted_at.trim()
+				if (!/[zZ]|[+-]\d{2}:?\d{2}$/.test(s)) {
+					s = s.replace(' ', 'T') + 'Z'
+				}
+				const acceptedDate = new Date(s)
 				const [hours, minutes, seconds] = order.receipt_timer
 					.split(':')
 					.map(Number)
@@ -631,7 +627,7 @@ const ViewOrderCustomer = () => {
 												Contact Concessionaire
 											</Text>
 										</TouchableOpacity>
-										{order.payment_receipt_expires_at && (
+										{order.payment_receipt_expires_at && order.order_status !== 'pending' && (
 											<Text style={styles.paymentExpiryText}>
 												Payment expires at:{' '}
 												{formatDateTime(order.payment_receipt_expires_at)}
@@ -647,14 +643,24 @@ const ViewOrderCustomer = () => {
 								try {
 									let deadlineMs: number | null = null
 									if (order.payment_receipt_expires_at) {
-										const expiresDate = new Date(order.payment_receipt_expires_at)
+										// Backend expiry is UTC; ensure we parse as UTC
+										let s = order.payment_receipt_expires_at.trim()
+										if (!/[zZ]|[+-]\d{2}:?\d{2}$/.test(s)) {
+											s = s.replace(' ', 'T') + 'Z'
+										}
+										const expiresDate = new Date(s)
 										if (!Number.isNaN(expiresDate.getTime())) {
 											deadlineMs = expiresDate.getTime()
 										}
 									}
 
 									if (deadlineMs === null && order.accepted_at && order.receipt_timer) {
-										const acceptedDate = new Date(order.accepted_at)
+										// Backend accepted_at is UTC; parse as UTC
+										let s = order.accepted_at.trim()
+										if (!/[zZ]|[+-]\d{2}:?\d{2}$/.test(s)) {
+											s = s.replace(' ', 'T') + 'Z'
+										}
+										const acceptedDate = new Date(s)
 										const [hours, minutes, seconds] = order.receipt_timer
 											.split(':')
 											.map(Number)
