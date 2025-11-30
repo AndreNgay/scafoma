@@ -189,6 +189,7 @@ export const getMenuItems = async (req, res) => {
 			cafeteria_id: r.cafeteria_id,
 			cafeteria_name: r.cafeteria_name,
 			image_url: makeImageDataUrl(r.image),
+			take_out_additional_fee: Number(r.take_out_additional_fee) || 0,
 			feedback: feedbackMap[r.id] || { feedback_count: 0, avg_rating: null },
 			order_count: orderCountMap[r.id] || 0,
 			variations: variationsMap[r.id] ? Object.values(variationsMap[r.id]) : [],
@@ -304,6 +305,7 @@ export const getMenuItemsByAdmin = async (req, res) => {
 			image_url: r.image
 				? `data:image/jpeg;base64,${r.image.toString('base64')}`
 				: null,
+			take_out_additional_fee: Number(r.take_out_additional_fee) || 0,
 			variations: variationsMap[r.id]
 				? Object.keys(variationsMap[r.id]).map((label) => ({
 						label,
@@ -434,6 +436,7 @@ export const getMenuItemsByConcessionaire = async (req, res) => {
 			concession_id: r.concession_id,
 			cafeteria_name: r.cafeteria_name,
 			image_url: makeImageDataUrl(r.image),
+			take_out_additional_fee: Number(r.take_out_additional_fee) || 0,
 			variations: variationsMap[r.id] ? Object.values(variationsMap[r.id]) : [],
 			gcash_payment_available: r.gcash_payment_available,
 			oncounter_payment_available: r.oncounter_payment_available,
@@ -461,7 +464,7 @@ export const getMenuItemsByConcessionaire = async (req, res) => {
 export const addMenuItem = async (req, res) => {
 	const client = await pool.connect()
 	try {
-		const { item_name, price, category, availability, variations } = req.body
+		const { item_name, price, category, availability, take_out_additional_fee, variations } = req.body
 
 		if (!item_name) {
 			return res
@@ -500,8 +503,8 @@ export const addMenuItem = async (req, res) => {
 		// Insert menu item
 		const insertMenuItem = await client.query(
 			`INSERT INTO tblmenuitem 
-        (concession_id, item_name, price, category, available, image, created_at) 
-       VALUES ($1,$2,$3,$4,$5,$6,NOW())
+        (concession_id, item_name, price, category, available, image, take_out_additional_fee, created_at) 
+       VALUES ($1,$2,$3,$4,$5,$6,$7,NOW())
        RETURNING id`,
 			[
 				concessionId,
@@ -510,6 +513,7 @@ export const addMenuItem = async (req, res) => {
 				category || null,
 				parseBool(availability),
 				imageBuffer,
+				Number(take_out_additional_fee) || 0,
 			]
 		)
 
@@ -613,7 +617,7 @@ export const addMenuItem = async (req, res) => {
 export const updateMenuItem = async (req, res) => {
 	const { id } = req.params
 	const concessionaireId = req.user.id
-	const { item_name, price, category } = req.body
+	const { item_name, price, category, take_out_additional_fee } = req.body
 	let availability = undefined
 	if (typeof req.body.availability !== 'undefined') {
 		const v = req.body.availability
@@ -668,6 +672,10 @@ export const updateMenuItem = async (req, res) => {
 		if (category) {
 			updateFields.push(`category = $${idx++}`)
 			updateParams.push(category)
+		}
+		if (take_out_additional_fee !== undefined) {
+			updateFields.push(`take_out_additional_fee = $${idx++}`)
+			updateParams.push(parseFloat(take_out_additional_fee) || 0)
 		}
 		if (availability !== null && availability !== undefined) {
 			updateFields.push(`available = $${idx++}`)

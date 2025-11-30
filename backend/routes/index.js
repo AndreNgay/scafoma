@@ -14,6 +14,7 @@ import cartRoutes from './cartRoutes.js';
 import itemVariationGroupRoutes from './itemVariationGroupRoutes.js';
 import dashboardRoutes from './dashboardRoutes.js';
 import notificationRoutes from './notificationRoutes.js';
+import concessionaireAnalyticsRoutes from './concessionaireAnalyticsRoutes.js';
 
 const router = express.Router();
 
@@ -31,6 +32,7 @@ router.use('/item-variation-group', itemVariationGroupRoutes);
 router.use('/feedback', feedbackRoutes);
 router.use('/cart', cartRoutes);
 router.use('/notification', notificationRoutes);
+router.use('/concessionaire-analytics', concessionaireAnalyticsRoutes);
 
 // Dashboard
 router.use('/dashboard', dashboardRoutes);

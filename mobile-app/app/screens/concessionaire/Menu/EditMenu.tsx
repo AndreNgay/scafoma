@@ -61,6 +61,10 @@ const EditMenu: React.FC = () => {
 	const [variationGroupsLoading, setVariationGroupsLoading] = useState(true)
 	const [existingCategories, setExistingCategories] = useState<string[]>([])
 	const { showToast } = useToast()
+	const initialTakeOutFee = normalizeCurrencyValue(
+		menuItem?.take_out_additional_fee != null ? String(menuItem.take_out_additional_fee) : '0'
+	)
+	const [takeOutAdditionalFee, setTakeOutAdditionalFee] = useState(initialTakeOutFee)
 
 	const [importModalVisible, setImportModalVisible] = useState(false)
 	const [importItemsLoading, setImportItemsLoading] = useState(false)
@@ -71,8 +75,16 @@ const EditMenu: React.FC = () => {
 		setPrice(sanitizeCurrencyInput(value))
 	}
 
+	const handleTakeOutFeeChange = (value: string) => {
+		setTakeOutAdditionalFee(sanitizeCurrencyInput(value))
+	}
+
 	const ensurePriceFallback = () => {
 		setPrice((prev) => normalizeCurrencyValue(prev))
+	}
+
+	const ensureTakeOutFeeFallback = () => {
+		setTakeOutAdditionalFee((prev) => normalizeCurrencyValue(prev))
 	}
 
 	// Tooltips removed
@@ -522,12 +534,14 @@ const EditMenu: React.FC = () => {
 		}
 
 		const normalizedPrice = normalizeCurrencyValue(price)
+		const normalizedTakeOutFee = normalizeCurrencyValue(takeOutAdditionalFee)
 
 		const formData = new FormData()
 		formData.append('item_name', itemName.trim())
 		formData.append('price', normalizedPrice)
 		formData.append('category', category.trim())
 		formData.append('availability', availability ? 'true' : 'false')
+		formData.append('take_out_additional_fee', normalizedTakeOutFee)
 		formData.append('variations', JSON.stringify(variationGroups))
 
 		if (image?.uri && !image.uri.startsWith('data')) {
@@ -656,6 +670,24 @@ const EditMenu: React.FC = () => {
 				</View>
 				<Text style={styles.helperText}>
 					Leaving this blank automatically sets the price to ₱0.00.
+				</Text>
+
+				<Text style={styles.label}>
+					Take Out Additional Fee
+				</Text>
+				<View style={styles.currencyInputWrapper}>
+					<Text style={styles.currencyPrefix}>₱</Text>
+					<TextInput
+						style={styles.currencyInput}
+						value={takeOutAdditionalFee}
+						keyboardType="numeric"
+						onChangeText={handleTakeOutFeeChange}
+						onBlur={ensureTakeOutFeeFallback}
+						placeholder="0.00"
+					/>
+				</View>
+				<Text style={styles.helperText}>
+					Additional fee for take-out orders (optional).
 				</Text>
 
 				<Text style={styles.label}>Image</Text>

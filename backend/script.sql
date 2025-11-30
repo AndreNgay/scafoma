@@ -81,6 +81,7 @@ CREATE TABLE IF NOT EXISTS public.tblmenuitem
     image bytea,
     category character varying(100) COLLATE pg_catalog."default",
     available boolean DEFAULT false,
+    take_out_additional_fee numeric(10, 2) DEFAULT 0,
     created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
     updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT tblmenuitem_pkey PRIMARY KEY (id)

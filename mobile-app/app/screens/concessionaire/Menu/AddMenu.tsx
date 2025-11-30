@@ -47,6 +47,7 @@ const AddMenu: React.FC = () => {
 	const [variationGroups, setVariationGroups] = useState<VariationGroup[]>([])
 	const [loading, setLoading] = useState(false)
 	const [existingCategories, setExistingCategories] = useState<string[]>([])
+	const [takeOutAdditionalFee, setTakeOutAdditionalFee] = useState('0')
 
 	const navigation = useNavigation<any>()
 	const { showToast } = useToast()
@@ -60,8 +61,16 @@ const AddMenu: React.FC = () => {
 		setPrice(sanitizeCurrencyInput(value))
 	}
 
+	const handleTakeOutFeeChange = (value: string) => {
+		setTakeOutAdditionalFee(sanitizeCurrencyInput(value))
+	}
+
 	const ensurePriceFallback = () => {
 		setPrice((prev) => normalizeCurrencyValue(prev))
+	}
+
+	const ensureTakeOutFeeFallback = () => {
+		setTakeOutAdditionalFee((prev) => normalizeCurrencyValue(prev))
 	}
 
 	// Load existing categories for this concessionaire to show as quick-select chips
@@ -453,10 +462,12 @@ const AddMenu: React.FC = () => {
 
 		const formData = new FormData()
 		const normalizedPrice = normalizeCurrencyValue(price)
+		const normalizedTakeOutFee = normalizeCurrencyValue(takeOutAdditionalFee)
 		formData.append('item_name', itemName.trim())
 		formData.append('price', normalizedPrice)
 		formData.append('category', category.trim()) // ✅ send typed category
 		formData.append('availability', availability ? 'true' : 'false')
+		formData.append('take_out_additional_fee', normalizedTakeOutFee)
 
 		// Separate variations with images from those without, but keep image_url
 		// so the backend can clone imported images via data URLs.
@@ -600,6 +611,24 @@ const AddMenu: React.FC = () => {
 				</View>
 				<Text style={styles.helperText}>
 					Leaving this blank automatically sets the price to ₱0.00.
+				</Text>
+
+				<Text style={styles.label}>
+					Take Out Additional Fee
+				</Text>
+				<View style={styles.currencyInputWrapper}>
+					<Text style={styles.currencyPrefix}>₱</Text>
+					<TextInput
+						style={styles.currencyInput}
+						value={takeOutAdditionalFee}
+						keyboardType="numeric"
+						onChangeText={handleTakeOutFeeChange}
+						onBlur={ensureTakeOutFeeFallback}
+						placeholder="0.00"
+					/>
+				</View>
+				<Text style={styles.helperText}>
+					Additional fee for take-out orders (optional).
 				</Text>
 
 				<Text style={styles.label}>Image</Text>

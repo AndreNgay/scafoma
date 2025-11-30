@@ -225,11 +225,12 @@ const MenuItemDetails = () => {
 
 	// Price calculation
 	const basePrice = Number(item.price) || 0
+	const takeOutFee = diningOption === 'take-out' ? (Number(item.take_out_additional_fee) || 0) : 0
 	const variationTotal = selectedVariations.reduce((sum, v) => {
 		const qty = variationQuantities[v.id] || 1
 		return sum + Number(v.additional_price || 0) * qty
 	}, 0)
-	const displayPrice = (basePrice + variationTotal) * quantity
+	const displayPrice = (basePrice + variationTotal + takeOutFee) * quantity
 
 	// Handle variation selection
 	const toggleVariation = (group: any, variation: any) => {
@@ -571,7 +572,7 @@ const MenuItemDetails = () => {
 				</TouchableOpacity>
 
 				{/* Content with padding */}
-				<View style={{ paddingHorizontal: 16 }}>
+				<View style={{ paddingHorizontal: 20, paddingTop: 20 }}>
 					<Text style={styles.title}>{item.item_name}</Text>
 
 					{/* Cafeteria + Concession */}
@@ -592,7 +593,9 @@ const MenuItemDetails = () => {
 						:	<Text style={styles.link}>{item?.concession_name || ''}</Text>}
 					</Text>
 
-					<Text style={styles.desc}>{item.description}</Text>
+					{item.description && (
+						<Text style={styles.desc}>{item.description}</Text>
+					)}
 				</View>
 
 				{/* Dining Option */}
@@ -638,6 +641,11 @@ const MenuItemDetails = () => {
 									style={styles.inlineIcon}
 								/>{' '}
 								Take Out
+								{item.take_out_additional_fee && Number(item.take_out_additional_fee) > 0 && (
+									<Text style={styles.takeOutFeeText}>
+										{' '}+₱{Number(item.take_out_additional_fee).toFixed(2)}
+									</Text>
+								)}
 							</Text>
 						</TouchableOpacity>
 					</View>
@@ -645,10 +653,13 @@ const MenuItemDetails = () => {
 
 				{/* Variations */}
 				{loadingVariations ?
-					<ActivityIndicator
-						style={{ marginTop: 10 }}
-						color="#A40C2D"
-					/>
+					<View style={styles.loadingContainer}>
+						<ActivityIndicator
+							size="large"
+							color="#A40C2D"
+						/>
+						<Text style={styles.loadingText}>Loading item options...</Text>
+					</View>
 				:	Object.entries<any>(groupedVariations).map(([groupName, group]) => {
 						const selectionsInGroup = selectedVariations.filter(
 							(v) => v.group_id === group.id
@@ -828,97 +839,109 @@ const MenuItemDetails = () => {
 					/>
 				</View>
 
-				{/* Quantity & Price */}
-				<View style={styles.quantitySection}>
-					<View style={styles.quantityHeader}>
-						<Text style={styles.quantityLabel}>Quantity</Text>
-						<Text style={styles.priceInQuantity}>
-							₱{displayPrice.toFixed(2)}
-						</Text>
+				{/* Order Summary Section */}
+				<View style={styles.orderSummaryContainer}>
+					{/* Quantity & Price */}
+					<View style={styles.quantitySection}>
+						<View style={styles.quantityHeader}>
+							<Text style={styles.quantityLabel}>Quantity</Text>
+							<Text style={styles.priceInQuantity}>
+								₱{displayPrice.toFixed(2)}
+							</Text>
+						</View>
+						<View style={styles.quantityControls}>
+							<TouchableOpacity
+								style={styles.qtyBtn}
+								onPress={() => setQuantity(Math.max(1, quantity - 1))}>
+								<Ionicons name="remove" size={20} color="#fff" />
+							</TouchableOpacity>
+							<Text style={styles.qtyValue}>{quantity}</Text>
+							<TouchableOpacity
+								style={styles.qtyBtn}
+								onPress={() => setQuantity(quantity + 1)}>
+								<Ionicons name="add" size={20} color="#fff" />
+							</TouchableOpacity>
+						</View>
 					</View>
-					<View style={styles.quantityControls}>
-						<TouchableOpacity
-							style={styles.qtyBtn}
-							onPress={() => setQuantity(Math.max(1, quantity - 1))}>
-							<Text style={styles.qtyText}>−</Text>
-						</TouchableOpacity>
-						<Text style={styles.qtyValue}>{quantity}</Text>
-						<TouchableOpacity
-							style={styles.qtyBtn}
-							onPress={() => setQuantity(quantity + 1)}>
-							<Text style={styles.qtyText}>+</Text>
-						</TouchableOpacity>
-					</View>
-				</View>
 
-				{/* Payment Method */}
-				<View style={styles.paymentMethodContainer}>
-					<Text style={styles.paymentMethodTitle}>Payment Method</Text>
-					{(
-						!availablePaymentMethods.gcash && !availablePaymentMethods.onCounter
-					) ?
-						<Text style={styles.noPaymentMethodsText}>
-							No payment methods are currently available for this concession.
-						</Text>
-					:	<>
-							<View style={styles.paymentMethodButtons}>
-								{availablePaymentMethods.gcash && (
-									<TouchableOpacity
-										style={[
-											styles.paymentMethodButton,
-											paymentMethod === 'gcash' && styles.paymentMethodSelected,
-										]}
-										onPress={() => setPaymentMethod('gcash')}>
-										<View style={styles.paymentMethodContent}>
-											<Image
-												source={GCashIcon}
-												style={styles.paymentMethodIcon}
-											/>
-											<Text
-												style={[
-													styles.paymentMethodText,
-													paymentMethod === 'gcash' &&
-														styles.paymentMethodTextSelected,
-												]}>
-												GCash
-											</Text>
-										</View>
-									</TouchableOpacity>
-								)}
-								{availablePaymentMethods.onCounter && (
-									<TouchableOpacity
-										style={[
-											styles.paymentMethodButton,
-											paymentMethod === 'on-counter' &&
-												styles.paymentMethodSelected,
-										]}
-										onPress={() => setPaymentMethod('on-counter')}>
-										<Text
+					{/* Divider */}
+					<View style={styles.divider} />
+
+					{/* Payment Method */}
+					<View style={styles.paymentMethodSection}>
+						<Text style={styles.paymentMethodTitle}>Payment Method</Text>
+						{(
+							!availablePaymentMethods.gcash && !availablePaymentMethods.onCounter
+						) ?
+							<Text style={styles.noPaymentMethodsText}>
+								No payment methods are currently available for this concession.
+							</Text>
+						:	<>
+								<View style={styles.paymentMethodButtons}>
+									{availablePaymentMethods.gcash && (
+										<TouchableOpacity
 											style={[
-												styles.paymentMethodText,
+												styles.paymentMethodButton,
+												paymentMethod === 'gcash' &&
+													styles.paymentMethodSelected,
+											]}
+											onPress={() => setPaymentMethod('gcash')}>
+											<View style={styles.paymentMethodContent}>
+												<Ionicons
+													name="wallet-outline"
+													size={16}
+													color={
+														paymentMethod === 'gcash' ? '#A40C2D' : '#64748b'
+													}
+													style={styles.paymentMethodIcon}
+												/>
+												<Text
+													style={[
+														styles.paymentMethodText,
+														paymentMethod === 'gcash' &&
+															styles.paymentMethodTextSelected,
+													]}>
+													GCash
+												</Text>
+											</View>
+										</TouchableOpacity>
+									)}
+									{availablePaymentMethods.onCounter && (
+										<TouchableOpacity
+											style={[
+												styles.paymentMethodButton,
 												paymentMethod === 'on-counter' &&
-													styles.paymentMethodTextSelected,
-											]}>
-											<Ionicons
-												name="cash-outline"
-												size={14}
-												color={
-													paymentMethod === 'on-counter' ? '#A40C2D' : '#666'
-												}
-												style={styles.inlineIcon}
-											/>{' '}
-											On-Counter
-										</Text>
-									</TouchableOpacity>
+													styles.paymentMethodSelected,
+											]}
+											onPress={() => setPaymentMethod('on-counter')}>
+											<View style={styles.paymentMethodContent}>
+												<Ionicons
+													name="cash-outline"
+													size={16}
+													color={
+														paymentMethod === 'on-counter' ? '#A40C2D' : '#64748b'
+													}
+													style={styles.paymentMethodIcon}
+												/>
+												<Text
+													style={[
+														styles.paymentMethodText,
+														paymentMethod === 'on-counter' &&
+															styles.paymentMethodTextSelected,
+													]}>
+													On Counter
+												</Text>
+											</View>
+										</TouchableOpacity>
+									)}
+								</View>
+								{paymentMethod === 'gcash' && (
+									<Text style={styles.gcashNumberText}>
+										GCash Number: 0945-424-6367
+									</Text>
 								)}
-							</View>
-							{paymentMethod === 'gcash' && item.gcash_number && (
-								<Text style={styles.gcashNumberText}>
-									GCash Number: {item.gcash_number}
-								</Text>
-							)}
-						</>
-					}
+							</>}
+					</View>
 				</View>
 
 				{/* Buttons */}
@@ -1078,141 +1101,233 @@ const MenuItemDetails = () => {
 }
 
 const styles = StyleSheet.create({
-	container: { flex: 1, backgroundColor: '#f5f5f5' },
+	container: { 
+		flex: 1, 
+		backgroundColor: '#f8fafc',
+	},
 	image: {
 		width: '100%',
-		height: 250,
-		backgroundColor: '#e5e7eb',
+		height: 280,
+		backgroundColor: '#f1f5f9',
 	},
 	title: {
-		fontSize: 24,
-		fontWeight: 'bold',
-		color: '#1f2937',
-		marginBottom: 8,
+		fontSize: 20,
+		fontWeight: '700',
+		color: '#0f172a',
+		marginBottom: 12,
+		lineHeight: 26,
 	},
-	subText: { fontSize: 14, color: '#6b7280', marginBottom: 12 },
-	link: { color: '#A40C2D', fontWeight: '600' },
+	subText: { 
+		fontSize: 14, 
+		color: '#64748b', 
+		marginBottom: 16,
+		lineHeight: 18,
+	},
+	link: { 
+		color: '#A40C2D', 
+		fontWeight: '600',
+		textDecorationLine: 'underline',
+	},
 
 	qtyBtn: {
-		width: 32,
-		height: 32,
+		width: 36,
+		height: 36,
 		backgroundColor: '#A40C2D',
-		borderRadius: 8,
+		borderRadius: 10,
 		justifyContent: 'center',
 		alignItems: 'center',
-		marginHorizontal: 8,
+		marginHorizontal: 12,
+		shadowColor: '#A40C2D',
+		shadowOffset: { width: 0, height: 2 },
+		shadowOpacity: 0.2,
+		shadowRadius: 4,
+		elevation: 3,
 	},
-	qtyText: { color: '#fff', fontSize: 18, fontWeight: 'bold' },
+	qtyText: { 
+		color: '#fff', 
+		fontSize: 20, 
+		fontWeight: 'bold' 
+	},
 	qtyValue: {
-		fontSize: 18,
-		fontWeight: '600',
-		minWidth: 30,
+		fontSize: 20,
+		fontWeight: '700',
+		minWidth: 40,
 		textAlign: 'center',
+		color: '#1e293b',
 	},
 
 	desc: {
 		fontSize: 14,
-		color: '#6b7280',
+		color: '#475569',
 		lineHeight: 20,
-		marginBottom: 16,
+		marginBottom: 20,
 	},
 
 	diningOptionContainer: {
 		backgroundColor: '#fff',
-		padding: 16,
-		marginHorizontal: 16,
-		borderRadius: 12,
-		marginBottom: 16,
+		padding: 20,
+		marginHorizontal: 20,
+		borderRadius: 16,
+		marginBottom: 20,
 		shadowColor: '#000',
-		shadowOffset: { width: 0, height: 1 },
-		shadowOpacity: 0.05,
-		shadowRadius: 4,
-		elevation: 2,
+		shadowOffset: { width: 0, height: 4 },
+		shadowOpacity: 0.08,
+		shadowRadius: 12,
+		elevation: 4,
+		borderWidth: 1,
+		borderColor: '#f1f5f9',
 	},
 	diningOptionTitle: {
 		fontSize: 16,
 		fontWeight: '600',
-		color: '#1f2937',
-		marginBottom: 12,
+		color: '#0f172a',
+		marginBottom: 16,
 	},
-	diningOptionButtons: { flexDirection: 'row', gap: 10 },
+	diningOptionButtons: { 
+		flexDirection: 'row', 
+		gap: 12 
+	},
 	diningOptionButton: {
 		flex: 1,
-		paddingVertical: 12,
-		paddingHorizontal: 8,
-		borderRadius: 8,
+		paddingVertical: 16,
+		paddingHorizontal: 12,
+		borderRadius: 12,
 		borderWidth: 2,
-		borderColor: '#e5e7eb',
+		borderColor: '#e2e8f0',
 		backgroundColor: '#fff',
 		alignItems: 'center',
+		shadowColor: '#000',
+		shadowOffset: { width: 0, height: 1 },
+		shadowOpacity: 0.03,
+		shadowRadius: 3,
+		elevation: 1,
 	},
 	diningOptionSelected: {
 		borderColor: '#A40C2D',
-		backgroundColor: '#fee2e2',
+		backgroundColor: '#fef2f2',
+		shadowColor: '#A40C2D',
+		shadowOffset: { width: 0, height: 2 },
+		shadowOpacity: 0.15,
+		shadowRadius: 6,
+		elevation: 3,
 	},
 	diningOptionText: {
 		fontSize: 14,
-		fontWeight: '500',
-		color: '#6b7280',
+		fontWeight: '600',
+		color: '#64748b',
 	},
 	inlineIcon: {
-		width: 14,
-		height: 14,
-		marginRight: 6,
+		width: 16,
+		height: 16,
+		marginRight: 8,
 	},
 	diningOptionTextSelected: {
 		color: '#A40C2D',
-		fontWeight: '600',
+		fontWeight: '700',
+	},
+	takeOutFeeText: {
+		fontSize: 12,
+		color: '#A40C2D',
+		fontWeight: '700',
+		backgroundColor: '#fef2f2',
+		paddingHorizontal: 6,
+		paddingVertical: 2,
+		borderRadius: 6,
+		marginLeft: 4,
 	},
 
+	orderSummaryContainer: {
+		backgroundColor: '#fff',
+		marginHorizontal: 20,
+		marginBottom: 20,
+		borderRadius: 16,
+		shadowColor: '#000',
+		shadowOffset: { width: 0, height: 4 },
+		shadowOpacity: 0.08,
+		shadowRadius: 12,
+		elevation: 4,
+		borderWidth: 1,
+		borderColor: '#f1f5f9',
+	},
+	quantitySection: {
+		padding: 20,
+		borderBottomWidth: 1,
+		borderBottomColor: '#f1f5f9',
+	},
+	divider: {
+		height: 1,
+		backgroundColor: '#f1f5f9',
+		marginHorizontal: 20,
+	},
+	paymentMethodSection: {
+		padding: 20,
+	},
 	paymentMethodContainer: {
 		backgroundColor: '#fff',
-		padding: 16,
-		marginHorizontal: 16,
-		borderRadius: 12,
-		marginBottom: 16,
+		padding: 20,
+		marginHorizontal: 20,
+		borderRadius: 16,
+		marginBottom: 20,
 		shadowColor: '#000',
-		shadowOffset: { width: 0, height: 1 },
-		shadowOpacity: 0.05,
-		shadowRadius: 4,
-		elevation: 2,
+		shadowOffset: { width: 0, height: 4 },
+		shadowOpacity: 0.08,
+		shadowRadius: 12,
+		elevation: 4,
+		borderWidth: 1,
+		borderColor: '#f1f5f9',
 	},
 	paymentMethodTitle: {
 		fontSize: 16,
 		fontWeight: '600',
-		color: '#1f2937',
-		marginBottom: 12,
+		color: '#0f172a',
+		marginBottom: 16,
 	},
-	paymentMethodButtons: { flexDirection: 'row', gap: 10 },
+	paymentMethodButtons: { 
+		flexDirection: 'row', 
+		gap: 12 
+	},
 	paymentMethodButton: {
 		flex: 1,
-		paddingVertical: 12,
-		paddingHorizontal: 8,
-		borderRadius: 8,
+		paddingVertical: 16,
+		paddingHorizontal: 12,
+		borderRadius: 12,
 		borderWidth: 2,
-		borderColor: '#e5e7eb',
+		borderColor: '#e2e8f0',
 		backgroundColor: '#fff',
 		alignItems: 'center',
+		shadowColor: '#000',
+		shadowOffset: { width: 0, height: 1 },
+		shadowOpacity: 0.03,
+		shadowRadius: 3,
+		elevation: 1,
 	},
 	paymentMethodSelected: {
 		borderColor: '#A40C2D',
-		backgroundColor: '#fee2e2',
+		backgroundColor: '#fef2f2',
+		shadowColor: '#A40C2D',
+		shadowOffset: { width: 0, height: 2 },
+		shadowOpacity: 0.15,
+		shadowRadius: 6,
+		elevation: 3,
 	},
 	paymentMethodText: {
 		fontSize: 14,
-		fontWeight: '500',
-		color: '#6b7280',
+		fontWeight: '600',
+		color: '#64748b',
 	},
 	paymentMethodTextSelected: {
 		color: '#A40C2D',
-		fontWeight: '600',
+		fontWeight: '700',
 	},
 	gcashNumberText: {
-		fontSize: 12,
-		color: '#666',
-		marginTop: 8,
+		fontSize: 13,
+		color: '#64748b',
+		marginTop: 12,
 		textAlign: 'center',
 		fontStyle: 'italic',
+		backgroundColor: '#f8fafc',
+		padding: 8,
+		borderRadius: 8,
 	},
 	paymentMethodContent: {
 		flexDirection: 'row',
@@ -1236,200 +1351,350 @@ const styles = StyleSheet.create({
 
 	group: {
 		backgroundColor: '#fff',
-		padding: 16,
-		marginHorizontal: 16,
-		borderRadius: 12,
-		marginBottom: 16,
+		padding: 20,
+		marginHorizontal: 20,
+		borderRadius: 16,
+		marginBottom: 20,
 		shadowColor: '#000',
-		shadowOffset: { width: 0, height: 1 },
-		shadowOpacity: 0.05,
-		shadowRadius: 4,
-		elevation: 2,
+		shadowOffset: { width: 0, height: 4 },
+		shadowOpacity: 0.08,
+		shadowRadius: 12,
+		elevation: 4,
+		borderWidth: 1,
+		borderColor: '#f1f5f9',
 	},
 	groupTitle: {
 		fontSize: 16,
 		fontWeight: '600',
-		color: '#1f2937',
-		marginBottom: 12,
+		color: '#0f172a',
+		marginBottom: 16,
 	},
-	required: { color: 'red', fontSize: 14 },
-	multiple: { fontSize: 12, color: '#555', marginLeft: 5 },
+	required: { 
+		color: '#dc2626', 
+		fontSize: 13,
+		fontWeight: '600',
+		marginLeft: 4,
+	},
+	multiple: { 
+		fontSize: 12, 
+		color: '#64748b', 
+		marginLeft: 8,
+		fontStyle: 'italic',
+	},
 	selectionCounter: {
 		fontSize: 12,
-		color: '#666',
-		marginTop: 4,
+		color: '#64748b',
+		marginTop: 8,
 		fontWeight: '500',
+		backgroundColor: '#f1f5f9',
+		paddingHorizontal: 8,
+		paddingVertical: 4,
+		borderRadius: 6,
+		alignSelf: 'flex-start',
 	},
 	option: {
-		padding: 10,
-		backgroundColor: '#f2f2f2',
-		borderRadius: 8,
-		marginBottom: 6,
+		padding: 14,
+		backgroundColor: '#f8fafc',
+		borderRadius: 12,
+		marginBottom: 10,
 		flexDirection: 'row',
 		alignItems: 'center',
 	},
 	optionSelected: {
-		backgroundColor: '#A40C2D33',
-		borderWidth: 1,
+		backgroundColor: '#fef2f2',
+		borderWidth: 2,
 		borderColor: '#A40C2D',
+		shadowColor: '#A40C2D',
+		shadowOffset: { width: 0, height: 2 },
+		shadowOpacity: 0.1,
+		shadowRadius: 6,
+		elevation: 2,
 	},
-	variationContent: { flexDirection: 'row', alignItems: 'center', flex: 1 },
-	variationImage: { width: 50, height: 50, borderRadius: 8, marginRight: 12 },
-	variationTextContainer: { flex: 1 },
-	variationName: { fontSize: 16, fontWeight: '500' },
-	variationPrice: { fontSize: 14, color: '#A40C2D', fontWeight: '600' },
+	variationContent: { 
+		flexDirection: 'row', 
+		alignItems: 'center', 
+		flex: 1,
+	},
+	variationImage: { 
+		width: 60, 
+		height: 60, 
+		borderRadius: 12, 
+		marginRight: 14,
+		backgroundColor: '#f1f5f9',
+	},
+	variationTextContainer: { 
+		flex: 1,
+		justifyContent: 'center',
+	},
+	variationName: { 
+		fontSize: 15, 
+		fontWeight: '600',
+		color: '#1e293b',
+		marginBottom: 2,
+	},
+	variationPrice: { 
+		fontSize: 13, 
+		color: '#059669', 
+		fontWeight: '700',
+		backgroundColor: '#ecfdf5',
+		paddingHorizontal: 8,
+		paddingVertical: 2,
+		borderRadius: 6,
+		alignSelf: 'flex-start',
+	},
 	variationQuantityContainer: {
 		flexDirection: 'row',
 		alignItems: 'center',
-		marginLeft: 10,
+		marginLeft: 14,
+		backgroundColor: '#f8fafc',
+		padding: 4,
+		borderRadius: 10,
 	},
 	variationQtyButton: {
-		width: 32,
-		height: 32,
+		width: 28,
+		height: 28,
 		backgroundColor: '#A40C2D',
-		borderRadius: 6,
+		borderRadius: 7,
 		justifyContent: 'center',
 		alignItems: 'center',
+		shadowColor: '#000',
+		shadowOffset: { width: 0, height: 1 },
+		shadowOpacity: 0.1,
+		shadowRadius: 2,
+		elevation: 1,
 	},
 	variationQtyButtonDisabled: {
-		backgroundColor: '#ccc',
+		backgroundColor: '#cbd5e1',
+		shadowOpacity: 0,
+		elevation: 0,
 	},
 	variationQtyButtonText: {
 		color: '#fff',
-		fontSize: 18,
+		fontSize: 16,
 		fontWeight: 'bold',
 	},
 	variationQtyButtonTextDisabled: {
-		color: '#999',
+		color: '#94a3b8',
 	},
 	variationQtyValue: {
 		fontSize: 16,
-		fontWeight: '600',
-		marginHorizontal: 12,
-		minWidth: 20,
+		fontWeight: '700',
+		marginHorizontal: 10,
+		minWidth: 24,
 		textAlign: 'center',
+		color: '#1e293b',
 	},
 
-	noteContainer: {
+noteContainer: {
 		backgroundColor: '#fff',
-		padding: 16,
-		marginHorizontal: 16,
-		borderRadius: 12,
-		marginBottom: 16,
+		padding: 20,
+		marginHorizontal: 20,
+		borderRadius: 16,
+		marginBottom: 20,
 		shadowColor: '#000',
-		shadowOffset: { width: 0, height: 1 },
-		shadowOpacity: 0.05,
-		shadowRadius: 4,
-		elevation: 2,
+		shadowOffset: { width: 0, height: 4 },
+		shadowOpacity: 0.08,
+		shadowRadius: 12,
+		elevation: 4,
+		borderWidth: 1,
+		borderColor: '#f1f5f9',
 	},
 	noteLabel: {
 		fontSize: 16,
 		fontWeight: '600',
-		color: '#1f2937',
-		marginBottom: 8,
+		color: '#0f172a',
+		marginBottom: 12,
 	},
 	noteInput: {
-		backgroundColor: '#f9fafb',
-		borderWidth: 1,
-		borderColor: '#e5e7eb',
-		borderRadius: 8,
-		padding: 12,
-		minHeight: 80,
+		backgroundColor: '#f8fafc',
+		borderWidth: 2,
+		borderColor: '#e2e8f0',
+		borderRadius: 12,
+		padding: 16,
+		minHeight: 90,
 		textAlignVertical: 'top',
 		fontSize: 14,
-		color: '#1f2937',
+		color: '#1e293b',
+		lineHeight: 20,
 	},
 
-	quantitySection: {
-		backgroundColor: '#fff',
-		padding: 16,
-		marginHorizontal: 16,
-		borderRadius: 12,
-		marginBottom: 16,
-		shadowColor: '#000',
-		shadowOffset: { width: 0, height: 1 },
-		shadowOpacity: 0.05,
-		shadowRadius: 4,
-		elevation: 2,
-	},
-	quantityHeader: {
+quantityHeader: {
 		flexDirection: 'row',
 		justifyContent: 'space-between',
 		alignItems: 'center',
-		marginBottom: 12,
+		marginBottom: 16,
 	},
 	quantityLabel: {
 		fontSize: 16,
 		fontWeight: '600',
-		color: '#1f2937',
+		color: '#0f172a',
 	},
 	priceInQuantity: {
-		fontSize: 24,
-		fontWeight: 'bold',
+		fontSize: 20,
+		fontWeight: '700',
 		color: '#A40C2D',
+		backgroundColor: '#fef2f2',
+		paddingHorizontal: 12,
+		paddingVertical: 6,
+		borderRadius: 10,
 	},
 	quantityControls: {
 		flexDirection: 'row',
 		justifyContent: 'center',
 		alignItems: 'center',
+		backgroundColor: '#f8fafc',
+		padding: 8,
+		borderRadius: 16,
 	},
 
 	btn: {
 		backgroundColor: '#A40C2D',
-		paddingVertical: 16,
-		paddingHorizontal: 24,
-		borderRadius: 12,
+		paddingVertical: 18,
+		paddingHorizontal: 32,
+		borderRadius: 16,
 		alignItems: 'center',
-		marginHorizontal: 16,
-		marginBottom: 12,
+		marginHorizontal: 20,
+		marginBottom: 16,
 		shadowColor: '#A40C2D',
-		shadowOffset: { width: 0, height: 4 },
-		shadowOpacity: 0.3,
-		shadowRadius: 8,
-		elevation: 4,
+		shadowOffset: { width: 0, height: 6 },
+		shadowOpacity: 0.4,
+		shadowRadius: 12,
+		elevation: 6,
+		borderWidth: 1,
+		borderColor: '#A40C2D80',
 	},
 	btnAlt: {
-		backgroundColor: '#6b7280',
-		shadowColor: '#6b7280',
+		backgroundColor: '#64748b',
+		shadowColor: '#64748b',
+		borderColor: '#64748b80',
 	},
 	btnDisabled: {
-		backgroundColor: '#d1d5db',
-		opacity: 0.6,
+		backgroundColor: '#cbd5e1',
+		opacity: 0.7,
 		shadowOpacity: 0,
+		elevation: 0,
+		borderColor: '#cbd5e1',
 	},
-	btnText: { color: '#fff', fontWeight: 'bold', fontSize: 16 },
-	btnTextDisabled: { color: '#9ca3af' },
+	btnText: { 
+		color: '#fff', 
+		fontWeight: '700', 
+		fontSize: 16,
+		letterSpacing: 0.5,
+	},
+	btnTextDisabled: { 
+		color: '#94a3b8',
+		fontWeight: '600',
+	},
 
-	feedbackContainer: { marginTop: 20 },
-	feedbackTitle: { fontSize: 18, fontWeight: 'bold', marginBottom: 10 },
-	feedbackInfo: { color: '#666', fontSize: 12, marginBottom: 8 },
-	noFeedback: { color: '#888', fontStyle: 'italic' },
-	feedbackCard: {
-		backgroundColor: '#f9f9f9',
-		padding: 10,
-		borderRadius: 6,
-		marginBottom: 10,
+	feedbackContainer: { 
+		marginTop: 24,
+		marginHorizontal: 20,
 	},
+	feedbackTitle: { 
+		fontSize: 18, 
+		fontWeight: '700', 
+		marginBottom: 16,
+		color: '#0f172a',
+	},
+	feedbackInfo: { 
+		color: '#64748b', 
+		fontSize: 14, 
+		marginBottom: 12,
+		backgroundColor: '#f1f5f9',
+		padding: 12,
+		borderRadius: 8,
+	},
+	noFeedback: { 
+		color: '#94a3b8', 
+		fontStyle: 'italic',
+		textAlign: 'center',
+		padding: 20,
+	},
+	feedbackCard: {
+		backgroundColor: '#fff',
+		padding: 16,
+		borderRadius: 12,
+		marginBottom: 12,
+		shadowColor: '#000',
+		shadowOffset: { width: 0, height: 2 },
+		shadowOpacity: 0.05,
+		shadowRadius: 6,
+		elevation: 2,
+		borderWidth: 1,
+		borderColor: '#f1f5f9',
+	},
+	loadingContainer: {
+		backgroundColor: '#fff',
+		padding: 40,
+		marginHorizontal: 20,
+		borderRadius: 16,
+		marginBottom: 20,
+		alignItems: 'center',
+		justifyContent: 'center',
+		shadowColor: '#000',
+		shadowOffset: { width: 0, height: 4 },
+		shadowOpacity: 0.08,
+		shadowRadius: 12,
+		elevation: 4,
+		borderWidth: 1,
+		borderColor: '#f1f5f9',
+	},
+	loadingText: {
+		marginTop: 12,
+		fontSize: 16,
+		color: '#64748b',
+		fontWeight: '500',
+	},
+
 	feedbackHeader: {
 		flexDirection: 'row',
 		alignItems: 'center',
-		marginBottom: 6,
+		marginBottom: 8,
 	},
-	profileImage: { width: 40, height: 40, borderRadius: 20, marginRight: 10 },
+	profileImage: { 
+		width: 44, 
+		height: 44, 
+		borderRadius: 22, 
+		marginRight: 12,
+		borderWidth: 2,
+		borderColor: '#f1f5f9',
+	},
 	profilePlaceholder: {
-		width: 40,
-		height: 40,
-		borderRadius: 20,
-		backgroundColor: '#ccc',
+		width: 44,
+		height: 44,
+		borderRadius: 22,
+		backgroundColor: '#f1f5f9',
 		alignItems: 'center',
 		justifyContent: 'center',
-		marginRight: 10,
+		marginRight: 12,
+		borderWidth: 2,
+		borderColor: '#e2e8f0',
 	},
-	profileInitials: { color: '#fff', fontWeight: 'bold' },
-	feedbackUser: { fontWeight: '600' },
-	feedbackRating: { color: '#A40C2D' },
-	feedbackComment: { color: '#333', marginVertical: 3 },
-	feedbackDate: { fontSize: 12, color: '#888' },
+	profileInitials: { 
+		color: '#64748b', 
+		fontWeight: '700',
+		fontSize: 16,
+	},
+	feedbackUser: { 
+		fontWeight: '700',
+		fontSize: 15,
+		color: '#1e293b',
+	},
+	feedbackRating: { 
+		color: '#fbbf24',
+		fontSize: 14,
+	},
+	feedbackComment: { 
+		color: '#475569', 
+		marginVertical: 6,
+		lineHeight: 18,
+		fontSize: 14,
+	},
+	feedbackDate: { 
+		fontSize: 12, 
+		color: '#94a3b8',
+		marginTop: 4,
+	},
 	feedbackModal: {
 		position: 'absolute',
 		left: 0,
