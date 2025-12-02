@@ -4,8 +4,10 @@
   "main": "index.js",
   "type": "module",
   "scripts": {
-    "start": "node index.js",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "start": "nodemon index.js",
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "db-ping": "node scripts/db-ping.js",
+    "db-monitor": "node scripts/db-ping.js --continuous"
   },
   "keywords": [],
   "author": "",

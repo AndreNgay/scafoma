@@ -1,6 +1,5 @@
 import { pool } from "../libs/database.js";
 
-
 // Helper: parse boolean safely
 const parseBool = (val) => {
   if (typeof val === "boolean") return val;
@@ -16,13 +15,15 @@ export const getFeedbackById = async (req, res) => {
 
   try {
     const result = await pool.query(
-      `SELECT f.id, f.customer_id, f.rating, f.comment, f.created_at, 
+      `SELECT f.id, f.customer_id, f.rating, f.comment,
+              -- Convert UTC to Asia/Manila
+              (f.created_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Manila') as created_at,
               u.first_name, u.last_name, u.profile_image
        FROM tblfeedback f
        JOIN tbluser u ON f.customer_id = u.id
        WHERE f.menu_item_id = $1
        ORDER BY f.created_at DESC`,
-      [id]
+      [id],
     );
 
     // Convert profile_image to base64 if exists
@@ -41,7 +42,6 @@ export const getFeedbackById = async (req, res) => {
       .json({ message: "Server error while fetching feedbacks" });
   }
 };
-
 
 /**
  * GET /feedback/can-leave/:itemId/:customerId
@@ -64,14 +64,16 @@ export const canLeaveFeedback = async (req, res) => {
          AND o.in_cart = FALSE
          AND o.order_status IN ('completed', 'ready for pickup', 'accepted')
        LIMIT 1`,
-      [customerId, itemId]
+      [customerId, itemId],
     );
 
     const canLeave = checkRes.rows.length > 0;
     return res.status(200).json({ canLeave });
   } catch (error) {
     console.error("Error checking feedback eligibility:", error);
-    return res.status(500).json({ message: "Server error while checking feedback eligibility" });
+    return res
+      .status(500)
+      .json({ message: "Server error while checking feedback eligibility" });
   }
 };
 
@@ -87,7 +89,9 @@ export const createFeedback = async (req, res) => {
   const { customer_id, menu_item_id, rating, comment } = req.body;
 
   if (!customer_id || !menu_item_id || !rating) {
-    return res.status(400).json({ message: "customer_id, menu_item_id, and rating are required" });
+    return res
+      .status(400)
+      .json({ message: "customer_id, menu_item_id, and rating are required" });
   }
 
   try {
@@ -101,20 +105,26 @@ export const createFeedback = async (req, res) => {
          AND o.in_cart = FALSE
          AND o.order_status IN ('completed', 'ready for pickup', 'accepted')
        LIMIT 1`,
-      [customer_id, menu_item_id]
+      [customer_id, menu_item_id],
     );
 
     if (orderCheck.rows.length === 0) {
-      return res.status(403).json({ message: "You can only leave feedback after ordering this item." });
+      return res
+        .status(403)
+        .json({
+          message: "You can only leave feedback after ordering this item.",
+        });
     }
 
     // 2) Prevent duplicate feedback by same customer for same menu item (optional)
     const existing = await pool.query(
       `SELECT id FROM tblfeedback WHERE customer_id = $1 AND menu_item_id = $2 LIMIT 1`,
-      [customer_id, menu_item_id]
+      [customer_id, menu_item_id],
     );
     if (existing.rows.length > 0) {
-      return res.status(409).json({ message: "You have already left feedback for this item." });
+      return res
+        .status(409)
+        .json({ message: "You have already left feedback for this item." });
     }
 
     // 3) Insert feedback
@@ -122,12 +132,14 @@ export const createFeedback = async (req, res) => {
       `INSERT INTO tblfeedback (customer_id, menu_item_id, rating, comment)
        VALUES ($1, $2, $3, $4)
        RETURNING *`,
-      [customer_id, menu_item_id, rating, comment || null]
+      [customer_id, menu_item_id, rating, comment || null],
     );
 
     return res.status(201).json(insertRes.rows[0]);
   } catch (error) {
     console.error("Error creating feedback:", error);
-    return res.status(500).json({ message: "Server error while creating feedback" });
+    return res
+      .status(500)
+      .json({ message: "Server error while creating feedback" });
   }
 };

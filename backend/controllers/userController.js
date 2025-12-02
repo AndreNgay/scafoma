@@ -1,10 +1,10 @@
 import { comparePassword, hashPassword } from "../libs/index.js";
 import { pool } from "../libs/database.js";
 
-
 // Utility function for random password
 const generateRandomPassword = (length = 6) => {
-  const chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+  const chars =
+    "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
   return Array.from({ length })
     .map(() => chars[Math.floor(Math.random() * chars.length)])
     .join("");
@@ -31,8 +31,8 @@ export const createConcessionaire = async (req, res) => {
     const passwordHash = await hashPassword(passwordPlain);
 
     const result = await pool.query({
-      text: `INSERT INTO tbluser (email, password, role, created_at) 
-             VALUES ($1, $2, 'concessionaire', CURRENT_TIMESTAMP) 
+      text: `INSERT INTO tbluser (email, password, role, created_at)
+             VALUES ($1, $2, 'concessionaire', CURRENT_TIMESTAMP)
              RETURNING id, email, role, created_at`,
       values: [email, passwordHash],
     });
@@ -47,7 +47,9 @@ export const createConcessionaire = async (req, res) => {
     });
   } catch (error) {
     console.error("Error creating concessionaire:", error);
-    res.status(500).json({ status: "failed", message: "Internal Server Error" });
+    res
+      .status(500)
+      .json({ status: "failed", message: "Internal Server Error" });
   }
 };
 
@@ -90,7 +92,9 @@ export const resetPassword = async (req, res) => {
     });
   } catch (error) {
     console.error("Error resetting password:", error);
-    res.status(500).json({ status: "failed", message: "Internal Server Error" });
+    res
+      .status(500)
+      .json({ status: "failed", message: "Internal Server Error" });
   }
 };
 
@@ -98,7 +102,9 @@ export const getUser = async (req, res) => {
   try {
     const { id } = req.user;
 
-    const result = await pool.query("SELECT * FROM tbluser WHERE id = $1", [id]);
+    const result = await pool.query("SELECT * FROM tbluser WHERE id = $1", [
+      id,
+    ]);
 
     if (result.rows.length === 0) {
       return res.status(404).json({ message: "User not found" });
@@ -129,7 +135,10 @@ export const getUserById = async (req, res) => {
       return res.status(400).json({ message: "Invalid user ID" });
     }
 
-    const result = await pool.query("SELECT id, first_name, last_name, email, role, contact_number, messenger_link, profile_image, created_at, updated_at FROM tbluser WHERE id = $1", [userId]);
+    const result = await pool.query(
+      "SELECT id, first_name, last_name, email, role, contact_number, messenger_link, profile_image, created_at, updated_at FROM tbluser WHERE id = $1",
+      [userId],
+    );
 
     if (result.rows.length === 0) {
       return res.status(404).json({ message: "User not found" });
@@ -151,25 +160,27 @@ export const getUserById = async (req, res) => {
   }
 };
 
-
-
 export const getAllUsers = async (req, res) => {
   try {
-    const result = await pool.query("SELECT * FROM tbluser ORDER BY created_at DESC");
+    const result = await pool.query(
+      "SELECT * FROM tbluser ORDER BY created_at DESC",
+    );
     res.status(200).json({
       status: "success",
       message: "Users retrieved successfully",
-      users: result.rows
+      users: result.rows,
     });
   } catch (error) {
     console.error("Error retrieving all users:", error);
-    res.status(500).json({ status: "failed", message: "Internal Server Error" });
+    res
+      .status(500)
+      .json({ status: "failed", message: "Internal Server Error" });
   }
 };
 
 export const changePassword = async (req, res) => {
   try {
-    const { id } = req.params;  
+    const { id } = req.params;
     const { currentPassword, newPassword, confirmPassword } = req.body;
 
     const userExists = await pool.query({
@@ -216,7 +227,6 @@ export const changePassword = async (req, res) => {
   }
 };
 
-
 export const updateUser = async (req, res) => {
   try {
     const { id } = req.params; // <-- get from params
@@ -235,8 +245,8 @@ export const updateUser = async (req, res) => {
     }
 
     const updatedUser = await pool.query({
-      text: `UPDATE tbluser 
-             SET first_name = $1, last_name = $2, email = $3, role = $4, updated_at = CURRENT_TIMESTAMP 
+      text: `UPDATE tbluser
+             SET first_name = $1, last_name = $2, email = $3, role = $4, updated_at = CURRENT_TIMESTAMP
              WHERE id = $5 RETURNING *`,
       values: [first_name, last_name, email, role, id],
     });
@@ -251,7 +261,9 @@ export const updateUser = async (req, res) => {
     });
   } catch (error) {
     console.error("Error updating user:", error);
-    res.status(500).json({ status: "failed", message: "Internal Server Error" });
+    res
+      .status(500)
+      .json({ status: "failed", message: "Internal Server Error" });
   }
 };
 
@@ -265,9 +277,13 @@ export const updateProfile = async (req, res) => {
       imageBuffer = req.file.buffer;
     }
 
-    const userExists = await pool.query("SELECT * FROM tbluser WHERE id = $1", [id]);
+    const userExists = await pool.query("SELECT * FROM tbluser WHERE id = $1", [
+      id,
+    ]);
     if (userExists.rowCount === 0) {
-      return res.status(404).json({ status: "failed", message: "User not found" });
+      return res
+        .status(404)
+        .json({ status: "failed", message: "User not found" });
     }
 
     const normalizedContact =
@@ -289,14 +305,20 @@ export const updateProfile = async (req, res) => {
            updated_at = CURRENT_TIMESTAMP
        WHERE id = $6
        RETURNING id, email, first_name, last_name, role, profile_image, contact_number, messenger_link`,
-      [first_name, last_name, normalizedContact, normalizedMessenger, imageBuffer, id]
+      [
+        first_name,
+        last_name,
+        normalizedContact,
+        normalizedMessenger,
+        imageBuffer,
+        id,
+      ],
     );
 
     const user = updatedUser.rows[0];
     if (user.profile_image) {
       user.profile_image_url = `data:image/jpeg;base64,${user.profile_image.toString("base64")}`;
-    }
-    else {
+    } else {
       user.profile_image_url = null;
     }
     delete user.profile_image;
@@ -308,13 +330,11 @@ export const updateProfile = async (req, res) => {
     });
   } catch (error) {
     console.error("Error updating profile:", error);
-    res.status(500).json({ status: "failed", message: "Internal Server Error" });
+    res
+      .status(500)
+      .json({ status: "failed", message: "Internal Server Error" });
   }
 };
-
-
-
-
 
 export const deleteUser = async (req, res) => {
   try {
@@ -343,6 +363,8 @@ export const deleteUser = async (req, res) => {
     });
   } catch (error) {
     console.error("Error deleting user:", error);
-    res.status(500).json({ status: "failed", message: "Internal Server Error" });
+    res
+      .status(500)
+      .json({ status: "failed", message: "Internal Server Error" });
   }
 };
