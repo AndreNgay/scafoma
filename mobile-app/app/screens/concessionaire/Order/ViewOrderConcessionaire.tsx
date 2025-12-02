@@ -1,23 +1,23 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useState } from "react";
 import {
-	View,
-	Text,
-	StyleSheet,
-	ActivityIndicator,
-	FlatList,
-	Image,
-	ScrollView,
-	TouchableOpacity,
-	Modal,
-	TextInput,
-	RefreshControl,
-} from 'react-native'
-import { useRoute, useNavigation } from '@react-navigation/native'
-import { Ionicons } from '@expo/vector-icons'
-import Checkbox from 'expo-checkbox'
-import api from '../../../libs/apiCall'
-import { useToast } from '../../../contexts/ToastContext'
-import ImagePreviewModal from '../../../components/ImagePreviewModal'
+  View,
+  Text,
+  StyleSheet,
+  ActivityIndicator,
+  FlatList,
+  Image,
+  ScrollView,
+  TouchableOpacity,
+  Modal,
+  TextInput,
+  RefreshControl,
+} from "react-native";
+import { useRoute, useNavigation } from "@react-navigation/native";
+import { Ionicons } from "@expo/vector-icons";
+import Checkbox from "expo-checkbox";
+import api from "../../../libs/apiCall";
+import { useToast } from "../../../contexts/ToastContext";
+import ImagePreviewModal from "../../../components/ImagePreviewModal";
 
 const ViewOrderConcessionaire = () => {
 	const route = useRoute<any>()
@@ -65,13 +65,13 @@ const ViewOrderConcessionaire = () => {
 			const month = months[dateObj.getMonth()];
 			const day = String(dateObj.getDate()).padStart(2, '0');
 			const year = dateObj.getFullYear();
-			
+
 			let hours = dateObj.getHours();
 			const minutes = String(dateObj.getMinutes()).padStart(2, '0');
 			const ampm = hours >= 12 ? 'PM' : 'AM';
 			hours = hours % 12;
 			hours = hours ? hours : 12; // 0 should be 12
-			
+
 			return `${month} ${day}, ${year}, ${hours}:${minutes} ${ampm}`;
 		} catch {
 			return String(value)
@@ -1483,474 +1483,474 @@ const ViewOrderConcessionaire = () => {
 }
 
 const styles = StyleSheet.create({
-	container: { flex: 1, backgroundColor: '#fff' },
-	contentContainer: { padding: 15, paddingBottom: 100 },
-	customerSection: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		backgroundColor: '#f9f9f9',
-		padding: 15,
-		borderRadius: 10,
-		marginBottom: 20,
-	},
-	customerAvatar: {
-		width: 60,
-		height: 60,
-		borderRadius: 30,
-	},
-	customerAvatarPlaceholder: {
-		width: 60,
-		height: 60,
-		borderRadius: 30,
-		backgroundColor: '#A40C2D',
-		alignItems: 'center',
-		justifyContent: 'center',
-	},
-	customerInitials: {
-		color: '#fff',
-		fontSize: 20,
-		fontWeight: 'bold',
-	},
-	customerInfo: {
-		flex: 1,
-		marginLeft: 15,
-	},
-	customerName: {
-		fontSize: 16,
-		fontWeight: '600',
-		color: '#333',
-		marginBottom: 4,
-	},
-	customerEmail: {
-		fontSize: 14,
-		color: '#666',
-	},
-	inlineIcon: {
-		marginRight: 6,
-	},
-	header: {
-		fontSize: 20,
-		fontWeight: 'bold',
-		marginBottom: 15,
-		color: '#A40C2D',
-	},
-	infoSection: {
-		flexDirection: 'row',
-		justifyContent: 'space-between',
-		alignItems: 'center',
-		paddingVertical: 8,
-		borderBottomWidth: 1,
-		borderBottomColor: '#f0f0f0',
-	},
-	infoLabel: { fontSize: 14, fontWeight: '600', color: '#333', flex: 1 },
-	infoValue: { fontSize: 14, color: '#666', flex: 1, textAlign: 'right' },
-	status: { fontWeight: '600', color: '#A40C2D' },
-	statusText: { textTransform: 'capitalize' },
-	scheduleTime: { color: '#28a745', fontWeight: '500' },
-	sectionHeader: {
-		fontSize: 16,
-		fontWeight: '600',
-		marginTop: 15,
-		marginBottom: 10,
-	},
-	itemCard: {
-		backgroundColor: '#f9f9f9',
-		padding: 10,
-		borderRadius: 8,
-		marginBottom: 8,
-	},
-	itemName: { fontWeight: '600' },
-	variation: { fontSize: 13, color: '#444' },
-	paymentProof: { marginTop: 5, width: '100%', height: 200, borderRadius: 10 },
-	emptyText: { textAlign: 'center', color: '#888', marginTop: 20 },
-	note: { fontSize: 13, color: '#555', fontStyle: 'italic', marginTop: 2 },
-	buttonRow: { flexDirection: 'row', marginTop: 15 },
-	acceptBtn: {
-		flex: 1,
-		backgroundColor: 'green',
-		padding: 10,
-		borderRadius: 8,
-		marginRight: 5,
-		alignItems: 'center',
-	},
-	declineBtn: {
-		flex: 1,
-		backgroundColor: 'red',
-		padding: 10,
-		borderRadius: 8,
-		marginLeft: 5,
-		alignItems: 'center',
-	},
-	readyBtn: {
-		flex: 1,
-		backgroundColor: 'orange',
-		padding: 10,
-		borderRadius: 8,
-		marginTop: 10,
-		alignItems: 'center',
-	},
-	completeBtn: {
-		flex: 1,
-		backgroundColor: '#A40C2D',
-		padding: 10,
-		borderRadius: 8,
-		marginTop: 10,
-		alignItems: 'center',
-	},
-	btnText: { color: '#fff', fontWeight: '600' },
-	declineReason: { color: '#dc3545', fontStyle: 'italic' },
-	modalOverlay: {
-		flex: 1,
-		backgroundColor: 'rgba(0, 0, 0, 0.5)',
-		justifyContent: 'center',
-		alignItems: 'center',
-	},
-	modalContainer: {
-		backgroundColor: '#fff',
-		borderRadius: 10,
-		padding: 20,
-		margin: 20,
-		maxHeight: '80%',
-		width: '90%',
-	},
-	modalHeader: {
-		fontSize: 18,
-		fontWeight: 'bold',
-		color: '#A40C2D',
-		marginBottom: 10,
-		textAlign: 'center',
-	},
-	modalSubtitle: {
-		fontSize: 14,
-		color: '#666',
-		marginBottom: 20,
-		textAlign: 'center',
-	},
-	reasonLabel: {
-		fontSize: 16,
-		fontWeight: '600',
-		marginTop: 15,
-		marginBottom: 10,
-		color: '#333',
-	},
-	reasonOption: {
-		padding: 12,
-		borderWidth: 1,
-		borderColor: '#ddd',
-		borderRadius: 8,
-		marginBottom: 8,
-		backgroundColor: '#f9f9f9',
-	},
-	selectedReason: {
-		backgroundColor: '#A40C2D',
-		borderColor: '#A40C2D',
-	},
-	reasonText: {
-		fontSize: 14,
-		color: '#333',
-	},
-	selectedReasonText: {
-		color: '#fff',
-		fontWeight: '600',
-	},
-	itemToggleContainer: {
-		marginTop: 15,
-		backgroundColor: '#f8f9fa',
-		padding: 12,
-		borderRadius: 8,
-		borderWidth: 1,
-		borderColor: '#e0e0e0',
-	},
-	itemToggleSubtext: {
-		fontSize: 12,
-		color: '#666',
-		marginBottom: 12,
-	},
-	itemToggleRow: {
-		flexDirection: 'row',
-		justifyContent: 'space-between',
-		alignItems: 'center',
-		paddingVertical: 10,
-		borderBottomWidth: 1,
-		borderBottomColor: '#e8e8e8',
-	},
-	itemToggleName: {
-		fontSize: 14,
-		fontWeight: '500',
-		color: '#333',
-		flex: 1,
-	},
-	toggleButton: {
-		paddingHorizontal: 12,
-		paddingVertical: 8,
-		borderRadius: 6,
-		backgroundColor: '#fff',
-		borderWidth: 1,
-		borderColor: '#ddd',
-	},
-	toggleButtonActive: {
-		backgroundColor: '#dc3545',
-		borderColor: '#dc3545',
-	},
-	toggleButtonText: {
-		fontSize: 12,
-		fontWeight: '600',
-		color: '#333',
-	},
-	toggleButtonTextActive: {
-		color: '#fff',
-	},
-	checkbox: {
-		width: 20,
-		height: 20,
-		marginRight: 10,
-	},
-	customReasonContainer: {
-		marginTop: 10,
-	},
-	customReasonInput: {
-		borderWidth: 1,
-		borderColor: '#ddd',
-		borderRadius: 8,
-		padding: 12,
-		fontSize: 14,
-		backgroundColor: '#fff',
-		textAlignVertical: 'top',
-	},
-	modalButtonRow: {
-		flexDirection: 'row',
-		marginTop: 20,
-		gap: 10,
-	},
-	cancelModalBtn: {
-		flex: 1,
-		backgroundColor: '#ccc',
-		padding: 12,
-		borderRadius: 8,
-		alignItems: 'center',
-	},
-	cancelModalText: {
-		color: '#fff',
-		fontWeight: '600',
-	},
-	submitDeclineBtn: {
-		flex: 1,
-		backgroundColor: '#dc3545',
-		padding: 12,
-		borderRadius: 8,
-		alignItems: 'center',
-	},
-	submitDeclineText: {
-		color: '#fff',
-		fontWeight: '600',
-	},
-	sectionCard: {
-		backgroundColor: '#fff',
-		borderRadius: 12,
-		padding: 16,
-		marginVertical: 8,
-		shadowColor: '#000',
-		shadowOffset: {
-			width: 0,
-			height: 2,
-		},
-		shadowOpacity: 0.1,
-		shadowRadius: 3.84,
-		elevation: 5,
-	},
-	sectionTitle: {
-		fontSize: 16,
-		fontWeight: '600',
-		color: '#A40C2D',
-		marginBottom: 12,
-	},
-	fullImageContainer: {
-		flex: 1,
-		justifyContent: 'center',
-		alignItems: 'center',
-		padding: 10,
-	},
-	fullPaymentProof: {
-		width: '100%',
-		height: '80%',
-		borderRadius: 10,
-		backgroundColor: '#000',
-	},
-	updatedPrice: {
-		fontWeight: '600',
-		color: '#28a745',
-	},
-	totalPrice: {
-		fontWeight: '600',
-		color: '#A40C2D',
-	},
-	paymentProofSection: {
-		marginTop: 12,
-	},
-	declineCard: {
-		borderLeftWidth: 4,
-		borderLeftColor: '#dc3545',
-		backgroundColor: '#fff5f5',
-	},
-	gcashSection: {
-		marginTop: 12,
-		paddingTop: 12,
-		borderTopWidth: 1,
-		borderTopColor: '#f0f0f0',
-	},
-	paymentMethodDisplay: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		flex: 1,
-		justifyContent: 'flex-end',
-	},
-	timerCard: {
-		backgroundColor: '#e8f5e9',
-		borderRadius: 8,
-		padding: 12,
-		marginBottom: 12,
-		borderWidth: 2,
-		borderColor: '#28a745',
-	},
-	timerCardExpired: {
-		backgroundColor: '#ffebee',
-		borderColor: '#dc3545',
-	},
-	timerHeader: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		marginBottom: 8,
-		gap: 8,
-	},
-	timerTitle: {
-		fontSize: 14,
-		fontWeight: '700',
-		color: '#28a745',
-	},
-	timerTitleExpired: {
-		color: '#dc3545',
-	},
-	timerCountdown: {
-		fontSize: 28,
-		fontWeight: '900',
-		color: '#28a745',
-		textAlign: 'center',
-		marginVertical: 8,
-	},
-	timerCountdownExpired: {
-		color: '#dc3545',
-	},
-	timerInstructions: {
-		fontSize: 11,
-		color: '#666',
-		textAlign: 'center',
-		marginTop: 4,
-	},
-	timerExpiredMessage: {
-		fontSize: 11,
-		color: '#dc3545',
-		textAlign: 'center',
-		marginTop: 4,
-		fontWeight: '600',
-	},
-	rejectReceiptBtn: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		justifyContent: 'center',
-		backgroundColor: '#dc3545',
-		padding: 12,
-		borderRadius: 8,
-		marginTop: 12,
-	},
-	rejectReceiptBtnDisabled: {
-		opacity: 0.6,
-	},
-	rejectReceiptText: {
-		color: '#fff',
-		fontSize: 14,
-		fontWeight: '600',
-	},
-	noReceiptContainer: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		justifyContent: 'center',
-		backgroundColor: '#fff8e1',
-		padding: 16,
-		borderRadius: 8,
-		borderWidth: 1,
-		borderColor: '#ff9800',
-		gap: 10,
-	},
-	noReceiptText: {
-		fontSize: 14,
-		color: '#ff9800',
-		fontWeight: '600',
-	},
-	paymentExpiryText: {
-		marginTop: 4,
-		fontSize: 12,
-		color: '#555',
-	},
-	expiredTimerContainer: {
-		marginTop: 15,
-		padding: 12,
-		backgroundColor: '#ffebee',
-		borderRadius: 8,
-		borderWidth: 2,
-		borderColor: '#dc3545',
-	},
-	expiredTimerMessage: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		marginBottom: 12,
-	},
-	expiredTimerText: {
-		fontSize: 14,
-		fontWeight: '600',
-		color: '#dc3545',
-		flex: 1,
-	},
-	rejectButtonsContainer: {
-		flexDirection: 'column',
-		gap: 8,
-		marginTop: 12,
-	},
-	rejectScreenshotBtn: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		justifyContent: 'center',
-		backgroundColor: '#ff6b35',
-		padding: 12,
-		borderRadius: 8,
-	},
-	rejectScreenshotBtnDisabled: {
-		opacity: 0.6,
-	},
-	toggleContainer: {
-		marginTop: 20,
-		padding: 15,
-		backgroundColor: '#f8f9fa',
-		borderRadius: 8,
-		borderWidth: 1,
-		borderColor: '#e0e0e0',
-	},
-	toggleLabel: {
-		fontSize: 16,
-		fontWeight: '600',
-		marginBottom: 8,
-		color: '#333',
-	},
-	toggleRow: {
-		flexDirection: 'row',
-		justifyContent: 'space-between',
-		alignItems: 'center',
-	},
-	toggleDescription: {
-		fontSize: 14,
-		color: '#666',
-		flex: 1,
-		marginRight: 15,
-	},
-})
+  container: { flex: 1, backgroundColor: "#fff" },
+  contentContainer: { padding: 15, paddingBottom: 100 },
+  customerSection: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#f9f9f9",
+    padding: 15,
+    borderRadius: 10,
+    marginBottom: 20,
+  },
+  customerAvatar: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+  },
+  customerAvatarPlaceholder: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: "#A40C2D",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  customerInitials: {
+    color: "#fff",
+    fontSize: 20,
+    fontWeight: "bold",
+  },
+  customerInfo: {
+    flex: 1,
+    marginLeft: 15,
+  },
+  customerName: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#333",
+    marginBottom: 4,
+  },
+  customerEmail: {
+    fontSize: 14,
+    color: "#666",
+  },
+  inlineIcon: {
+    marginRight: 6,
+  },
+  header: {
+    fontSize: 20,
+    fontWeight: "bold",
+    marginBottom: 15,
+    color: "#A40C2D",
+  },
+  infoSection: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: "#f0f0f0",
+  },
+  infoLabel: { fontSize: 14, fontWeight: "600", color: "#333", flex: 1 },
+  infoValue: { fontSize: 14, color: "#666", flex: 1, textAlign: "right" },
+  status: { fontWeight: "600", color: "#A40C2D" },
+  statusText: { textTransform: "capitalize" },
+  scheduleTime: { color: "#28a745", fontWeight: "500" },
+  sectionHeader: {
+    fontSize: 16,
+    fontWeight: "600",
+    marginTop: 15,
+    marginBottom: 10,
+  },
+  itemCard: {
+    backgroundColor: "#f9f9f9",
+    padding: 10,
+    borderRadius: 8,
+    marginBottom: 8,
+  },
+  itemName: { fontWeight: "600" },
+  variation: { fontSize: 13, color: "#444" },
+  paymentProof: { marginTop: 5, width: "100%", height: 200, borderRadius: 10 },
+  emptyText: { textAlign: "center", color: "#888", marginTop: 20 },
+  note: { fontSize: 13, color: "#555", fontStyle: "italic", marginTop: 2 },
+  buttonRow: { flexDirection: "row", marginTop: 15 },
+  acceptBtn: {
+    flex: 1,
+    backgroundColor: "green",
+    padding: 10,
+    borderRadius: 8,
+    marginRight: 5,
+    alignItems: "center",
+  },
+  declineBtn: {
+    flex: 1,
+    backgroundColor: "red",
+    padding: 10,
+    borderRadius: 8,
+    marginLeft: 5,
+    alignItems: "center",
+  },
+  readyBtn: {
+    flex: 1,
+    backgroundColor: "orange",
+    padding: 10,
+    borderRadius: 8,
+    marginTop: 10,
+    alignItems: "center",
+  },
+  completeBtn: {
+    flex: 1,
+    backgroundColor: "#A40C2D",
+    padding: 10,
+    borderRadius: 8,
+    marginTop: 10,
+    alignItems: "center",
+  },
+  btnText: { color: "#fff", fontWeight: "600" },
+  declineReason: { color: "#dc3545", fontStyle: "italic" },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  modalContainer: {
+    backgroundColor: "#fff",
+    borderRadius: 10,
+    padding: 20,
+    margin: 20,
+    maxHeight: "80%",
+    width: "90%",
+  },
+  modalHeader: {
+    fontSize: 18,
+    fontWeight: "bold",
+    color: "#A40C2D",
+    marginBottom: 10,
+    textAlign: "center",
+  },
+  modalSubtitle: {
+    fontSize: 14,
+    color: "#666",
+    marginBottom: 20,
+    textAlign: "center",
+  },
+  reasonLabel: {
+    fontSize: 16,
+    fontWeight: "600",
+    marginTop: 15,
+    marginBottom: 10,
+    color: "#333",
+  },
+  reasonOption: {
+    padding: 12,
+    borderWidth: 1,
+    borderColor: "#ddd",
+    borderRadius: 8,
+    marginBottom: 8,
+    backgroundColor: "#f9f9f9",
+  },
+  selectedReason: {
+    backgroundColor: "#A40C2D",
+    borderColor: "#A40C2D",
+  },
+  reasonText: {
+    fontSize: 14,
+    color: "#333",
+  },
+  selectedReasonText: {
+    color: "#fff",
+    fontWeight: "600",
+  },
+  itemToggleContainer: {
+    marginTop: 15,
+    backgroundColor: "#f8f9fa",
+    padding: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "#e0e0e0",
+  },
+  itemToggleSubtext: {
+    fontSize: 12,
+    color: "#666",
+    marginBottom: 12,
+  },
+  itemToggleRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: "#e8e8e8",
+  },
+  itemToggleName: {
+    fontSize: 14,
+    fontWeight: "500",
+    color: "#333",
+    flex: 1,
+  },
+  toggleButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 6,
+    backgroundColor: "#fff",
+    borderWidth: 1,
+    borderColor: "#ddd",
+  },
+  toggleButtonActive: {
+    backgroundColor: "#dc3545",
+    borderColor: "#dc3545",
+  },
+  toggleButtonText: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: "#333",
+  },
+  toggleButtonTextActive: {
+    color: "#fff",
+  },
+  checkbox: {
+    width: 20,
+    height: 20,
+    marginRight: 10,
+  },
+  customReasonContainer: {
+    marginTop: 10,
+  },
+  customReasonInput: {
+    borderWidth: 1,
+    borderColor: "#ddd",
+    borderRadius: 8,
+    padding: 12,
+    fontSize: 14,
+    backgroundColor: "#fff",
+    textAlignVertical: "top",
+  },
+  modalButtonRow: {
+    flexDirection: "row",
+    marginTop: 20,
+    gap: 10,
+  },
+  cancelModalBtn: {
+    flex: 1,
+    backgroundColor: "#ccc",
+    padding: 12,
+    borderRadius: 8,
+    alignItems: "center",
+  },
+  cancelModalText: {
+    color: "#fff",
+    fontWeight: "600",
+  },
+  submitDeclineBtn: {
+    flex: 1,
+    backgroundColor: "#dc3545",
+    padding: 12,
+    borderRadius: 8,
+    alignItems: "center",
+  },
+  submitDeclineText: {
+    color: "#fff",
+    fontWeight: "600",
+  },
+  sectionCard: {
+    backgroundColor: "#fff",
+    borderRadius: 12,
+    padding: 16,
+    marginVertical: 8,
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 3.84,
+    elevation: 5,
+  },
+  sectionTitle: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#A40C2D",
+    marginBottom: 12,
+  },
+  fullImageContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 10,
+  },
+  fullPaymentProof: {
+    width: "100%",
+    height: "80%",
+    borderRadius: 10,
+    backgroundColor: "#000",
+  },
+  updatedPrice: {
+    fontWeight: "600",
+    color: "#28a745",
+  },
+  totalPrice: {
+    fontWeight: "600",
+    color: "#A40C2D",
+  },
+  paymentProofSection: {
+    marginTop: 12,
+  },
+  declineCard: {
+    borderLeftWidth: 4,
+    borderLeftColor: "#dc3545",
+    backgroundColor: "#fff5f5",
+  },
+  gcashSection: {
+    marginTop: 12,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: "#f0f0f0",
+  },
+  paymentMethodDisplay: {
+    flexDirection: "row",
+    alignItems: "center",
+    flex: 1,
+    justifyContent: "flex-end",
+  },
+  timerCard: {
+    backgroundColor: "#e8f5e9",
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 12,
+    borderWidth: 2,
+    borderColor: "#28a745",
+  },
+  timerCardExpired: {
+    backgroundColor: "#ffebee",
+    borderColor: "#dc3545",
+  },
+  timerHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 8,
+    gap: 8,
+  },
+  timerTitle: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: "#28a745",
+  },
+  timerTitleExpired: {
+    color: "#dc3545",
+  },
+  timerCountdown: {
+    fontSize: 28,
+    fontWeight: "900",
+    color: "#28a745",
+    textAlign: "center",
+    marginVertical: 8,
+  },
+  timerCountdownExpired: {
+    color: "#dc3545",
+  },
+  timerInstructions: {
+    fontSize: 11,
+    color: "#666",
+    textAlign: "center",
+    marginTop: 4,
+  },
+  timerExpiredMessage: {
+    fontSize: 11,
+    color: "#dc3545",
+    textAlign: "center",
+    marginTop: 4,
+    fontWeight: "600",
+  },
+  rejectReceiptBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#dc3545",
+    padding: 12,
+    borderRadius: 8,
+    marginTop: 12,
+  },
+  rejectReceiptBtnDisabled: {
+    opacity: 0.6,
+  },
+  rejectReceiptText: {
+    color: "#fff",
+    fontSize: 14,
+    fontWeight: "600",
+  },
+  noReceiptContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#fff8e1",
+    padding: 16,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "#ff9800",
+    gap: 10,
+  },
+  noReceiptText: {
+    fontSize: 14,
+    color: "#ff9800",
+    fontWeight: "600",
+  },
+  paymentExpiryText: {
+    marginTop: 4,
+    fontSize: 12,
+    color: "#555",
+  },
+  expiredTimerContainer: {
+    marginTop: 15,
+    padding: 12,
+    backgroundColor: "#ffebee",
+    borderRadius: 8,
+    borderWidth: 2,
+    borderColor: "#dc3545",
+  },
+  expiredTimerMessage: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 12,
+  },
+  expiredTimerText: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#dc3545",
+    flex: 1,
+  },
+  rejectButtonsContainer: {
+    flexDirection: "column",
+    gap: 8,
+    marginTop: 12,
+  },
+  rejectScreenshotBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#ff6b35",
+    padding: 12,
+    borderRadius: 8,
+  },
+  rejectScreenshotBtnDisabled: {
+    opacity: 0.6,
+  },
+  toggleContainer: {
+    marginTop: 20,
+    padding: 15,
+    backgroundColor: "#f8f9fa",
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "#e0e0e0",
+  },
+  toggleLabel: {
+    fontSize: 16,
+    fontWeight: "600",
+    marginBottom: 8,
+    color: "#333",
+  },
+  toggleRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  toggleDescription: {
+    fontSize: 14,
+    color: "#666",
+    flex: 1,
+    marginRight: 15,
+  },
+});
 
-export default ViewOrderConcessionaire
+export default ViewOrderConcessionaire;

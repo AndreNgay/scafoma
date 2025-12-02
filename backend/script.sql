@@ -31,6 +31,20 @@ CREATE TABLE IF NOT EXISTS public.tblconcession
     CONSTRAINT tblconcession_pkey PRIMARY KEY (id)
 );
 
+CREATE TABLE IF NOT EXISTS public.tblemailverification
+(
+    id serial NOT NULL,
+    email character varying(100) COLLATE pg_catalog."default" NOT NULL,
+    otp_code character varying(6) COLLATE pg_catalog."default",
+    verification_token character varying(64) COLLATE pg_catalog."default",
+    verification_type character varying(20) COLLATE pg_catalog."default" NOT NULL DEFAULT 'email_verification'::character varying,
+    expires_at timestamp without time zone NOT NULL,
+    used boolean DEFAULT false,
+    created_at timestamp without time zone DEFAULT (CURRENT_TIMESTAMP AT TIME ZONE 'UTC'::text),
+    updated_at timestamp without time zone DEFAULT (CURRENT_TIMESTAMP AT TIME ZONE 'UTC'::text),
+    CONSTRAINT tblemailverification_pkey PRIMARY KEY (id)
+);
+
 CREATE TABLE IF NOT EXISTS public.tblfeedback
 (
     id serial NOT NULL,
@@ -81,9 +95,9 @@ CREATE TABLE IF NOT EXISTS public.tblmenuitem
     image bytea,
     category character varying(100) COLLATE pg_catalog."default",
     available boolean DEFAULT false,
-    take_out_additional_fee numeric(10, 2) DEFAULT 0,
     created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
     updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
+    take_out_additional_fee numeric(10, 2) DEFAULT 0,
     CONSTRAINT tblmenuitem_pkey PRIMARY KEY (id)
 );
 
@@ -121,6 +135,10 @@ CREATE TABLE IF NOT EXISTS public.tblorder
     payment_rejected_reason text COLLATE pg_catalog."default",
     accepted_at timestamp without time zone DEFAULT (CURRENT_TIMESTAMP AT TIME ZONE 'UTC'::text),
     payment_receipt_expires_at timestamp without time zone DEFAULT (CURRENT_TIMESTAMP AT TIME ZONE 'UTC'::text),
+    reopening_requested boolean DEFAULT false,
+    reopened_at timestamp without time zone,
+    original_decline_reason text COLLATE pg_catalog."default",
+    reopening_count integer DEFAULT 0,
     CONSTRAINT tblorder_pkey PRIMARY KEY (id)
 );
 
@@ -150,6 +168,37 @@ CREATE TABLE IF NOT EXISTS public.tblorderitemvariation
     CONSTRAINT tblorderitemvariation_pkey PRIMARY KEY (id)
 );
 
+CREATE TABLE IF NOT EXISTS public.tblorderreopeningrequest
+(
+    id serial NOT NULL,
+    order_id integer NOT NULL,
+    customer_id integer NOT NULL,
+    concessionaire_id integer NOT NULL,
+    request_message text COLLATE pg_catalog."default" NOT NULL,
+    request_type character varying(50) COLLATE pg_catalog."default" NOT NULL DEFAULT 'custom'::character varying,
+    status character varying(20) COLLATE pg_catalog."default" NOT NULL DEFAULT 'pending'::character varying,
+    response_message text COLLATE pg_catalog."default",
+    response_type character varying(50) COLLATE pg_catalog."default",
+    requested_at timestamp without time zone DEFAULT (CURRENT_TIMESTAMP AT TIME ZONE 'UTC'::text),
+    responded_at timestamp without time zone,
+    created_at timestamp without time zone DEFAULT (CURRENT_TIMESTAMP AT TIME ZONE 'UTC'::text),
+    updated_at timestamp without time zone DEFAULT (CURRENT_TIMESTAMP AT TIME ZONE 'UTC'::text),
+    CONSTRAINT tblorderreopeningrequest_pkey PRIMARY KEY (id)
+);
+
+CREATE TABLE IF NOT EXISTS public.tblreopeningrequestmessages
+(
+    id serial NOT NULL,
+    message_type character varying(50) COLLATE pg_catalog."default" NOT NULL,
+    category character varying(50) COLLATE pg_catalog."default" NOT NULL,
+    title character varying(100) COLLATE pg_catalog."default" NOT NULL,
+    message_text text COLLATE pg_catalog."default" NOT NULL,
+    is_active boolean DEFAULT true,
+    sort_order integer DEFAULT 0,
+    created_at timestamp without time zone DEFAULT (CURRENT_TIMESTAMP AT TIME ZONE 'UTC'::text),
+    CONSTRAINT tblreopeningrequestmessages_pkey PRIMARY KEY (id)
+);
+
 CREATE TABLE IF NOT EXISTS public.tbluser
 (
     id serial NOT NULL,
@@ -165,6 +214,12 @@ CREATE TABLE IF NOT EXISTS public.tbluser
     updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
     contact_number character varying(11) COLLATE pg_catalog."default",
     messenger_link character varying(255) COLLATE pg_catalog."default",
+    last_password_reset timestamp without time zone,
+    password_reset_count integer DEFAULT 0,
+    account_locked boolean DEFAULT false,
+    locked_until timestamp without time zone,
+    login_attempts integer DEFAULT 0,
+    last_login timestamp without time zone,
     CONSTRAINT tbluser_pkey PRIMARY KEY (id),
     CONSTRAINT tbluser_email_key UNIQUE (email)
 );
@@ -279,5 +334,32 @@ ALTER TABLE IF EXISTS public.tblorderitemvariation
     REFERENCES public.tblorderdetail (id) MATCH SIMPLE
     ON UPDATE CASCADE
     ON DELETE CASCADE;
+
+
+ALTER TABLE IF EXISTS public.tblorderreopeningrequest
+    ADD CONSTRAINT tblorderreopeningrequest_concessionaire_id_fkey FOREIGN KEY (concessionaire_id)
+    REFERENCES public.tbluser (id) MATCH SIMPLE
+    ON UPDATE NO ACTION
+    ON DELETE CASCADE;
+CREATE INDEX IF NOT EXISTS idx_reopening_request_concessionaire_id
+    ON public.tblorderreopeningrequest(concessionaire_id);
+
+
+ALTER TABLE IF EXISTS public.tblorderreopeningrequest
+    ADD CONSTRAINT tblorderreopeningrequest_customer_id_fkey FOREIGN KEY (customer_id)
+    REFERENCES public.tbluser (id) MATCH SIMPLE
+    ON UPDATE NO ACTION
+    ON DELETE CASCADE;
+CREATE INDEX IF NOT EXISTS idx_reopening_request_customer_id
+    ON public.tblorderreopeningrequest(customer_id);
+
+
+ALTER TABLE IF EXISTS public.tblorderreopeningrequest
+    ADD CONSTRAINT tblorderreopeningrequest_order_id_fkey FOREIGN KEY (order_id)
+    REFERENCES public.tblorder (id) MATCH SIMPLE
+    ON UPDATE NO ACTION
+    ON DELETE CASCADE;
+CREATE INDEX IF NOT EXISTS idx_reopening_request_order_id
+    ON public.tblorderreopeningrequest(order_id);
 
 END;

@@ -23,10 +23,10 @@ router.use('/user', userRoutes);
 router.use('/order', orderRoutes);
 router.use('/order-detail', orderDetailRoutes);
 router.use('/order-item-variation', orderItemVariationRoutes);
-router.use('/cafeteria', cafeteriaRoutes); 
-router.use('/concession', concessionRoutes); 
-router.use('/menu-item', menuItemRoutes); 
-router.use('/concessionaire', concessionaireRoutes); 
+router.use('/cafeteria', cafeteriaRoutes);
+router.use('/concession', concessionRoutes);
+router.use('/menu-item', menuItemRoutes);
+router.use('/concessionaire', concessionaireRoutes);
 router.use('/item-variation', itemVariationRoutes);
 router.use('/item-variation-group', itemVariationGroupRoutes);
 router.use('/feedback', feedbackRoutes);
@@ -35,6 +35,6 @@ router.use('/notification', notificationRoutes);
 router.use('/concessionaire-analytics', concessionaireAnalyticsRoutes);
 
 // Dashboard
-router.use('/dashboard', dashboardRoutes);
+router.use("/dashboard", dashboardRoutes);
 
 export default router;

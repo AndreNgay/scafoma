@@ -1199,13 +1199,18 @@ export const addOrder = async (req, res) => {
       }
     }
 
+    // Check if there's already an existing cart order for this customer and concession
     if (in_cart) {
       const existing = await pool.query(
         `SELECT * FROM tblorder WHERE customer_id=$1 AND concession_id=$2 AND in_cart=TRUE LIMIT 1`,
         [customer_id, concession_id],
       );
-      if (existing.rows.length > 0)
+      if (existing.rows.length > 0) {
+        console.log(
+          `Returning existing cart order ${existing.rows[0].id} for customer ${customer_id}`,
+        );
         return res.status(200).json(existing.rows[0]);
+      }
     }
 
     const initialStatus = status || "pending";
@@ -1243,7 +1248,7 @@ export const addOrder = async (req, res) => {
         concession_id,
         initialStatus,
         total_price,
-        in_cart ?? false,
+        in_cart || false,
         payment_method,
       ];
     } else {
@@ -1267,13 +1272,21 @@ export const addOrder = async (req, res) => {
         concession_id,
         initialStatus,
         total_price,
-        in_cart ?? false,
+        in_cart || false,
         payment_method,
       ];
     }
 
     const result = await pool.query(query, params);
-    res.status(201).json(result.rows[0]);
+    const newOrder = result.rows[0];
+
+    if (in_cart) {
+      console.log(
+        `Created new cart order ${newOrder.id} for customer ${customer_id} at concession ${concession_id}`,
+      );
+    }
+
+    res.status(201).json(newOrder);
   } catch (err) {
     console.error("Error adding order:", err);
     res.status(500).json({ error: "Failed to add order" });
@@ -1404,23 +1417,34 @@ export const cleanupInvalidCartItems = async (customerId) => {
 export const getCartByCustomerId = async (req, res) => {
   const { id } = req.params; // customer_id
   try {
+    console.log(`Fetching cart for customer ${id}`);
+
     // First, clean up any invalid cart items
-    await cleanupInvalidCartItems(id);
+    const cleanedCount = await cleanupInvalidCartItems(id);
+    if (cleanedCount > 0) {
+      console.log(
+        `Cleaned up ${cleanedCount} invalid cart items for customer ${id}`,
+      );
+    }
 
     const query = `
       SELECT o.id AS order_id,
              o.total_price,
+             o.created_at,
              od.dining_option,
              od.id AS order_detail_id,
              od.quantity,
              od.total_price AS order_detail_total,
+             od.note,
              m.item_name,
              m.price AS base_price,
+             m.image_url,
              c.concession_name,
              caf.cafeteria_name,
              m.available,
              c.status as concession_status,
-             ARRAY_AGG(iv.variation_name) FILTER (WHERE iv.id IS NOT NULL) AS variations
+             ARRAY_AGG(DISTINCT iv.variation_name) FILTER (WHERE iv.id IS NOT NULL) AS variations,
+             ARRAY_AGG(DISTINCT iv.additional_price) FILTER (WHERE iv.id IS NOT NULL) AS variation_prices
       FROM tblorder o
       JOIN tblorderdetail od ON o.id = od.order_id
       JOIN tblmenuitem m ON od.item_id = m.id
@@ -1431,10 +1455,12 @@ export const getCartByCustomerId = async (req, res) => {
       WHERE o.customer_id = $1 AND o.in_cart = TRUE
         AND m.available = TRUE
         AND c.status = 'open'
-      GROUP BY o.id, od.id, m.item_name, m.price, c.concession_name, caf.cafeteria_name, od.dining_option, m.available, c.status
-      ORDER BY o.created_at DESC;
+      GROUP BY o.id, od.id, m.item_name, m.price, m.image_url, c.concession_name, caf.cafeteria_name, od.dining_option, od.note, m.available, c.status
+      ORDER BY o.created_at DESC, od.id ASC;
     `;
     const result = await pool.query(query, [id]);
+
+    console.log(`Found ${result.rows.length} cart items for customer ${id}`);
     res.json(result.rows);
   } catch (err) {
     console.error("Error fetching cart:", err);
@@ -1450,6 +1476,8 @@ export const checkoutCart = async (req, res) => {
   const { schedule_time } = req.body; // optional schedule_time from request body
 
   try {
+    console.log(`Starting cart checkout for customer ${id}`);
+
     // First, clean up any invalid cart items before checkout
     const cleanedCount = await cleanupInvalidCartItems(id);
 
@@ -1484,6 +1512,10 @@ export const checkoutCart = async (req, res) => {
 
     const params = schedule_time ? [id, schedule_time] : [id];
     const result = await pool.query(updateQuery, params);
+
+    console.log(
+      `Successfully checked out ${result.rows.length} cart orders for customer ${id}`,
+    );
 
     // Create notifications for concessionaires for each order
     console.log(`📦 Creating notifications for ${result.rows.length} orders`);
