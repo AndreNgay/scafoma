@@ -186,19 +186,6 @@ CREATE TABLE IF NOT EXISTS public.tblorderreopeningrequest
     CONSTRAINT tblorderreopeningrequest_pkey PRIMARY KEY (id)
 );
 
-CREATE TABLE IF NOT EXISTS public.tblreopeningrequestmessages
-(
-    id serial NOT NULL,
-    message_type character varying(50) COLLATE pg_catalog."default" NOT NULL,
-    category character varying(50) COLLATE pg_catalog."default" NOT NULL,
-    title character varying(100) COLLATE pg_catalog."default" NOT NULL,
-    message_text text COLLATE pg_catalog."default" NOT NULL,
-    is_active boolean DEFAULT true,
-    sort_order integer DEFAULT 0,
-    created_at timestamp without time zone DEFAULT (CURRENT_TIMESTAMP AT TIME ZONE 'UTC'::text),
-    CONSTRAINT tblreopeningrequestmessages_pkey PRIMARY KEY (id)
-);
-
 CREATE TABLE IF NOT EXISTS public.tbluser
 (
     id serial NOT NULL,
