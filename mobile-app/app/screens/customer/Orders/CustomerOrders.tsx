@@ -325,33 +325,75 @@ const CustomerOrders = () => {
     let timeRemaining: string | null = null;
     let isExpired = false;
 
+    // First try backend expiry timestamp, then fall back to local calculation
     if (
       item.payment_method === "gcash" &&
       item.order_status === "accepted" &&
-      item.accepted_at &&
-      item.receipt_timer
+      !item.gcash_screenshot
     ) {
       try {
-        const acceptedDate = new Date(item.accepted_at.replace(" ", "T") + "Z");
-        const [hours, minutes, seconds] = item.receipt_timer
-          .split(":")
-          .map(Number);
-        const deadlineMs =
-          acceptedDate.getTime() +
-          (hours * 3600 + minutes * 60 + seconds) * 1000;
-        const remainingMs = deadlineMs - currentTime;
+        let deadlineMs: number | null = null;
 
-        if (remainingMs <= 0) {
-          isExpired = true;
-          timeRemaining = "Expired";
-        } else {
-          isExpired = false;
-          const remainingMinutes = Math.floor(remainingMs / 60000);
-          const remainingSeconds = Math.floor((remainingMs % 60000) / 1000);
-          timeRemaining = `${remainingMinutes}:${remainingSeconds.toString().padStart(2, "0")}`;
+        // Prefer backend's expiry timestamp if available
+        if (item.payment_receipt_expires_at) {
+          let s = item.payment_receipt_expires_at.trim();
+          if (!/[zZ]|[+-]\d{2}:?\d{2}$/.test(s)) {
+            s = s.replace(" ", "T") + "Z";
+          }
+          const expiresDate = new Date(s);
+          if (!Number.isNaN(expiresDate.getTime())) {
+            deadlineMs = expiresDate.getTime();
+          }
+        }
+
+        // Fallback to local calculation if backend expiry not available
+        if (!deadlineMs && item.accepted_at && item.receipt_timer) {
+          let s = item.accepted_at.trim();
+          if (!/[zZ]|[+-]\d{2}:?\d{2}$/.test(s)) {
+            s = s.replace(" ", "T") + "Z";
+          }
+          const acceptedDate = new Date(s);
+          
+          if (!Number.isNaN(acceptedDate.getTime())) {
+            const timerParts = item.receipt_timer.split(":");
+            if (timerParts.length === 3) {
+              const hours = Number(timerParts[0]) || 0;
+              const minutes = Number(timerParts[1]) || 0;
+              const seconds = Number(timerParts[2]) || 0;
+              
+              if (!Number.isNaN(hours) && !Number.isNaN(minutes) && !Number.isNaN(seconds)) {
+                deadlineMs = acceptedDate.getTime() + (hours * 3600 + minutes * 60 + seconds) * 1000;
+              }
+            }
+          }
+        }
+
+        // Calculate remaining time if we have a valid deadline
+        if (deadlineMs && !Number.isNaN(deadlineMs)) {
+          const remainingMs = deadlineMs - currentTime;
+
+          if (remainingMs <= 0) {
+            isExpired = true;
+            timeRemaining = "Expired";
+          } else {
+            isExpired = false;
+            const totalSeconds = Math.floor(remainingMs / 1000);
+            const hours = Math.floor(totalSeconds / 3600);
+            const minutes = Math.floor((totalSeconds % 3600) / 60);
+            const seconds = totalSeconds % 60;
+            
+            // Format as HH:MM:SS if hours > 0, otherwise MM:SS
+            if (hours > 0) {
+              timeRemaining = `${hours.toString().padStart(2, "0")}:${minutes.toString().padStart(2, "0")}:${seconds.toString().padStart(2, "0")}`;
+            } else {
+              timeRemaining = `${minutes.toString().padStart(2, "0")}:${seconds.toString().padStart(2, "0")}`;
+            }
+          }
         }
       } catch (e) {
         console.error("Error calculating timer:", e);
+        // Don't show timer if there's an error
+        timeRemaining = null;
       }
     }
 

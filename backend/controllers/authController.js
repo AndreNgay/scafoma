@@ -3,7 +3,10 @@ import { comparePassword, createJWT, hashPassword } from "../libs/index.js";
 
 export const signupUser = async (req, res) => {
   try {
-    const { first_name, last_name, email, password } = req.body;
+    const { first_name, last_name, email, password, contact_number, phone, messenger_link } = req.body;
+    
+    // Handle both 'phone' (from mobile app) and 'contact_number' field names
+    const phoneNumber = contact_number || phone;
 
     if (!first_name || !last_name || !email || !password) {
       return res.status(400).json({
@@ -29,11 +32,11 @@ export const signupUser = async (req, res) => {
 
     const user = await pool.query({
       text: `
-        INSERT INTO tbluser (email, first_name, last_name, password) 
-        VALUES ($1, $2, $3, $4) 
+        INSERT INTO tbluser (email, first_name, last_name, password, contact_number, messenger_link) 
+        VALUES ($1, $2, $3, $4, $5, $6) 
         RETURNING *
       `,
-      values: [email, first_name, last_name, hashedPassword]
+      values: [email, first_name, last_name, hashedPassword, phoneNumber || null, messenger_link || null]
     });
 
     user.rows[0].password = undefined;

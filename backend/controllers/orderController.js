@@ -1438,7 +1438,7 @@ export const getCartByCustomerId = async (req, res) => {
              od.note,
              m.item_name,
              m.price AS base_price,
-             m.image_url,
+             m.image,
              c.concession_name,
              caf.cafeteria_name,
              m.available,
@@ -1455,7 +1455,7 @@ export const getCartByCustomerId = async (req, res) => {
       WHERE o.customer_id = $1 AND o.in_cart = TRUE
         AND m.available = TRUE
         AND c.status = 'open'
-      GROUP BY o.id, od.id, m.item_name, m.price, m.image_url, c.concession_name, caf.cafeteria_name, od.dining_option, od.note, m.available, c.status
+      GROUP BY o.id, od.id, m.item_name, m.price, m.image, c.concession_name, caf.cafeteria_name, od.dining_option, od.note, m.available, c.status
       ORDER BY o.created_at DESC, od.id ASC;
     `;
     const result = await pool.query(query, [id]);

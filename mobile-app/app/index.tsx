@@ -15,7 +15,6 @@ import Profile from "./screens/Profile";
 import EditMenu from "./screens/concessionaire/Menu/EditMenu";
 import Concession from "./screens/concessionaire/Concession/Concession";
 import MenuItems from "./screens/customer/MenuItems/MenuItems";
-import FullConcessionMenu from "./screens/customer/MenuItems/FullConcessionMenu";
 import MenuItemDetails from "./screens/customer/MenuItems/MenuItemDetails";
 import ViewConcession from "./screens/customer/ViewConcession";
 import Home from './screens/customer/Home'
@@ -83,12 +82,7 @@ function MenuItemsStack() {
         component={MenuItems}
         options={{ title: "Menu" }}
       />
-      <MenuStackNav.Screen
-        name="Full Concession Menu"
-        component={FullConcessionMenu}
-        options={{ title: "Menu" }}
-      />
-      <MenuStackNav.Screen
+            <MenuStackNav.Screen
         name="Menu Item Details"
         component={MenuItemDetails}
         options={{ title: "Menu Item Details" }}
@@ -213,7 +207,7 @@ function CustomerTabs() {
               (r) => r.name === "Menu Items",
             );
 
-            // If we're already on this tab and the stack has multiple screens, reset to root
+            // Always reset to root when clicking Menu tab to ensure proper navigation
             const nestedIndex = menuItemsTab?.state?.index ?? 0;
             if (nestedIndex > 0) {
               e.preventDefault();
@@ -231,6 +225,13 @@ function CustomerTabs() {
                   ],
                 }),
               );
+            } else {
+              // Even if index is 0, ensure we're on the correct screen
+              const currentRoute = menuItemsTab?.state?.routes[0]?.name;
+              if (currentRoute !== "View Menu Items") {
+                e.preventDefault();
+                navigation.navigate("Menu Items", { screen: "View Menu Items" });
+              }
             }
           },
         })}

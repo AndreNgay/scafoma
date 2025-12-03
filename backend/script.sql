@@ -142,6 +142,18 @@ CREATE TABLE IF NOT EXISTS public.tblorder
     CONSTRAINT tblorder_pkey PRIMARY KEY (id)
 );
 
+COMMENT ON COLUMN public.tblorder.reopening_requested
+    IS 'Indicates if customer has requested to reopen this order';
+
+COMMENT ON COLUMN public.tblorder.reopened_at
+    IS 'Timestamp when the order was reopened by concessionaire';
+
+COMMENT ON COLUMN public.tblorder.original_decline_reason
+    IS 'Stores the original decline reason before reopening';
+
+COMMENT ON COLUMN public.tblorder.reopening_count
+    IS 'Number of times this order has been reopened';
+
 CREATE TABLE IF NOT EXISTS public.tblorderdetail
 (
     id serial NOT NULL,
@@ -185,6 +197,18 @@ CREATE TABLE IF NOT EXISTS public.tblorderreopeningrequest
     updated_at timestamp without time zone DEFAULT (CURRENT_TIMESTAMP AT TIME ZONE 'UTC'::text),
     CONSTRAINT tblorderreopeningrequest_pkey PRIMARY KEY (id)
 );
+
+COMMENT ON TABLE public.tblorderreopeningrequest
+    IS 'Stores requests from customers to reopen declined orders';
+
+COMMENT ON COLUMN public.tblorderreopeningrequest.request_type
+    IS 'Type of reopening request: custom, missed_deadline, technical_issue, payment_delay, forgot_upload, network_issue, busy_schedule, etc.';
+
+COMMENT ON COLUMN public.tblorderreopeningrequest.status
+    IS 'Status of the request: pending, approved, rejected';
+
+COMMENT ON COLUMN public.tblorderreopeningrequest.response_type
+    IS 'Type of response: approved, cannot_fulfill, out_of_stock, time_passed, business_hours, capacity_full, repeated_violation, custom, etc.';
 
 CREATE TABLE IF NOT EXISTS public.tbluser
 (

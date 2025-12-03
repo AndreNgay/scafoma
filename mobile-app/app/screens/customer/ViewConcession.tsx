@@ -14,6 +14,7 @@ import {
 } from 'react-native'
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigation, useRoute } from '@react-navigation/native'
+import { Ionicons } from '@expo/vector-icons'
 import api from '../../libs/apiCall'
 
 const PAGE_SIZE = 10
@@ -24,8 +25,11 @@ const ViewConcession = () => {
 	const params = (route.params as any) || {}
 	const [details, setDetails] = useState<any>(params.concession || null)
 	const [menuItems, setMenuItems] = useState<any[]>([])
+	const [filteredItems, setFilteredItems] = useState<any[]>([])
 	const cafeteria = params.cafeteria
 	const [search, setSearch] = useState('')
+	const [selectedCategory, setSelectedCategory] = useState<string | null>(null)
+	const [categories, setCategories] = useState<string[]>([])
 	const [loadingDetails, setLoadingDetails] = useState(false)
 	const [loadingItems, setLoadingItems] = useState(false)
 	const [initialLoading, setInitialLoading] = useState(true)
@@ -94,6 +98,14 @@ const ViewConcession = () => {
 				setMenuItems((prev) => [...prev, ...(newItems || [])])
 			}
 
+			// Extract categories from all items
+			if (pageNum === 1 || refresh) {
+				const uniqueCategories: string[] = Array.from(
+					new Set((newItems || []).map((i: any) => i.category || "").filter(Boolean)),
+				);
+				setCategories(uniqueCategories);
+			}
+
 			setHasMore(pageNum < pagination.totalPages)
 		} catch (e) {
 			console.error('Error loading menu items:', e)
@@ -116,6 +128,11 @@ const ViewConcession = () => {
 		}
 	}, [details?.id, params.concession?.id])
 
+	// Apply filters when search, category, or menu items change
+	useEffect(() => {
+		applyFilters();
+	}, [search, selectedCategory, menuItems])
+
 	// Pull to refresh
 	const onRefresh = () => {
 		setRefreshing(true)
@@ -132,15 +149,77 @@ const ViewConcession = () => {
 		}
 	}
 
-	const filteredItems = useMemo(() => {
-		const q = search.trim().toLowerCase()
-		if (!q) return menuItems
-		return menuItems.filter(
-			(it: any) =>
-				(it.item_name || '').toLowerCase().includes(q) ||
-				(it.category || '').toLowerCase().includes(q)
-		)
-	}, [menuItems, search])
+	// Apply filters function
+	const applyFilters = () => {
+		let filtered = [...menuItems];
+
+		// Apply search
+		const q = search.trim().toLowerCase();
+		if (q) {
+			filtered = filtered.filter(
+				(item: any) =>
+					(item.item_name || '').toLowerCase().includes(q) ||
+					(item.category || '').toLowerCase().includes(q)
+			);
+		}
+
+		// Apply category filter
+		if (selectedCategory) {
+			filtered = filtered.filter((item: any) => item.category === selectedCategory);
+		}
+
+		setFilteredItems(filtered);
+	}
+
+	// Calculate price range for an item
+	const calculatePriceRange = (item: any) => {
+		const base = Number(item.price || 0);
+		if (base > 0) return { low: base, high: base };
+
+		const groups = item.variations || [];
+		if (!groups.length) return { low: 0, high: 0 };
+
+		// Helper to get sorted price list for a group's variations
+		const getSortedPrices = (g: any) =>
+			(g.variations || [])
+				.map((v: any) => Number(v.price))
+				.filter((n: number) => Number.isFinite(n))
+				.sort((a: number, b: number) => a - b);
+
+		// Minimum extra: sum the cheapest options required by group constraints
+		let minExtra = 0;
+		for (const g of groups) {
+			const prices = getSortedPrices(g);
+			if (!prices.length) continue;
+			const required = !!g.required_selection;
+			const minSel = Number(g.min_selection || 0);
+			const need = Math.max(required ? 1 : 0, minSel);
+			for (let i = 0; i < need && i < prices.length; i++) {
+				minExtra += prices[i];
+			}
+		}
+
+		// Maximum extra: sum the most expensive options allowed by group constraints
+		let maxExtra = 0;
+		for (const g of groups) {
+			const prices = getSortedPrices(g);
+			if (!prices.length) continue;
+			const multiple = !!g.multiple_selection;
+			const maxSel =
+				Number.isFinite(Number(g.max_selection)) &&
+				Number(g.max_selection) > 0
+					? Number(g.max_selection)
+					: multiple
+						? prices.length
+						: 1;
+			const chosen = prices.slice(-maxSel); // most expensive allowed
+			for (const p of chosen) maxExtra += p;
+		}
+
+		const low = base + minExtra;
+		const high = base + Math.max(minExtra, maxExtra);
+		return { low, high };
+	}
 
 	// Full-screen loader for initial load
 	if (initialLoading && !details) {
@@ -217,18 +296,75 @@ const ViewConcession = () => {
 			</View>
 
 			{/* Search */}
-			<TextInput
-				value={search}
-				onChangeText={setSearch}
-				placeholder="Search menu items..."
-				style={styles.searchInput}
-			/>
+			<View style={styles.searchContainer}>
+				<Ionicons
+					name="search"
+					size={20}
+					color="#6b7280"
+					style={{ marginRight: 8 }}
+				/>
+				<TextInput
+					value={search}
+					onChangeText={setSearch}
+					placeholder="Search menu items..."
+					style={styles.searchInput}
+					blurOnSubmit={false}
+				/>
+				{search.length > 0 && (
+					<TouchableOpacity onPress={() => setSearch("")}>
+						<Ionicons name="close-circle" size={20} color="#6b7280" />
+					</TouchableOpacity>
+				)}
+			</View>
+
+			{/* Category Filter */}
+			{categories.length > 0 && (
+				<View style={styles.categoryFilterContainer}>
+					<TouchableOpacity
+						style={[
+							styles.categoryChip,
+							selectedCategory === null && styles.categoryChipActive,
+						]}
+						onPress={() => setSelectedCategory(null)}
+					>
+						<Text
+							style={[
+								styles.categoryChipText,
+								selectedCategory === null && styles.categoryChipTextActive,
+							]}
+						>
+							All
+						</Text>
+					</TouchableOpacity>
+					{categories.map((cat) => (
+						<TouchableOpacity
+							key={cat}
+							style={[
+								styles.categoryChip,
+								selectedCategory === cat && styles.categoryChipActive,
+							]}
+							onPress={() => setSelectedCategory(cat)}
+						>
+							<Text
+								style={[
+									styles.categoryChipText,
+									selectedCategory === cat && styles.categoryChipTextActive,
+								]}
+							>
+								{cat}
+							</Text>
+						</TouchableOpacity>
+					))}
+				</View>
+			)}
 		</>
 	)
 
 	// Render menu item
 	const renderMenuItem = ({ item }: { item: any }) => {
 		const available = Boolean(item.availability)
+		const priceRange = calculatePriceRange(item)
+		
 		return (
 			<TouchableOpacity
 				style={[styles.itemCard, !available && styles.itemDisabled]}
@@ -250,8 +386,28 @@ const ViewConcession = () => {
 				<View style={{ flex: 1 }}>
 					<Text style={styles.itemTitle}>{item.item_name}</Text>
 					<Text style={styles.itemSub}>{item.category || 'General'}</Text>
+					{(() => {
+						const feedbackCount = Number(
+							item.feedback?.feedback_count ?? item.feedback_count ?? 0,
+						);
+						const avgRating = item.feedback?.avg_rating ?? item.avg_rating;
+						if (
+							feedbackCount > 0 &&
+							avgRating !== null &&
+							avgRating !== undefined
+						) {
+							return (
+								<Text style={styles.feedbackText}>
+									⭐ {Number(avgRating).toFixed(1)} ({feedbackCount})
+								</Text>
+							);
+						}
+						return <Text style={styles.feedbackEmpty}>No feedback yet</Text>;
+					})()}
 					<Text style={styles.itemPrice}>
-						₱{Number(item.price || 0).toFixed(2)}
+						{priceRange.low === priceRange.high
+							? `₱${priceRange.low.toFixed(2)}`
+							: `₱${priceRange.low.toFixed(2)} - ₱${priceRange.high.toFixed(2)}`}
 					</Text>
 				</View>
 				{!available && (
@@ -374,21 +530,62 @@ const styles = StyleSheet.create({
 		color: '#333',
 	},
 	paymentText: { fontSize: 14, color: '#555', marginBottom: 4 },
-	searchInput: {
-		borderWidth: 1,
-		borderColor: '#e5e7eb',
-		borderRadius: 12,
-		paddingHorizontal: 16,
-		paddingVertical: 12,
-		backgroundColor: '#fff',
+	searchContainer: {
+		flexDirection: 'row',
+		alignItems: 'center',
 		marginHorizontal: 16,
 		marginBottom: 12,
-		fontSize: 15,
+		paddingHorizontal: 12,
+		paddingVertical: 8,
+		backgroundColor: '#fff',
+		borderRadius: 12,
+		borderWidth: 1,
+		borderColor: '#e5e7eb',
 		shadowColor: '#000',
 		shadowOffset: { width: 0, height: 1 },
 		shadowOpacity: 0.05,
 		shadowRadius: 2,
 		elevation: 1,
+	},
+	searchInput: {
+		flex: 1,
+		fontSize: 15,
+		color: '#1f2937',
+		paddingVertical: 4,
+	},
+	categoryFilterContainer: {
+		flexDirection: 'row',
+		flexWrap: 'wrap',
+		paddingHorizontal: 16,
+		paddingBottom: 12,
+		gap: 8,
+	},
+	categoryChip: {
+		paddingVertical: 6,
+		paddingHorizontal: 12,
+		borderRadius: 999,
+		borderWidth: 1,
+		borderColor: '#d1d5db',
+		backgroundColor: '#fff',
+	},
+	categoryChipActive: {
+		backgroundColor: '#A40C2D',
+		borderColor: '#A40C2D',
+	},
+	categoryChipText: {
+		fontSize: 14,
+		color: '#374151',
+	},
+	categoryChipTextActive: {
+		color: '#fff',
+		fontWeight: '600',
+	},
+		feedbackText: { marginTop: 2, fontSize: 12, color: '#111' },
+	feedbackEmpty: {
+		marginTop: 2,
+		fontSize: 12,
+		color: '#888',
+		fontStyle: 'italic',
 	},
 	itemCard: {
 		flexDirection: 'row',

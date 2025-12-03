@@ -24,6 +24,8 @@ import { Ionicons } from "@expo/vector-icons";
 import api from "../../../libs/apiCall";
 import { useToast } from "../../../contexts/ToastContext";
 import ImagePreviewModal from "../../../components/ImagePreviewModal";
+import OrderReopeningModal from "../../../components/OrderReopeningModal";
+import ReopeningStatusModal from "../../../components/ReopeningStatusModal";
 import useStore from "../../../store";
 
 // Import icons
@@ -45,6 +47,10 @@ const ViewOrderCustomer = () => {
   const [currentTime, setCurrentTime] = useState(Date.now());
   const [canRequestReopening, setCanRequestReopening] = useState(false);
   const [checkingReopeningStatus, setCheckingReopeningStatus] = useState(false);
+  const [reopeningModalVisible, setReopeningModalVisible] = useState(false);
+  const [statusModalVisible, setStatusModalVisible] = useState(false);
+  const [reopeningRequest, setReopeningRequest] = useState<any>(null);
+  const [submittingReopening, setSubmittingReopening] = useState(false);
   const { showToast } = useToast();
   const { user } = useStore();
 
@@ -238,6 +244,86 @@ const ViewOrderCustomer = () => {
   useEffect(() => {
     fetchOrder();
   }, [orderId]);
+
+  // ===============================
+  // Check reopening eligibility
+  // ===============================
+  const checkReopeningEligibility = async () => {
+    if (!order || order.order_status !== "declined") {
+      setCanRequestReopening(false);
+      return;
+    }
+
+    try {
+      setCheckingReopeningStatus(true);
+      const res = await api.get(`/order-reopening/order/${orderId}/can-reopen`);
+      setCanRequestReopening(res.data.canReopen);
+    } catch (err) {
+      console.error("Error checking reopening eligibility:", err);
+      setCanRequestReopening(false);
+    } finally {
+      setCheckingReopeningStatus(false);
+    }
+  };
+
+  useEffect(() => {
+    if (order) {
+      checkReopeningEligibility();
+    }
+  }, [order?.order_status, order?.id]);
+
+  // ===============================
+  // Handle reopening request
+  // ===============================
+  const handleRequestReopening = async () => {
+    // If there's already a pending request, show status modal
+    if (order?.reopening_requested) {
+      try {
+        const res = await api.get(`/order-reopening/order/${orderId}/status`);
+        if (res.data.hasRequest) {
+          setReopeningRequest(res.data.request);
+          setStatusModalVisible(true);
+        } else {
+          showToast("info", "No reopening request found");
+        }
+      } catch (err) {
+        console.error("Error fetching reopening status:", err);
+        showToast("error", "Failed to fetch reopening status");
+      }
+    } else {
+      // Show modal to create new request
+      setReopeningModalVisible(true);
+    }
+  };
+
+  // ===============================
+  // Submit reopening request
+  // ===============================
+  const submitReopeningRequest = async (
+    reasonType: string,
+    customMessage: string,
+  ) => {
+    try {
+      setSubmittingReopening(true);
+      await api.post(`/order-reopening/order/${orderId}/request`, {
+        requestType: reasonType,
+        customMessage: customMessage,
+      });
+
+      showToast("success", "Reopening request submitted successfully");
+      setReopeningModalVisible(false);
+
+      // Refresh order to get updated status
+      await fetchOrder();
+    } catch (err: any) {
+      console.error("Error submitting reopening request:", err);
+      const errorMessage =
+        err.response?.data?.error || "Failed to submit reopening request";
+      showToast("error", errorMessage);
+    } finally {
+      setSubmittingReopening(false);
+    }
+  };
 
   // Update current time every second for timer
   useEffect(() => {
@@ -972,6 +1058,20 @@ const ViewOrderCustomer = () => {
           </View>
         </View>
       </Modal>
+
+      <OrderReopeningModal
+        visible={reopeningModalVisible}
+        onClose={() => setReopeningModalVisible(false)}
+        onSubmit={submitReopeningRequest}
+        loading={submittingReopening}
+      />
+
+      <ReopeningStatusModal
+        visible={statusModalVisible}
+        onClose={() => setStatusModalVisible(false)}
+        request={reopeningRequest}
+        loading={false}
+      />
     </ScrollView>
   );
 };
@@ -1629,6 +1729,76 @@ const styles = StyleSheet.create({
   },
   uploadButtonText: {
     color: "#fff",
+    fontSize: 14,
+    fontWeight: "600",
+  },
+  reopeningStatusContainer: {
+    backgroundColor: "#f8f9fa",
+    padding: 12,
+    borderRadius: 8,
+    alignItems: "center",
+    marginTop: 12,
+  },
+  checkingStatusText: {
+    fontSize: 13,
+    color: "#666",
+    marginTop: 8,
+  },
+  reopeningContainer: {
+    marginTop: 12,
+    padding: 12,
+    backgroundColor: "#f8f9fa",
+    borderRadius: 8,
+    borderLeftWidth: 4,
+    borderLeftColor: "#28a745",
+  },
+  reopeningInfoContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 10,
+    gap: 8,
+  },
+  reopeningInfoText: {
+    fontSize: 13,
+    color: "#28a745",
+    fontWeight: "500",
+    flex: 1,
+  },
+  reopeningButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#28a745",
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    gap: 6,
+  },
+  reopeningButtonText: {
+    color: "#fff",
+    fontSize: 14,
+    fontWeight: "600",
+  },
+  reopeningPendingText: {
+    fontSize: 13,
+    color: "#cc8800",
+    fontWeight: "500",
+    flex: 1,
+  },
+  viewReopeningButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#fff",
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "#A40C2D",
+    gap: 6,
+  },
+  viewReopeningButtonText: {
+    color: "#A40C2D",
     fontSize: 14,
     fontWeight: "600",
   },

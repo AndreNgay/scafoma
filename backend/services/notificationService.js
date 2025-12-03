@@ -206,6 +206,62 @@ export const notifyAutoDeclineTimeout = async (
 };
 
 /**
+ * Notify concessionaire about order reopening request
+ */
+export const notifyReopeningRequest = async (
+  orderId,
+  concessionaireId,
+  customerName,
+  concessionName,
+) => {
+  const message = `${customerName} has requested to reopen order #${orderId}. Please review and respond to the request.`;
+  console.log(
+    `📬 Notifying concessionaire ${concessionaireId} about reopening request for order ${orderId}`,
+  );
+  return await createNotification(
+    concessionaireId,
+    "Reopening Request",
+    message,
+    { order_id: orderId },
+  );
+};
+
+/**
+ * Notify customer that their reopening request was approved
+ */
+export const notifyReopeningApproved = async (
+  orderId,
+  customerId,
+  concessionName,
+) => {
+  const message = `${concessionName}: Your request to reopen order #${orderId} has been approved! Please upload your GCash receipt within the required time.`;
+  console.log(
+    `📬 Notifying customer ${customerId} that reopening request for order ${orderId} was approved`,
+  );
+  return await createNotification(customerId, "Reopening Approved", message, {
+    order_id: orderId,
+  });
+};
+
+/**
+ * Notify customer that their reopening request was rejected
+ */
+export const notifyReopeningRejected = async (
+  orderId,
+  customerId,
+  concessionName,
+  rejectionReason,
+) => {
+  const message = `${concessionName}: Your request to reopen order #${orderId} has been declined.\nReason: ${rejectionReason}`;
+  console.log(
+    `📬 Notifying customer ${customerId} that reopening request for order ${orderId} was rejected`,
+  );
+  return await createNotification(customerId, "Reopening Declined", message, {
+    order_id: orderId,
+  });
+};
+
+/**
  * Mark notification as read
  */
 export const markNotificationAsRead = async (notificationId, userId) => {

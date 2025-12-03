@@ -18,1469 +18,1677 @@ import Checkbox from "expo-checkbox";
 import api from "../../../libs/apiCall";
 import { useToast } from "../../../contexts/ToastContext";
 import ImagePreviewModal from "../../../components/ImagePreviewModal";
+import ReopeningResponseModal from "../../../components/ReopeningResponseModal";
 
 const ViewOrderConcessionaire = () => {
-	const route = useRoute<any>()
-	const navigation = useNavigation<any>()
-	const { orderId } = route.params
-
-	const [order, setOrder] = useState<any>(null)
-	const [loading, setLoading] = useState(false)
-	const [refreshing, setRefreshing] = useState(false)
-	const [updatingStatus, setUpdatingStatus] = useState(false)
-	const [declineModalVisible, setDeclineModalVisible] = useState(false)
-	const [selectedReason, setSelectedReason] = useState<string>('')
-	const [customReason, setCustomReason] = useState<string>('')
-	const [itemsToToggle, setItemsToToggle] = useState<Record<number, boolean>>(
-		{}
-	)
-	const [variationsToToggle, setVariationsToToggle] = useState<
-		Record<number, boolean>
-	>({})
-	const [acceptModalVisible, setAcceptModalVisible] = useState(false)
-	const [adjustedTotal, setAdjustedTotal] = useState<string>('')
-	const [priceReason, setPriceReason] = useState<string>('')
-	const [customPriceReason, setCustomPriceReason] = useState<string>('')
-	const [previewSource, setPreviewSource] = useState<string | null>(null)
-	const [closingConcession, setClosingConcession] = useState(false)
-	const [currentTime, setCurrentTime] = useState(Date.now())
-	const [rejectingReceipt, setRejectingReceipt] = useState(false)
-	const [rejectScreenshotModalVisible, setRejectScreenshotModalVisible] = useState(false)
-	const [selectedRejectionReason, setSelectedRejectionReason] = useState<string>('')
-	const [customRejectionReason, setCustomRejectionReason] = useState<string>('')
-	const [rejectingScreenshot, setRejectingScreenshot] = useState(false)
-	const [restartTimer, setRestartTimer] = useState(false)
-	const { showToast } = useToast()
-
-	// Format dates with Asia/Manila timezone (robust to plain DB timestamps)
-	const formatManila = (value: any) => {
-		if (!value) return ''
-		try {
-			// Just parse and format the timestamp as-is (backend will handle timezone conversion)
-			const dateObj = new Date(value)
-			if (Number.isNaN(dateObj.getTime())) return String(value)
-
-			// Manual formatting
-			const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-			const month = months[dateObj.getMonth()];
-			const day = String(dateObj.getDate()).padStart(2, '0');
-			const year = dateObj.getFullYear();
-
-			let hours = dateObj.getHours();
-			const minutes = String(dateObj.getMinutes()).padStart(2, '0');
-			const ampm = hours >= 12 ? 'PM' : 'AM';
-			hours = hours % 12;
-			hours = hours ? hours : 12; // 0 should be 12
-
-			return `${month} ${day}, ${year}, ${hours}:${minutes} ${ampm}`;
-		} catch {
-			return String(value)
-		}
-	}
-
-	const formatSchedule = (value: any) => formatManila(value)
-	const formatDateTime = (value: any) => formatManila(value)
-
-	// Fetch order details from backend
-	const fetchOrderDetails = async (isRefresh = false) => {
-		try {
-			if (isRefresh) {
-				setRefreshing(true)
-			}
-			// Auto-decline any expired GCash receipts in bulk before fetching order details
-			try {
-				await api.post('/order/bulk-decline-expired')
-			} catch (e) {
-				console.warn('Bulk decline expired receipts failed:', e)
-			}
-			if (!isRefresh) {
-				setLoading(true)
-			}
-			const res = await api.get(`/order/${orderId}`) // Backend route /order/:id
-			setOrder(res.data)
-		} catch (err) {
-			console.error('Error fetching order details:', err)
-			showToast('error', 'Failed to fetch order details')
-		} finally {
-			if (isRefresh) {
-				setRefreshing(false)
-			} else {
-				setLoading(false)
-			}
-		}
-	}
-
-	useEffect(() => {
-		fetchOrderDetails()
-	}, [orderId])
-
-	// Update current time every second for timer
-	useEffect(() => {
-		const interval = setInterval(() => {
-			setCurrentTime(Date.now())
-		}, 1000)
-		return () => clearInterval(interval)
-	}, [])
-
-	// Calculate receipt timer
-	const calculateTimer = () => {
-		if (
-			!order ||
-			order.payment_method !== 'gcash' ||
-			order.order_status !== 'accepted'
-		) {
-			return { timeRemaining: null, isExpired: false }
-		}
-
-		try {
-			// Strictly prefer backend's expiry timestamp; do not add timer again
-			if (order.payment_receipt_expires_at) {
-				let s = order.payment_receipt_expires_at.trim()
-				if (!/[zZ]|[+-]\d{2}:?\d{2}$/.test(s)) {
-					s = s.replace(' ', 'T') + 'Z'
-				}
-				const expiresDate = new Date(s)
-				if (!Number.isNaN(expiresDate.getTime())) {
-					const deadlineMs = expiresDate.getTime()
-					const remainingMs = deadlineMs - currentTime
-					if (remainingMs <= 0) {
-						return { timeRemaining: 'Expired', isExpired: true }
-					}
-					const totalSeconds = Math.floor(remainingMs / 1000)
-					const hours = Math.floor(totalSeconds / 3600)
-					const minutes = Math.floor((totalSeconds % 3600) / 60)
-					const seconds = totalSeconds % 60
-					const timeRemaining = `${hours.toString().padStart(2, '0')}:${minutes
-						.toString()
-						.padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`
-					return { timeRemaining, isExpired: false }
-				}
-			}
-
-			// Fallback: calculate locally only if backend did not provide expiry
-			if (!order.accepted_at || !order.receipt_timer) {
-				return { timeRemaining: null, isExpired: false }
-			}
-
-			let s = order.accepted_at.trim()
-			if (!/[zZ]|[+-]\d{2}:?\d{2}$/.test(s)) {
-				s = s.replace(' ', 'T') + 'Z'
-			}
-			const acceptedDate = new Date(s)
-			const [hours, minutes, seconds] = order.receipt_timer
-				.split(':')
-				.map(Number)
-			const deadlineMs =
-				acceptedDate.getTime() +
-				(hours * 3600 + minutes * 60 + seconds) * 1000
-
-			const remainingMs = deadlineMs - currentTime
-
-			if (remainingMs <= 0) {
-				return { timeRemaining: 'Expired', isExpired: true }
-			}
-
-			const remainingMinutes = Math.floor(remainingMs / 60000)
-			const remainingSeconds = Math.floor((remainingMs % 60000) / 1000)
-			return {
-				timeRemaining: `${remainingMinutes}:${remainingSeconds
-					.toString()
-					.padStart(2, '0')}`,
-				isExpired: false,
-			}
-		} catch (e) {
-			console.error('Error calculating timer:', e)
-			return { timeRemaining: null, isExpired: false }
-		}
-	}
-
-	// Auto-decline order if timer expires
-	useEffect(() => {
-		if (!order) return
-
-		const checkExpiration = async () => {
-			// Only check GCash orders that are accepted without receipt
-			if (
-				order.payment_method === 'gcash' &&
-				order.order_status === 'accepted' &&
-				!order.gcash_screenshot
-			) {
-				const { isExpired } = calculateTimer()
-				if (isExpired) {
-					try {
-						await api.post(`/order/${order.id}/check-expired`)
-						await fetchOrderDetails()
-						showToast(
-							'error',
-							'Order automatically declined: Receipt not uploaded in time'
-						)
-					} catch (err) {
-						console.error('Error auto-declining order:', err)
-					}
-				}
-			}
-		}
-
-		checkExpiration()
-	}, [currentTime, order?.id, order?.order_status, order?.gcash_screenshot])
-
-	// Update order status
-	const updateStatus = async (newStatus: string, declineReason?: string) => {
-		if (!order) return
-		try {
-			setUpdatingStatus(true)
-			const requestData: any = { order_status: newStatus }
-			if (declineReason) {
-				requestData.decline_reason = declineReason
-			}
-			await api.put(`order/status/${order.id}`, requestData)
-			await fetchOrderDetails()
-			showToast('success', `Order marked as ${newStatus}`)
-		} catch (err) {
-			console.error(err)
-			showToast('error', 'Failed to update order status')
-		} finally {
-			setUpdatingStatus(false)
-		}
-	}
-
-	// Handle decline with reason
-	const handleDecline = () => {
-		setDeclineModalVisible(true)
-	}
-
-	// Submit decline with reason
-	const submitDecline = async () => {
-		if (!selectedReason && !customReason.trim()) {
-			showToast(
-				'error',
-				'Please select a reason or provide a custom reason for declining this order.'
-			)
-			return
-		}
-
-		const reason =
-			selectedReason === 'custom' ? customReason.trim() : selectedReason
-
-		// If "Item not available" is selected, update item availability
-		const toggledUnavailableItems: string[] = []
-		if (selectedReason === 'Item not available') {
-			try {
-				const itemsToUpdate = Object.entries(itemsToToggle).filter(
-					([_, shouldToggle]) => shouldToggle
-				)
-
-				for (const [itemIdStr, _] of itemsToUpdate) {
-					const itemId = parseInt(itemIdStr)
-					const item = order?.items?.find((i: any) => i.item_id === itemId)
-
-					if (item) {
-						// Update availability to false
-						await api.put(`/menu-item/${itemId}/availability`, {
-							available: false,
-						})
-						toggledUnavailableItems.push(item.item_name)
-					}
-				}
-			} catch (error) {
-				console.error('Error updating item availability:', error)
-				showToast('error', 'Failed to update item availability')
-				return
-			}
-		}
-
-		// If "Unavailable options/variations" is selected, update variation availability
-		const toggledUnavailableVariations: string[] = []
-		if (selectedReason === 'Unavailable options/variations') {
-			try {
-				const variationsToUpdate = Object.entries(variationsToToggle).filter(
-					([_, shouldToggle]) => shouldToggle
-				)
-
-				for (const [variationIdStr, _] of variationsToUpdate) {
-					const variationId = parseInt(variationIdStr)
-
-					// Update variation availability to false
-					await api.put(`/item-variation/${variationId}/availability`, {
-						available: false,
-					})
-
-					// Find variation name for notification
-					let variationName = ''
-					for (const item of order?.items || []) {
-						for (const v of item.variations || []) {
-							if (v.variation_id === variationId) {
-								variationName = `${v.group_name}: ${v.variation_name}`
-								break
-							}
-						}
-						if (variationName) break
-					}
-					if (variationName) {
-						toggledUnavailableVariations.push(variationName)
-					}
-				}
-			} catch (error) {
-				console.error('Error updating variation availability:', error)
-				showToast('error', 'Failed to update variation availability')
-				return
-			}
-		}
-
-		// Build decline reason with toggled items/variations info
-		let finalReason = reason
-		if (toggledUnavailableItems.length > 0) {
-			finalReason += `\n\nItems marked as unavailable: ${toggledUnavailableItems.join(
-				', '
-			)}`
-		}
-		if (toggledUnavailableVariations.length > 0) {
-			finalReason += `\n\nVariations marked as unavailable: ${toggledUnavailableVariations.join(
-				', '
-			)}`
-		}
-
-		await updateStatus('declined', finalReason)
-		setDeclineModalVisible(false)
-		setSelectedReason('')
-		setCustomReason('')
-		setItemsToToggle({})
-		setVariationsToToggle({})
-	}
-
-	// Cancel decline
-	const cancelDecline = () => {
-		setDeclineModalVisible(false)
-		setSelectedReason('')
-		setCustomReason('')
-		setItemsToToggle({})
-		setVariationsToToggle({})
-	}
-
-	const openAcceptModal = () => {
-		if (!order) return
-		const baseTotal =
-			(
-				order.updated_total_price !== null &&
-				order.updated_total_price !== undefined
-			) ?
-				order.updated_total_price
-			:	order.total_price
-		const formatted =
-			(
-				baseTotal !== null &&
-				baseTotal !== undefined &&
-				!Number.isNaN(Number(baseTotal))
-			) ?
-				Number(baseTotal).toFixed(2)
-			:	''
-		setAdjustedTotal(formatted)
-		setPriceReason('')
-		setCustomPriceReason('')
-		setAcceptModalVisible(true)
-	}
-
-	const cancelAccept = () => {
-		setAcceptModalVisible(false)
-		setPriceReason('')
-		setCustomPriceReason('')
-	}
-
-	const submitAccept = async () => {
-		if (!order) return
-		const originalTotal = Number(order.total_price ?? 0)
-		const trimmed = adjustedTotal.trim()
-
-		let newTotal: number | null = null
-		if (trimmed) {
-			const parsed = Number(trimmed)
-			if (!Number.isFinite(parsed) || parsed < 0) {
-				showToast('error', 'Please enter a valid total amount.')
-				return
-			}
-			newTotal = parsed
-		}
-
-		const payload: any = { order_status: 'accepted' }
-
-		if (newTotal !== null && newTotal !== originalTotal) {
-			if (!priceReason && !customPriceReason.trim()) {
-				showToast(
-					'error',
-					'Please select or enter a reason for changing the total.'
-				)
-				return
-			}
-			const reason =
-				priceReason === 'custom' ? customPriceReason.trim() : priceReason
-			payload.updated_total_price = newTotal
-			payload.price_change_reason = reason
-		}
-
-		try {
-			setUpdatingStatus(true)
-			await api.put(`order/status/${order.id}`, payload)
-			await fetchOrderDetails()
-			showToast('success', 'Order marked as accepted')
-			setAcceptModalVisible(false)
-		} catch (err) {
-			console.error(err)
-			showToast('error', 'Failed to update order status')
-		} finally {
-			setUpdatingStatus(false)
-		}
-	}
-
-	const onRefresh = () => {
-		if (loading) return
-		fetchOrderDetails(true)
-	}
-
-	// Reject receipt and restart timer
-	const rejectReceipt = async () => {
-		if (!order) return
-
-		try {
-			setRejectingReceipt(true)
-			await api.put(`/order/${order.id}/reject-receipt`)
-			await fetchOrderDetails()
-			showToast('success', 'Receipt rejected. Timer restarted.')
-		} catch (err) {
-			console.error('Error rejecting receipt:', err)
-			showToast('error', 'Failed to reject receipt')
-		} finally {
-			setRejectingReceipt(false)
-		}
-	}
-
-	// Reject GCash screenshot with specific reason
-	const rejectGCashScreenshot = async () => {
-		if (!order) return
-
-		if (!selectedRejectionReason && !customRejectionReason.trim()) {
-			showToast('error', 'Please select a rejection reason or provide a custom reason.')
-			return
-		}
-
-		const rejectionReason = selectedRejectionReason === 'other' ? customRejectionReason.trim() : selectedRejectionReason
-
-		try {
-			setRejectingScreenshot(true)
-			await api.put(`/order/${order.id}/reject-gcash-screenshot`, {
-				rejection_reason: selectedRejectionReason,
-				custom_reason: customRejectionReason.trim() || undefined,
-				restart_timer: restartTimer
-			})
-			await fetchOrderDetails()
-			showToast('success', `GCash screenshot rejected successfully.${restartTimer ? ' Timer restarted.' : ''}`)
-			setRejectScreenshotModalVisible(false)
-			setSelectedRejectionReason('')
-			setCustomRejectionReason('')
-			setRestartTimer(false)
-		} catch (err) {
-			console.error('Error rejecting GCash screenshot:', err)
-			showToast('error', 'Failed to reject GCash screenshot')
-		} finally {
-			setRejectingScreenshot(false)
-		}
-	}
-
-	// Open reject screenshot modal
-	const openRejectScreenshotModal = () => {
-		setRejectScreenshotModalVisible(true)
-	}
-
-	// Close reject screenshot modal
-	const closeRejectScreenshotModal = () => {
-		setRejectScreenshotModalVisible(false)
-		setSelectedRejectionReason('')
-		setCustomRejectionReason('')
-		setRestartTimer(false)
-	}
-
-	if (loading)
-		return (
-			<ActivityIndicator
-				size="large"
-				color="#A40C2D"
-				style={{ flex: 1 }}
-			/>
-		)
-
-	if (!order)
-		return (
-			<View style={styles.container}>
-				<Text style={styles.emptyText}>Order not found</Text>
-			</View>
-		)
-
-	// Render buttons depending on order status
-	const renderStatusButtons = () => {
-		if (updatingStatus) return <Text>Updating...</Text>
-
-		switch (order.order_status) {
-			case 'pending':
-				return (
-					<View style={styles.buttonRow}>
-						<TouchableOpacity
-							style={styles.acceptBtn}
-							onPress={openAcceptModal}>
-							<Text style={styles.btnText}>Accept</Text>
-						</TouchableOpacity>
-						<TouchableOpacity
-							style={styles.declineBtn}
-							onPress={handleDecline}>
-							<Text style={styles.btnText}>Decline Order</Text>
-						</TouchableOpacity>
-					</View>
-				)
-			case 'accepted': {
-				const { isExpired } = calculateTimer()
-				const gcashTimeoutExpired =
-					order.payment_method === 'gcash' &&
-					!order.gcash_screenshot &&
-					isExpired
-
-				if (gcashTimeoutExpired) {
-					return (
-						<View style={styles.expiredTimerContainer}>
-							<View style={styles.expiredTimerMessage}>
-								<Ionicons
-									name="alert-circle"
-									size={24}
-									color="#dc3545"
-									style={{ marginRight: 10 }}
-								/>
-								<Text style={styles.expiredTimerText}>
-									GCash receipt upload time has expired. This order must be declined.
-								</Text>
-							</View>
-							<TouchableOpacity
-								style={styles.declineBtn}
-								onPress={handleDecline}>
-								<Text style={styles.btnText}>Decline Order</Text>
-							</TouchableOpacity>
-						</View>
-					)
-				}
-
-				return (
-					<TouchableOpacity
-						style={styles.readyBtn}
-						onPress={() => updateStatus('ready for pickup')}>
-						<Text style={styles.btnText}>Ready for Pick-up</Text>
-					</TouchableOpacity>
-				)
-			}
-			case 'ready for pickup':
-				return (
-					<TouchableOpacity
-						style={styles.completeBtn}
-						onPress={() => updateStatus('completed')}>
-						<Text style={styles.btnText}>Complete</Text>
-					</TouchableOpacity>
-				)
-			case 'declined':
-			case 'completed':
-				return (
-					<Text style={{ marginTop: 10, fontStyle: 'italic' }}>
-						No further actions available
-					</Text>
-				)
-			default:
-				return null
-		}
-	}
-
-	return (
-		<ScrollView
-			style={styles.container}
-			contentContainerStyle={styles.contentContainer}
-			refreshControl={
-				<RefreshControl
-					refreshing={refreshing}
-					onRefresh={onRefresh}
-					tintColor="#A40C2D"
-				/>
-			}>
-			<Text style={styles.header}>Order #{order.id}</Text>
-
-			{/* Order Status & Basic Info */}
-			<View style={styles.sectionCard}>
-				<Text style={styles.sectionTitle}>
-					<Ionicons
-						name="clipboard-outline"
-						size={16}
-						color="#A40C2D"
-						style={styles.inlineIcon}
-					/>{' '}
-					Order Details
-				</Text>
-				<View style={styles.infoSection}>
-					<Text style={styles.infoLabel}>Status:</Text>
-					<Text style={[styles.status, styles.statusText]}>
-						{order.order_status}
-					</Text>
-				</View>
-				<View style={styles.infoSection}>
-					<Text style={styles.infoLabel}>Order Date:</Text>
-					<Text style={styles.infoValue}>{formatDateTime(order.created_at)}</Text>
-				</View>
-				{order.schedule_time && (
-					<View style={styles.infoSection}>
-						<Text style={styles.infoLabel}>Scheduled for:</Text>
-						<Text style={[styles.infoValue, styles.scheduleTime]}>
-							<Ionicons
-								name="time-outline"
-								size={14}
-								color="#28a745"
-								style={styles.inlineIcon}
-							/>{' '}
-							{formatSchedule(order.schedule_time)}
-						</Text>
-					</View>
-				)}
-				{order.note && (
-					<View style={styles.infoSection}>
-						<Text style={styles.infoLabel}>Note:</Text>
-						<Text style={styles.infoValue}>{order.note}</Text>
-					</View>
-				)}
-			</View>
-
-			{/* Order Items */}
-			<View style={styles.sectionCard}>
-				<Text style={styles.sectionTitle}>
-					<Ionicons
-						name="cart-outline"
-						size={16}
-						color="#A40C2D"
-						style={styles.inlineIcon}
-					/>{' '}
-					Order Items
-				</Text>
-				<FlatList
-					data={order.items || []}
-					keyExtractor={(item) => item.id.toString()}
-					renderItem={({ item }) => (
-						<View style={styles.itemCard}>
-							<Text style={styles.itemName}>
-								{Number(item.quantity ?? 1)} x {item.item_name}
-							</Text>
-							<Text style={styles.infoLabel}>Dining Option:</Text>
-							<Text style={styles.infoValue}>
-								<Ionicons
-									name={
-										item.dining_option === 'take-out' ?
-											'cube-outline'
-										:	'restaurant-outline'
-									}
-									size={14}
-									color="#666"
-									style={styles.inlineIcon}
-								/>
-								{item.dining_option === 'take-out' ? 'Take-out' : 'Dine-in'}
-							</Text>
-							<Text>₱{Number(item.total_price).toFixed(2)}</Text>
-							{item.note && <Text style={styles.note}>Note: {item.note}</Text>}
-							{item.variations?.length > 0 && (
-								<View style={{ marginTop: 5 }}>
-									{item.variations.map((v: any, vIndex: number) => (
-										<Text
-											key={`${item.id}-${v.id}-${vIndex}`}
-											style={styles.variation}>
-											• {v.variation_group_name}: {v.variation_name}
-											{v.quantity > 1 ? ` x${v.quantity}` : ''} (+₱
-											{Number(v.additional_price || 0).toFixed(2)})
-											{v.quantity > 1 ?
-												` = ₱${(
-													Number(v.additional_price || 0) * (v.quantity || 1)
-												).toFixed(2)}`
-											:	''}
-										</Text>
-									))}
-								</View>
-							)}
-						</View>
-					)}
-					scrollEnabled={false}
-				/>
-			</View>
-
-			{/* Payment Information */}
-			<View style={styles.sectionCard}>
-				<Text style={styles.sectionTitle}>
-					<Ionicons
-						name="card-outline"
-						size={16}
-						color="#A40C2D"
-						style={styles.inlineIcon}
-					/>{' '}
-					Payment
-				</Text>
-				<View style={styles.infoSection}>
-					<Text style={styles.infoLabel}>Payment Method:</Text>
-					<View style={styles.paymentMethodDisplay}>
-						{order.payment_method === 'gcash' ?
-							<Text style={styles.infoValue}>GCash</Text>
-						:	<Text style={styles.infoValue}>
-								<Ionicons
-									name="cash-outline"
-									size={14}
-									color="#666"
-									style={styles.inlineIcon}
-								/>{' '}
-								On-Counter
-							</Text>
-						}
-					</View>
-				</View>
-
-				{/* Total Pricing Information */}
-				{(
-					order.updated_total_price !== null &&
-					order.updated_total_price !== undefined &&
-					!Number.isNaN(Number(order.updated_total_price)) &&
-					!Number.isNaN(Number(order.total_price)) &&
-					Number(order.updated_total_price) !== Number(order.total_price)
-				) ?
-					<>
-						<View style={styles.infoSection}>
-							<Text style={styles.infoLabel}>Original Total:</Text>
-							<Text style={styles.infoValue}>
-								₱{Number(order.total_price).toFixed(2)}
-							</Text>
-						</View>
-						<View style={styles.infoSection}>
-							<Text style={styles.infoLabel}>Updated Total:</Text>
-							<Text style={[styles.infoValue, styles.updatedPrice]}>
-								₱{Number(order.updated_total_price).toFixed(2)}
-							</Text>
-						</View>
-						{order.price_change_reason && (
-							<View style={styles.infoSection}>
-								<Text style={styles.infoLabel}>Price Change Reason:</Text>
-								<Text style={styles.infoValue}>
-									{order.price_change_reason}
-								</Text>
-							</View>
-						)}
-					</>
-				:	<View style={styles.infoSection}>
-						<Text style={styles.infoLabel}>Total:</Text>
-						<Text style={[styles.infoValue, styles.totalPrice]}>
-							₱{Number(order.total_price).toFixed(2)}
-						</Text>
-					</View>
-				}
-				{order.payment_method === 'gcash' && (
-					<View style={styles.gcashSection}>
-						{order.payment_receipt_expires_at && order.order_status !== 'pending' && (
-							<Text style={styles.paymentExpiryText}>
-								Payment expires at:{' '}
-								{formatDateTime(order.payment_receipt_expires_at)}
-							</Text>
-						)}
-
-						{/* Receipt Status Indicators */}
-						{order.gcash_screenshot ?
-							<View style={styles.paymentProofSection}>
-								<View
-									style={{
-										flexDirection: 'row',
-										justifyContent: 'space-between',
-										alignItems: 'center',
-										marginBottom: 8,
-									}}>
-									<Text style={styles.infoLabel}>GCash Screenshot:</Text>
-									<View
-										style={{
-											backgroundColor: '#28a745',
-											paddingHorizontal: 8,
-											paddingVertical: 4,
-											borderRadius: 4,
-										}}>
-										<Text
-											style={{
-												color: '#fff',
-												fontSize: 12,
-												fontWeight: '600',
-											}}>
-											Uploaded
-										</Text>
-									</View>
-								</View>
-								<TouchableOpacity
-									onPress={() => setPreviewSource(order.gcash_screenshot)}>
-									<Image
-										source={{ uri: order.gcash_screenshot }}
-										style={styles.paymentProof}
-									/>
-								</TouchableOpacity>
-
-								{/* Reject Receipt Button */}
-								{order.order_status === 'accepted' && (
-									<TouchableOpacity
-										style={[
-											styles.rejectScreenshotBtn,
-											rejectingScreenshot && styles.rejectScreenshotBtnDisabled,
-										]}
-										onPress={openRejectScreenshotModal}
-										disabled={rejectingScreenshot}>
-										<Ionicons
-											name="close-circle-outline"
-											size={16}
-											color="#fff"
-											style={{ marginRight: 6 }}
-										/>
-										<Text style={styles.rejectReceiptText}>
-											{rejectingScreenshot ?
-												'Rejecting...'
-											:	'Reject Screenshot'}
-										</Text>
-									</TouchableOpacity>
-								)}
-							</View>
-						:	<View style={styles.noReceiptContainer}>
-								<Ionicons
-									name="alert-circle-outline"
-									size={24}
-									color="#ff9800"
-								/>
-								<Text style={styles.noReceiptText}>
-									No GCash receipt uploaded yet
-								</Text>
-							</View>
-						}
-					</View>
-				)}
-			</View>
-
-			{/* Decline Reason (if applicable) */}
-			{order.order_status === 'declined' && order.decline_reason && (
-				<View style={[styles.sectionCard, styles.declineCard]}>
-					<Text style={styles.sectionTitle}>
-						<Ionicons
-							name="close-circle-outline"
-							size={16}
-							color="#dc3545"
-							style={styles.inlineIcon}
-						/>{' '}
-						Decline Information
-					</Text>
-					<View style={styles.infoSection}>
-						<Text style={styles.infoLabel}>Reason:</Text>
-						<Text style={[styles.infoValue, styles.declineReason]}>
-							{order.decline_reason}
-						</Text>
-					</View>
-				</View>
-			)}
-
-			{/* Customer Info Section */}
-			<TouchableOpacity
-				style={styles.customerSection}
-				onPress={() =>
-					navigation.navigate('View Customer Profile', {
-						customerId: order.customer_id,
-					})
-				}>
-				{order.customer_profile_image ?
-					<Image
-						source={{ uri: order.customer_profile_image }}
-						style={styles.customerAvatar}
-					/>
-				:	<View style={styles.customerAvatarPlaceholder}>
-						<Text style={styles.customerInitials}>
-							{order.customer_first_name?.[0]}
-							{order.customer_last_name?.[0]}
-						</Text>
-					</View>
-				}
-				<View style={styles.customerInfo}>
-					<Text style={styles.customerName}>
-						{order.customer_first_name} {order.customer_last_name}
-					</Text>
-					<Text style={styles.customerEmail}>{order.customer_email}</Text>
-				</View>
-			</TouchableOpacity>
-
-			{renderStatusButtons()}
-
-			<ImagePreviewModal
-				visible={!!previewSource}
-				imageUrl={previewSource}
-				title="GCash screenshot"
-				onClose={() => setPreviewSource(null)}
-			/>
-
-			{/* Accept Order Modal (optional price adjustment) */}
-			<Modal
-				visible={acceptModalVisible}
-				animationType="slide"
-				transparent={true}>
-				<View style={styles.modalOverlay}>
-					<View style={styles.modalContainer}>
-						<Text style={styles.modalHeader}>Accept Order</Text>
-						<Text style={styles.modalSubtitle}>
-							You can optionally adjust the total before accepting.
-						</Text>
-
-						<View style={styles.infoSection}>
-							<Text style={styles.infoLabel}>Original Total:</Text>
-							<Text style={styles.infoValue}>
-								₱{Number(order.total_price).toFixed(2)}
-							</Text>
-						</View>
-
-						<View style={styles.infoSection}>
-							<Text style={styles.infoLabel}>New Total (optional):</Text>
-							<TextInput
-								style={styles.customReasonInput}
-								keyboardType="numeric"
-								placeholder={Number(order.total_price).toFixed(2)}
-								value={adjustedTotal}
-								onChangeText={setAdjustedTotal}
-							/>
-						</View>
-
-						<Text style={styles.reasonLabel}>
-							Reason for change (optional):
-						</Text>
-						{[
-							'Applied discount',
-							'Correcting system total',
-							'Removed unavailable items',
-							'Other (specify below)',
-						].map((reason, index) => (
-							<TouchableOpacity
-								key={index}
-								style={[
-									styles.reasonOption,
-									(index === 3 ?
-										priceReason === 'custom'
-									:	priceReason === reason) && styles.selectedReason,
-								]}
-								onPress={() => {
-									if (index === 3) {
-										setPriceReason('custom')
-									} else {
-										setPriceReason(reason)
-										setCustomPriceReason('')
-									}
-								}}>
-								<Text
-									style={[
-										styles.reasonText,
-										(index === 3 ?
-											priceReason === 'custom'
-										:	priceReason === reason) && styles.selectedReasonText,
-									]}>
-									{reason}
-								</Text>
-							</TouchableOpacity>
-						))}
-
-						{priceReason === 'custom' && (
-							<View style={styles.customReasonContainer}>
-								<Text style={styles.reasonLabel}>Custom reason:</Text>
-								<TextInput
-									style={[styles.customReasonInput]}
-									placeholder="Enter your reason for changing the total..."
-									value={customPriceReason}
-									onChangeText={setCustomPriceReason}
-									multiline
-									numberOfLines={3}
-								/>
-							</View>
-						)}
-
-						<View style={styles.modalButtonRow}>
-							<TouchableOpacity
-								style={styles.cancelModalBtn}
-								onPress={cancelAccept}
-								disabled={updatingStatus}>
-								<Text style={styles.cancelModalText}>Cancel</Text>
-							</TouchableOpacity>
-							<TouchableOpacity
-								style={styles.submitDeclineBtn}
-								onPress={submitAccept}
-								disabled={updatingStatus}>
-								<Text style={styles.submitDeclineText}>
-									{updatingStatus ? 'Saving...' : 'Accept Order'}
-								</Text>
-							</TouchableOpacity>
-						</View>
-					</View>
-				</View>
-			</Modal>
-
-			{/* Decline Reason Modal */}
-			<Modal
-				visible={declineModalVisible}
-				animationType="slide"
-				transparent={true}>
-				<View style={styles.modalOverlay}>
-					<ScrollView
-						style={styles.modalContainer}
-						contentContainerStyle={{ paddingBottom: 20 }}>
-						<Text style={styles.modalHeader}>Decline Order</Text>
-						<Text style={styles.modalSubtitle}>
-							Please provide a reason for declining this order:
-						</Text>
-
-						{/* Preset Reasons */}
-						<Text style={styles.reasonLabel}>Select a reason:</Text>
-						{[
-							'Item not available',
-							'Unavailable options/variations',
-							'Concession is closed or about to close',
-							'Order too large to fulfill',
-							'Other (specify below)',
-						].map((reason, index) => (
-							<TouchableOpacity
-								key={index}
-								style={[
-									styles.reasonOption,
-									selectedReason === (index === 4 ? 'custom' : reason) &&
-										styles.selectedReason,
-								]}
-								onPress={() => {
-									setSelectedReason(index === 4 ? 'custom' : reason)
-									if (index !== 4) setCustomReason('')
-								}}>
-								<Text
-									style={[
-										styles.reasonText,
-										selectedReason === (index === 4 ? 'custom' : reason) &&
-											styles.selectedReasonText,
-									]}>
-									{reason}
-								</Text>
-							</TouchableOpacity>
-						))}
-
-						{/* Item Availability Toggles for "Item not available" */}
-						{selectedReason === 'Item not available' && order?.items && (
-							<View style={styles.itemToggleContainer}>
-								<Text style={styles.reasonLabel}>
-									Mark items as unavailable:
-								</Text>
-								<Text style={styles.itemToggleSubtext}>
-									Selected items will be marked unavailable in your menu
-								</Text>
-								{/* Get unique items from order */}
-								{Array.from(
-									new Map(
-										order.items.map((item: any) => [
-											item.item_id,
-											{ id: item.item_id, name: item.item_name },
-										])
-									).values()
-								).map((item: any) => (
-									<View
-										key={item.id}
-										style={styles.itemToggleRow}>
-										<Checkbox
-											value={itemsToToggle[item.id] || false}
-											onValueChange={(value: boolean) => {
-												setItemsToToggle((prev) => ({
-													...prev,
-													[item.id]: value,
-												}))
-											}}
-											color={itemsToToggle[item.id] ? '#A40C2D' : undefined}
-											style={styles.checkbox}
-										/>
-										<Text style={styles.itemToggleName}>{item.name}</Text>
-									</View>
-								))}
-							</View>
-						)}
-
-						{/* Variation Availability Toggles for "Unavailable options/variations" */}
-						{selectedReason === 'Unavailable options/variations' &&
-							order?.items && (
-								<View style={styles.itemToggleContainer}>
-									<Text style={styles.reasonLabel}>
-										Mark variations as unavailable:
-									</Text>
-									<Text style={styles.itemToggleSubtext}>
-										Selected variations will be marked unavailable in your menu
-									</Text>
-
-									{(() => {
-										// Group variations by item
-										const itemsWithVariations: Array<{
-											itemId: number
-											itemName: string
-											variations: Array<{
-												variationId: number
-												groupName: string
-												variationName: string
-											}>
-										}> = []
-
-										console.log('Order Items:', JSON.stringify(order.items))
-										// Collect unique items with their variations
-										const processedItems = new Set<number>()
-										for (const orderItem of order.items) {
-											if (
-												!processedItems.has(orderItem.item_id) &&
-												orderItem.variations &&
-												orderItem.variations.length > 0
-											) {
-												processedItems.add(orderItem.item_id)
-												const variations: Array<{
-													variationId: number
-													groupName: string
-													variationName: string
-												}> = []
-
-												// Collect all unique variations for this item from all order items
-												const seenVariations = new Set<number>()
-												for (const oi of order.items) {
-													if (oi.item_id === orderItem.item_id) {
-														for (const v of oi.variations || []) {
-															if (!seenVariations.has(v.id)) {
-																seenVariations.add(v.id)
-																variations.push({
-																	variationId: v.id,
-																	groupName: v.variation_group_name,
-																	variationName: v.variation_name,
-																})
-															}
-														}
-													}
-												}
-												itemsWithVariations.push({
-													itemId: orderItem.item_id,
-													itemName: orderItem.item_name,
-													variations,
-												})
-											}
-										}
-
-										if (itemsWithVariations.length === 0) {
-											return (
-												<Text
-													style={[
-														styles.itemToggleSubtext,
-														{ fontStyle: 'italic', marginTop: 10 },
-													]}>
-													No variations in this order to toggle
-												</Text>
-											)
-										}
-
-										// Group variations by group name for each item
-										return itemsWithVariations.map((item, itemIndex) => {
-											const groupedVariations = new Map<
-												string,
-												Array<{ variationId: number; variationName: string }>
-											>()
-
-											for (const v of item.variations) {
-												if (!groupedVariations.has(v.groupName)) {
-													groupedVariations.set(v.groupName, [])
-												}
-												groupedVariations.get(v.groupName)!.push({
-													variationId: v.variationId,
-													variationName: v.variationName,
-												})
-											}
-											console.log(
-												'itemsWithVariations:',
-												JSON.stringify(itemsWithVariations)
-											)
-
-											console.log(
-												'Grouped Variations:',
-												JSON.stringify(groupedVariations)
-											)
-
-											return (
-												<View
-													key={`${item.itemId}-${itemIndex}`}
-													style={{
-														marginTop: 15,
-														paddingTop: 15,
-														borderTopWidth: 1,
-														borderTopColor: '#e0e0e0',
-													}}>
-													<Text
-														style={{
-															fontSize: 15,
-															fontWeight: '600',
-															color: '#A40C2D',
-															marginBottom: 10,
-														}}>
-														{item.itemName}
-													</Text>
-
-													{Array.from(groupedVariations.entries()).map(
-														([groupName, variations], groupIndex) => (
-															<View
-																key={`${item.itemId}-${groupName}-${groupIndex}`}
-																style={{ marginBottom: 12 }}>
-																<View
-																	style={{
-																		flexDirection: 'row',
-																		alignItems: 'center',
-																		marginBottom: 6,
-																	}}>
-																	<Checkbox
-																		value={variations.every(
-																			(v) => variationsToToggle[v.variationId]
-																		)}
-																		onValueChange={(value: boolean) => {
-																			const newState = { ...variationsToToggle }
-																			for (const v of variations) {
-																				newState[v.variationId] = value
-																			}
-																			setVariationsToToggle(newState)
-																		}}
-																		color={
-																			(
-																				variations.every(
-																					(v) =>
-																						variationsToToggle[v.variationId]
-																				)
-																			) ?
-																				'#A40C2D'
-																			:	undefined
-																		}
-																		style={styles.checkbox}
-																	/>
-																	<Text
-																		style={{
-																			fontSize: 14,
-																			fontWeight: '600',
-																			color: '#555',
-																			marginLeft: 10,
-																			flex: 1,
-																		}}>
-																		{groupName} (Select All)
-																	</Text>
-																</View>
-
-																{variations.map((v, vIndex) => (
-																	<View
-																		key={`${item.itemId}-${groupName}-${groupIndex}-${v.variationId}-${vIndex}`}
-																		style={{
-																			flexDirection: 'row',
-																			alignItems: 'center',
-																			paddingVertical: 8,
-																			paddingLeft: 15,
-																		}}>
-																		<Checkbox
-																			value={
-																				variationsToToggle[v.variationId] ||
-																				false
-																			}
-																			onValueChange={(value: boolean) => {
-																				setVariationsToToggle((prev) => ({
-																					...prev,
-																					[v.variationId]: value,
-																				}))
-																			}}
-																			color={
-																				variationsToToggle[v.variationId] ?
-																					'#A40C2D'
-																				:	undefined
-																			}
-																			style={styles.checkbox}
-																		/>
-																		<Text
-																			style={{
-																				fontSize: 13,
-																				color: '#333',
-																				marginLeft: 10,
-																				flex: 1,
-																			}}>
-																			{v.variationName}
-																		</Text>
-																	</View>
-																))}
-															</View>
-														)
-													)}
-												</View>
-											)
-										})
-									})()}
-								</View>
-							)}
-
-						{/* Close Concession Button for "Concession is closed or about to close" */}
-						{selectedReason === 'Concession is closed or about to close' && (
-							<View style={styles.itemToggleContainer}>
-								<Text style={styles.reasonLabel}>Close your concession:</Text>
-								<Text style={styles.itemToggleSubtext}>
-									This will close your concession and prevent new orders
-								</Text>
-								<TouchableOpacity
-									style={[
-										styles.submitDeclineBtn,
-										{ marginTop: 10 },
-										closingConcession && { opacity: 0.6 },
-									]}
-									onPress={async () => {
-										try {
-											setClosingConcession(true)
-											await api.put(
-												`/concession/${order.concession_id}/status`,
-												{
-													status: 'closed',
-												}
-											)
-											showToast('success', 'Concession closed successfully')
-										} catch (error) {
-											console.error('Error closing concession:', error)
-											showToast('error', 'Failed to close concession')
-										} finally {
-											setClosingConcession(false)
-										}
-									}}
-									disabled={closingConcession}>
-									<Text style={styles.submitDeclineText}>
-										{closingConcession ? 'Closing...' : 'Close Concession Now'}
-									</Text>
-								</TouchableOpacity>
-							</View>
-						)}
-
-						{/* Custom Reason Input */}
-						{selectedReason === 'custom' && (
-							<View style={styles.customReasonContainer}>
-								<Text style={styles.reasonLabel}>Custom reason:</Text>
-								<TextInput
-									style={styles.customReasonInput}
-									placeholder="Enter your reason for declining..."
-									value={customReason}
-									onChangeText={setCustomReason}
-									multiline
-									numberOfLines={3}
-								/>
-							</View>
-						)}
-
-						{/* Modal Buttons */}
-						<View style={styles.modalButtonRow}>
-							<TouchableOpacity
-								style={styles.cancelModalBtn}
-								onPress={cancelDecline}>
-								<Text style={styles.cancelModalText}>Cancel</Text>
-							</TouchableOpacity>
-							<TouchableOpacity
-								style={styles.submitDeclineBtn}
-								onPress={submitDecline}
-								disabled={updatingStatus}>
-								<Text style={styles.submitDeclineText}>
-									{updatingStatus ? 'Declining...' : 'Decline Order'}
-								</Text>
-							</TouchableOpacity>
-						</View>
-					</ScrollView>
-				</View>
-			</Modal>
-
-			{/* Reject GCash Screenshot Modal */}
-			<Modal
-				visible={rejectScreenshotModalVisible}
-				animationType="slide"
-				transparent={true}>
-				<View style={styles.modalOverlay}>
-					<ScrollView
-						style={styles.modalContainer}
-						contentContainerStyle={{ paddingBottom: 20 }}>
-						<Text style={styles.modalHeader}>Reject GCash Screenshot</Text>
-						<Text style={styles.modalSubtitle}>
-							Please provide a reason for rejecting this GCash screenshot:
-						</Text>
-
-						{/* Rejection Reasons */}
-						<Text style={styles.reasonLabel}>Select a rejection reason:</Text>
-						{[
-							{ key: 'insufficient_amount', label: 'Insufficient payment amount' },
-							{ key: 'wrong_image', label: 'Invalid or incorrect image uploaded' },
-							{ key: 'unclear_receipt', label: 'Receipt image is unclear or unreadable' },
-							{ key: 'mismatched_name', label: 'Account name does not match' },
-							{ key: 'other', label: 'Other (specify below)' },
-						].map((reason, index) => (
-							<TouchableOpacity
-								key={index}
-								style={[
-									styles.reasonOption,
-									selectedRejectionReason === reason.key && styles.selectedReason,
-								]}
-								onPress={() => {
-									setSelectedRejectionReason(reason.key)
-									if (reason.key !== 'other') setCustomRejectionReason('')
-								}}>
-								<Text
-									style={[
-										styles.reasonText,
-										selectedRejectionReason === reason.key && styles.selectedReasonText,
-									]}>
-									{reason.label}
-								</Text>
-							</TouchableOpacity>
-						))}
-
-						{/* Custom Reason for "Other" */}
-						{selectedRejectionReason === 'other' && (
-							<View style={styles.customReasonContainer}>
-								<Text style={styles.reasonLabel}>Custom reason:</Text>
-								<TextInput
-									style={[styles.customReasonInput]}
-									placeholder="Enter your reason for rejecting this screenshot..."
-									value={customRejectionReason}
-									onChangeText={setCustomRejectionReason}
-									multiline
-									numberOfLines={3}
-								/>
-							</View>
-						)}
-
-						{/* Restart Timer Toggle */}
-						<View style={styles.toggleContainer}>
-							<Text style={styles.toggleLabel}>Restart payment timer:</Text>
-							<View style={styles.toggleRow}>
-								<Text style={styles.toggleDescription}>
-									Enable to give the customer more time to upload a new receipt
-								</Text>
-								<Checkbox
-									value={restartTimer}
-									onValueChange={setRestartTimer}
-									color={restartTimer ? '#A40C2D' : undefined}
-									style={styles.checkbox}
-								/>
-							</View>
-						</View>
-
-						<View style={styles.modalButtonRow}>
-							<TouchableOpacity
-								style={styles.cancelModalBtn}
-								onPress={closeRejectScreenshotModal}
-								disabled={rejectingScreenshot}>
-								<Text style={styles.cancelModalText}>Cancel</Text>
-							</TouchableOpacity>
-							<TouchableOpacity
-								style={styles.submitDeclineBtn}
-								onPress={rejectGCashScreenshot}
-								disabled={rejectingScreenshot}>
-								<Text style={styles.submitDeclineText}>
-									{rejectingScreenshot ? 'Rejecting...' : 'Reject Screenshot'}
-								</Text>
-							</TouchableOpacity>
-						</View>
-					</ScrollView>
-				</View>
-			</Modal>
-		</ScrollView>
-	)
-}
+  const route = useRoute<any>();
+  const navigation = useNavigation<any>();
+  const { orderId } = route.params;
+
+  const [order, setOrder] = useState<any>(null);
+  const [loading, setLoading] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+  const [updatingStatus, setUpdatingStatus] = useState(false);
+  const [declineModalVisible, setDeclineModalVisible] = useState(false);
+  const [selectedReason, setSelectedReason] = useState<string>("");
+  const [customReason, setCustomReason] = useState<string>("");
+  const [itemsToToggle, setItemsToToggle] = useState<Record<number, boolean>>(
+    {},
+  );
+  const [variationsToToggle, setVariationsToToggle] = useState<
+    Record<number, boolean>
+  >({});
+  const [acceptModalVisible, setAcceptModalVisible] = useState(false);
+  const [adjustedTotal, setAdjustedTotal] = useState<string>("");
+  const [priceReason, setPriceReason] = useState<string>("");
+  const [customPriceReason, setCustomPriceReason] = useState<string>("");
+  const [previewSource, setPreviewSource] = useState<string | null>(null);
+  const [closingConcession, setClosingConcession] = useState(false);
+  const [currentTime, setCurrentTime] = useState(Date.now());
+  const [rejectingReceipt, setRejectingReceipt] = useState(false);
+  const [rejectScreenshotModalVisible, setRejectScreenshotModalVisible] =
+    useState(false);
+  const [selectedRejectionReason, setSelectedRejectionReason] =
+    useState<string>("");
+  const [customRejectionReason, setCustomRejectionReason] =
+    useState<string>("");
+  const [rejectingScreenshot, setRejectingScreenshot] = useState(false);
+  const [restartTimer, setRestartTimer] = useState(false);
+  const [reopeningRequest, setReopeningRequest] = useState<any>(null);
+  const [reopeningModalVisible, setReopeningModalVisible] = useState(false);
+  const [respondingToReopening, setRespondingToReopening] = useState(false);
+  const { showToast } = useToast();
+
+  // Format dates with Asia/Manila timezone (robust to plain DB timestamps)
+  const formatManila = (value: any) => {
+    if (!value) return "";
+    try {
+      // Just parse and format the timestamp as-is (backend will handle timezone conversion)
+      const dateObj = new Date(value);
+      if (Number.isNaN(dateObj.getTime())) return String(value);
+
+      // Manual formatting
+      const months = [
+        "Jan",
+        "Feb",
+        "Mar",
+        "Apr",
+        "May",
+        "Jun",
+        "Jul",
+        "Aug",
+        "Sep",
+        "Oct",
+        "Nov",
+        "Dec",
+      ];
+      const month = months[dateObj.getMonth()];
+      const day = String(dateObj.getDate()).padStart(2, "0");
+      const year = dateObj.getFullYear();
+
+      let hours = dateObj.getHours();
+      const minutes = String(dateObj.getMinutes()).padStart(2, "0");
+      const ampm = hours >= 12 ? "PM" : "AM";
+      hours = hours % 12;
+      hours = hours ? hours : 12; // 0 should be 12
+
+      return `${month} ${day}, ${year}, ${hours}:${minutes} ${ampm}`;
+    } catch {
+      return String(value);
+    }
+  };
+
+  const formatSchedule = (value: any) => formatManila(value);
+  const formatDateTime = (value: any) => formatManila(value);
+
+  // Fetch order details from backend
+  const fetchOrderDetails = async (isRefresh = false) => {
+    try {
+      if (isRefresh) {
+        setRefreshing(true);
+      }
+      // Auto-decline any expired GCash receipts in bulk before fetching order details
+      try {
+        await api.post("/order/bulk-decline-expired");
+      } catch (e) {
+        console.warn("Bulk decline expired receipts failed:", e);
+      }
+      if (!isRefresh) {
+        setLoading(true);
+      }
+      const res = await api.get(`/order/${orderId}`); // Backend route /order/:id
+      setOrder(res.data);
+
+      // Check for reopening request if order is declined
+      if (
+        res.data.order_status === "declined" &&
+        res.data.reopening_requested
+      ) {
+        checkForReopeningRequest();
+      } else {
+        setReopeningRequest(null);
+      }
+    } catch (err) {
+      console.error("Error fetching order details:", err);
+      showToast("error", "Failed to fetch order details");
+    } finally {
+      if (isRefresh) {
+        setRefreshing(false);
+      } else {
+        setLoading(false);
+      }
+    }
+  };
+
+  useEffect(() => {
+    fetchOrderDetails();
+  }, [orderId]);
+
+  // ===============================
+  // Check for reopening request
+  // ===============================
+  const checkForReopeningRequest = async () => {
+    try {
+      const res = await api.get(`/order-reopening/order/${orderId}/status`);
+      if (res.data.hasRequest && res.data.request.status === "pending") {
+        // Add customer name from order to the request data
+        const requestWithCustomer = {
+          ...res.data.request,
+          customer_name: `${order?.customer_first_name || ''} ${order?.customer_last_name || ''}`.trim()
+        };
+        setReopeningRequest(requestWithCustomer);
+      } else {
+        setReopeningRequest(null);
+      }
+    } catch (err) {
+      console.error("Error checking reopening request:", err);
+      setReopeningRequest(null);
+    }
+  };
+
+  // ===============================
+  // Handle reopening request view
+  // ===============================
+  const handleViewReopeningRequest = () => {
+    if (reopeningRequest) {
+      setReopeningModalVisible(true);
+    }
+  };
+
+  // ===============================
+  // Approve reopening request
+  // ===============================
+  const handleApproveReopening = async () => {
+    if (!reopeningRequest) return;
+
+    try {
+      setRespondingToReopening(true);
+      await api.put(`/order-reopening/request/${reopeningRequest.id}/respond`, {
+        action: "approve",
+      });
+
+      showToast(
+        "success",
+        "Reopening request approved. Order has been reopened.",
+      );
+      setReopeningModalVisible(false);
+      setReopeningRequest(null);
+      await fetchOrderDetails();
+    } catch (err: any) {
+      console.error("Error approving reopening request:", err);
+      const errorMessage =
+        err.response?.data?.error || "Failed to approve reopening request";
+      showToast("error", errorMessage);
+    } finally {
+      setRespondingToReopening(false);
+    }
+  };
+
+  // ===============================
+  // Decline reopening request
+  // ===============================
+  const handleDeclineReopening = async (
+    reasonType: string,
+    customMessage: string,
+  ) => {
+    if (!reopeningRequest) return;
+
+    try {
+      setRespondingToReopening(true);
+      await api.put(`/order-reopening/request/${reopeningRequest.id}/respond`, {
+        action: "reject",
+        responseType: reasonType,
+        customMessage: customMessage,
+      });
+
+      showToast("success", "Reopening request declined");
+      setReopeningModalVisible(false);
+      setReopeningRequest(null);
+      await fetchOrderDetails();
+    } catch (err: any) {
+      console.error("Error declining reopening request:", err);
+      const errorMessage =
+        err.response?.data?.error || "Failed to decline reopening request";
+      showToast("error", errorMessage);
+    } finally {
+      setRespondingToReopening(false);
+    }
+  };
+
+  // Update current time every second for timer
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setCurrentTime(Date.now());
+    }, 1000);
+    return () => clearInterval(interval);
+  }, []);
+
+  // Calculate receipt timer
+  const calculateTimer = () => {
+    if (
+      !order ||
+      order.payment_method !== "gcash" ||
+      order.order_status !== "accepted"
+    ) {
+      return { timeRemaining: null, isExpired: false };
+    }
+
+    try {
+      // Strictly prefer backend's expiry timestamp; do not add timer again
+      if (order.payment_receipt_expires_at) {
+        let s = order.payment_receipt_expires_at.trim();
+        if (!/[zZ]|[+-]\d{2}:?\d{2}$/.test(s)) {
+          s = s.replace(" ", "T") + "Z";
+        }
+        const expiresDate = new Date(s);
+        if (!Number.isNaN(expiresDate.getTime())) {
+          const deadlineMs = expiresDate.getTime();
+          const remainingMs = deadlineMs - currentTime;
+          if (remainingMs <= 0) {
+            return { timeRemaining: "Expired", isExpired: true };
+          }
+          const totalSeconds = Math.floor(remainingMs / 1000);
+          const hours = Math.floor(totalSeconds / 3600);
+          const minutes = Math.floor((totalSeconds % 3600) / 60);
+          const seconds = totalSeconds % 60;
+          const timeRemaining = `${hours.toString().padStart(2, "0")}:${minutes
+            .toString()
+            .padStart(2, "0")}:${seconds.toString().padStart(2, "0")}`;
+          return { timeRemaining, isExpired: false };
+        }
+      }
+
+      // Fallback: calculate locally only if backend did not provide expiry
+      if (!order.accepted_at || !order.receipt_timer) {
+        return { timeRemaining: null, isExpired: false };
+      }
+
+      let s = order.accepted_at.trim();
+      if (!/[zZ]|[+-]\d{2}:?\d{2}$/.test(s)) {
+        s = s.replace(" ", "T") + "Z";
+      }
+      const acceptedDate = new Date(s);
+      const [hours, minutes, seconds] = order.receipt_timer
+        .split(":")
+        .map(Number);
+      const deadlineMs =
+        acceptedDate.getTime() + (hours * 3600 + minutes * 60 + seconds) * 1000;
+
+      const remainingMs = deadlineMs - currentTime;
+
+      if (remainingMs <= 0) {
+        return { timeRemaining: "Expired", isExpired: true };
+      }
+
+      const remainingMinutes = Math.floor(remainingMs / 60000);
+      const remainingSeconds = Math.floor((remainingMs % 60000) / 1000);
+      return {
+        timeRemaining: `${remainingMinutes}:${remainingSeconds
+          .toString()
+          .padStart(2, "0")}`,
+        isExpired: false,
+      };
+    } catch (e) {
+      console.error("Error calculating timer:", e);
+      return { timeRemaining: null, isExpired: false };
+    }
+  };
+
+  // Auto-decline order if timer expires
+  useEffect(() => {
+    if (!order) return;
+
+    const checkExpiration = async () => {
+      // Only check GCash orders that are accepted without receipt
+      if (
+        order.payment_method === "gcash" &&
+        order.order_status === "accepted" &&
+        !order.gcash_screenshot
+      ) {
+        const { isExpired } = calculateTimer();
+        if (isExpired) {
+          try {
+            await api.post(`/order/${order.id}/check-expired`);
+            await fetchOrderDetails();
+            showToast(
+              "error",
+              "Order automatically declined: Receipt not uploaded in time",
+            );
+          } catch (err) {
+            console.error("Error auto-declining order:", err);
+          }
+        }
+      }
+    };
+
+    checkExpiration();
+  }, [currentTime, order?.id, order?.order_status, order?.gcash_screenshot]);
+
+  // Update order status
+  const updateStatus = async (newStatus: string, declineReason?: string) => {
+    if (!order) return;
+    try {
+      setUpdatingStatus(true);
+      const requestData: any = { order_status: newStatus };
+      if (declineReason) {
+        requestData.decline_reason = declineReason;
+      }
+      await api.put(`order/status/${order.id}`, requestData);
+      await fetchOrderDetails();
+      showToast("success", `Order marked as ${newStatus}`);
+    } catch (err) {
+      console.error(err);
+      showToast("error", "Failed to update order status");
+    } finally {
+      setUpdatingStatus(false);
+    }
+  };
+
+  // Handle decline with reason
+  const handleDecline = () => {
+    setDeclineModalVisible(true);
+  };
+
+  // Submit decline with reason
+  const submitDecline = async () => {
+    if (!selectedReason && !customReason.trim()) {
+      showToast(
+        "error",
+        "Please select a reason or provide a custom reason for declining this order.",
+      );
+      return;
+    }
+
+    const reason =
+      selectedReason === "custom" ? customReason.trim() : selectedReason;
+
+    // If "Item not available" is selected, update item availability
+    const toggledUnavailableItems: string[] = [];
+    if (selectedReason === "Item not available") {
+      try {
+        const itemsToUpdate = Object.entries(itemsToToggle).filter(
+          ([_, shouldToggle]) => shouldToggle,
+        );
+
+        for (const [itemIdStr, _] of itemsToUpdate) {
+          const itemId = parseInt(itemIdStr);
+          const item = order?.items?.find((i: any) => i.item_id === itemId);
+
+          if (item) {
+            // Update availability to false
+            await api.put(`/menu-item/${itemId}/availability`, {
+              available: false,
+            });
+            toggledUnavailableItems.push(item.item_name);
+          }
+        }
+      } catch (error) {
+        console.error("Error updating item availability:", error);
+        showToast("error", "Failed to update item availability");
+        return;
+      }
+    }
+
+    // If "Unavailable options/variations" is selected, update variation availability
+    const toggledUnavailableVariations: string[] = [];
+    if (selectedReason === "Unavailable options/variations") {
+      try {
+        const variationsToUpdate = Object.entries(variationsToToggle).filter(
+          ([_, shouldToggle]) => shouldToggle,
+        );
+
+        for (const [variationIdStr, _] of variationsToUpdate) {
+          const variationId = parseInt(variationIdStr);
+
+          // Update variation availability to false
+          await api.put(`/item-variation/${variationId}/availability`, {
+            available: false,
+          });
+
+          // Find variation name for notification
+          let variationName = "";
+          for (const item of order?.items || []) {
+            for (const v of item.variations || []) {
+              if (v.variation_id === variationId) {
+                variationName = `${v.group_name}: ${v.variation_name}`;
+                break;
+              }
+            }
+            if (variationName) break;
+          }
+          if (variationName) {
+            toggledUnavailableVariations.push(variationName);
+          }
+        }
+      } catch (error) {
+        console.error("Error updating variation availability:", error);
+        showToast("error", "Failed to update variation availability");
+        return;
+      }
+    }
+
+    // Build decline reason with toggled items/variations info
+    let finalReason = reason;
+    if (toggledUnavailableItems.length > 0) {
+      finalReason += `\n\nItems marked as unavailable: ${toggledUnavailableItems.join(
+        ", ",
+      )}`;
+    }
+    if (toggledUnavailableVariations.length > 0) {
+      finalReason += `\n\nVariations marked as unavailable: ${toggledUnavailableVariations.join(
+        ", ",
+      )}`;
+    }
+
+    await updateStatus("declined", finalReason);
+    setDeclineModalVisible(false);
+    setSelectedReason("");
+    setCustomReason("");
+    setItemsToToggle({});
+    setVariationsToToggle({});
+  };
+
+  // Cancel decline
+  const cancelDecline = () => {
+    setDeclineModalVisible(false);
+    setSelectedReason("");
+    setCustomReason("");
+    setItemsToToggle({});
+    setVariationsToToggle({});
+  };
+
+  const openAcceptModal = () => {
+    if (!order) return;
+    const baseTotal =
+      order.updated_total_price !== null &&
+      order.updated_total_price !== undefined
+        ? order.updated_total_price
+        : order.total_price;
+    const formatted =
+      baseTotal !== null &&
+      baseTotal !== undefined &&
+      !Number.isNaN(Number(baseTotal))
+        ? Number(baseTotal).toFixed(2)
+        : "";
+    setAdjustedTotal(formatted);
+    setPriceReason("");
+    setCustomPriceReason("");
+    setAcceptModalVisible(true);
+  };
+
+  const cancelAccept = () => {
+    setAcceptModalVisible(false);
+    setPriceReason("");
+    setCustomPriceReason("");
+  };
+
+  const submitAccept = async () => {
+    if (!order) return;
+    const originalTotal = Number(order.total_price ?? 0);
+    const trimmed = adjustedTotal.trim();
+
+    let newTotal: number | null = null;
+    if (trimmed) {
+      const parsed = Number(trimmed);
+      if (!Number.isFinite(parsed) || parsed < 0) {
+        showToast("error", "Please enter a valid total amount.");
+        return;
+      }
+      newTotal = parsed;
+    }
+
+    const payload: any = { order_status: "accepted" };
+
+    if (newTotal !== null && newTotal !== originalTotal) {
+      if (!priceReason && !customPriceReason.trim()) {
+        showToast(
+          "error",
+          "Please select or enter a reason for changing the total.",
+        );
+        return;
+      }
+      const reason =
+        priceReason === "custom" ? customPriceReason.trim() : priceReason;
+      payload.updated_total_price = newTotal;
+      payload.price_change_reason = reason;
+    }
+
+    try {
+      setUpdatingStatus(true);
+      await api.put(`order/status/${order.id}`, payload);
+      await fetchOrderDetails();
+      showToast("success", "Order marked as accepted");
+      setAcceptModalVisible(false);
+    } catch (err) {
+      console.error(err);
+      showToast("error", "Failed to update order status");
+    } finally {
+      setUpdatingStatus(false);
+    }
+  };
+
+  const onRefresh = () => {
+    if (loading) return;
+    fetchOrderDetails(true);
+  };
+
+  // Reject receipt and restart timer
+  const rejectReceipt = async () => {
+    if (!order) return;
+
+    try {
+      setRejectingReceipt(true);
+      await api.put(`/order/${order.id}/reject-receipt`);
+      await fetchOrderDetails();
+      showToast("success", "Receipt rejected. Timer restarted.");
+    } catch (err) {
+      console.error("Error rejecting receipt:", err);
+      showToast("error", "Failed to reject receipt");
+    } finally {
+      setRejectingReceipt(false);
+    }
+  };
+
+  // Reject GCash screenshot with specific reason
+  const rejectGCashScreenshot = async () => {
+    if (!order) return;
+
+    if (!selectedRejectionReason && !customRejectionReason.trim()) {
+      showToast(
+        "error",
+        "Please select a rejection reason or provide a custom reason.",
+      );
+      return;
+    }
+
+    const rejectionReason =
+      selectedRejectionReason === "other"
+        ? customRejectionReason.trim()
+        : selectedRejectionReason;
+
+    try {
+      setRejectingScreenshot(true);
+      await api.put(`/order/${order.id}/reject-gcash-screenshot`, {
+        rejection_reason: selectedRejectionReason,
+        custom_reason: customRejectionReason.trim() || undefined,
+        restart_timer: restartTimer,
+      });
+      await fetchOrderDetails();
+      showToast(
+        "success",
+        `GCash screenshot rejected successfully.${restartTimer ? " Timer restarted." : ""}`,
+      );
+      setRejectScreenshotModalVisible(false);
+      setSelectedRejectionReason("");
+      setCustomRejectionReason("");
+      setRestartTimer(false);
+    } catch (err) {
+      console.error("Error rejecting GCash screenshot:", err);
+      showToast("error", "Failed to reject GCash screenshot");
+    } finally {
+      setRejectingScreenshot(false);
+    }
+  };
+
+  // Open reject screenshot modal
+  const openRejectScreenshotModal = () => {
+    setRejectScreenshotModalVisible(true);
+  };
+
+  // Close reject screenshot modal
+  const closeRejectScreenshotModal = () => {
+    setRejectScreenshotModalVisible(false);
+    setSelectedRejectionReason("");
+    setCustomRejectionReason("");
+    setRestartTimer(false);
+  };
+
+  if (loading)
+    return (
+      <ActivityIndicator size="large" color="#A40C2D" style={{ flex: 1 }} />
+    );
+
+  if (!order)
+    return (
+      <View style={styles.container}>
+        <Text style={styles.emptyText}>Order not found</Text>
+      </View>
+    );
+
+  // Render buttons depending on order status
+  const renderStatusButtons = () => {
+    if (updatingStatus) return <Text>Updating...</Text>;
+
+    switch (order.order_status) {
+      case "pending":
+        return (
+          <View style={styles.buttonRow}>
+            <TouchableOpacity
+              style={styles.acceptBtn}
+              onPress={openAcceptModal}
+            >
+              <Text style={styles.btnText}>Accept</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.declineBtn} onPress={handleDecline}>
+              <Text style={styles.btnText}>Decline Order</Text>
+            </TouchableOpacity>
+          </View>
+        );
+      case "accepted": {
+        const { isExpired } = calculateTimer();
+        const gcashTimeoutExpired =
+          order.payment_method === "gcash" &&
+          !order.gcash_screenshot &&
+          isExpired;
+
+        if (gcashTimeoutExpired) {
+          return (
+            <View style={styles.expiredTimerContainer}>
+              <View style={styles.expiredTimerMessage}>
+                <Ionicons
+                  name="alert-circle"
+                  size={24}
+                  color="#dc3545"
+                  style={{ marginRight: 10 }}
+                />
+                <Text style={styles.expiredTimerText}>
+                  GCash receipt upload time has expired. This order must be
+                  declined.
+                </Text>
+              </View>
+              <TouchableOpacity
+                style={styles.declineBtn}
+                onPress={handleDecline}
+              >
+                <Text style={styles.btnText}>Decline Order</Text>
+              </TouchableOpacity>
+            </View>
+          );
+        }
+
+        return (
+          <TouchableOpacity
+            style={styles.readyBtn}
+            onPress={() => updateStatus("ready for pickup")}
+          >
+            <Text style={styles.btnText}>Ready for Pick-up</Text>
+          </TouchableOpacity>
+        );
+      }
+      case "ready for pickup":
+        return (
+          <TouchableOpacity
+            style={styles.completeBtn}
+            onPress={() => updateStatus("completed")}
+          >
+            <Text style={styles.btnText}>Complete</Text>
+          </TouchableOpacity>
+        );
+      case "declined":
+      case "completed":
+        return (
+          <Text style={{ marginTop: 10, fontStyle: "italic" }}>
+            No further actions available
+          </Text>
+        );
+      default:
+        return null;
+    }
+  };
+
+  return (
+    <ScrollView
+      style={styles.container}
+      contentContainerStyle={styles.contentContainer}
+      refreshControl={
+        <RefreshControl
+          refreshing={refreshing}
+          onRefresh={onRefresh}
+          tintColor="#A40C2D"
+        />
+      }
+    >
+      <Text style={styles.header}>Order #{order.id}</Text>
+
+      {/* Order Status & Basic Info */}
+      <View style={styles.sectionCard}>
+        <Text style={styles.sectionTitle}>
+          <Ionicons
+            name="clipboard-outline"
+            size={16}
+            color="#A40C2D"
+            style={styles.inlineIcon}
+          />{" "}
+          Order Details
+        </Text>
+        <View style={styles.infoSection}>
+          <Text style={styles.infoLabel}>Status:</Text>
+          <Text style={[styles.status, styles.statusText]}>
+            {order.order_status}
+          </Text>
+        </View>
+        <View style={styles.infoSection}>
+          <Text style={styles.infoLabel}>Order Date:</Text>
+          <Text style={styles.infoValue}>
+            {formatDateTime(order.created_at)}
+          </Text>
+        </View>
+        {order.schedule_time && (
+          <View style={styles.infoSection}>
+            <Text style={styles.infoLabel}>Scheduled for:</Text>
+            <Text style={[styles.infoValue, styles.scheduleTime]}>
+              <Ionicons
+                name="time-outline"
+                size={14}
+                color="#28a745"
+                style={styles.inlineIcon}
+              />{" "}
+              {formatSchedule(order.schedule_time)}
+            </Text>
+          </View>
+        )}
+        {order.note && (
+          <View style={styles.infoSection}>
+            <Text style={styles.infoLabel}>Note:</Text>
+            <Text style={styles.infoValue}>{order.note}</Text>
+          </View>
+        )}
+      </View>
+
+      {/* Order Items */}
+      <View style={styles.sectionCard}>
+        <Text style={styles.sectionTitle}>
+          <Ionicons
+            name="cart-outline"
+            size={16}
+            color="#A40C2D"
+            style={styles.inlineIcon}
+          />{" "}
+          Order Items
+        </Text>
+        <FlatList
+          data={order.items || []}
+          keyExtractor={(item) => item.id.toString()}
+          renderItem={({ item }) => (
+            <View style={styles.itemCard}>
+              <Text style={styles.itemName}>
+                {Number(item.quantity ?? 1)} x {item.item_name}
+              </Text>
+              <Text style={styles.infoLabel}>Dining Option:</Text>
+              <Text style={styles.infoValue}>
+                <Ionicons
+                  name={
+                    item.dining_option === "take-out"
+                      ? "cube-outline"
+                      : "restaurant-outline"
+                  }
+                  size={14}
+                  color="#666"
+                  style={styles.inlineIcon}
+                />
+                {item.dining_option === "take-out" ? "Take-out" : "Dine-in"}
+              </Text>
+              <Text>₱{Number(item.total_price).toFixed(2)}</Text>
+              {item.note && <Text style={styles.note}>Note: {item.note}</Text>}
+              {item.variations?.length > 0 && (
+                <View style={{ marginTop: 5 }}>
+                  {item.variations.map((v: any, vIndex: number) => (
+                    <Text
+                      key={`${item.id}-${v.id}-${vIndex}`}
+                      style={styles.variation}
+                    >
+                      • {v.variation_group_name}: {v.variation_name}
+                      {v.quantity > 1 ? ` x${v.quantity}` : ""} (+₱
+                      {Number(v.additional_price || 0).toFixed(2)})
+                      {v.quantity > 1
+                        ? ` = ₱${(
+                            Number(v.additional_price || 0) * (v.quantity || 1)
+                          ).toFixed(2)}`
+                        : ""}
+                    </Text>
+                  ))}
+                </View>
+              )}
+            </View>
+          )}
+          scrollEnabled={false}
+        />
+      </View>
+
+      {/* Payment Information */}
+      <View style={styles.sectionCard}>
+        <Text style={styles.sectionTitle}>
+          <Ionicons
+            name="card-outline"
+            size={16}
+            color="#A40C2D"
+            style={styles.inlineIcon}
+          />{" "}
+          Payment
+        </Text>
+        <View style={styles.infoSection}>
+          <Text style={styles.infoLabel}>Payment Method:</Text>
+          <View style={styles.paymentMethodDisplay}>
+            {order.payment_method === "gcash" ? (
+              <Text style={styles.infoValue}>GCash</Text>
+            ) : (
+              <Text style={styles.infoValue}>
+                <Ionicons
+                  name="cash-outline"
+                  size={14}
+                  color="#666"
+                  style={styles.inlineIcon}
+                />{" "}
+                On-Counter
+              </Text>
+            )}
+          </View>
+        </View>
+
+        {/* Total Pricing Information */}
+        {order.updated_total_price !== null &&
+        order.updated_total_price !== undefined &&
+        !Number.isNaN(Number(order.updated_total_price)) &&
+        !Number.isNaN(Number(order.total_price)) &&
+        Number(order.updated_total_price) !== Number(order.total_price) ? (
+          <>
+            <View style={styles.infoSection}>
+              <Text style={styles.infoLabel}>Original Total:</Text>
+              <Text style={styles.infoValue}>
+                ₱{Number(order.total_price).toFixed(2)}
+              </Text>
+            </View>
+            <View style={styles.infoSection}>
+              <Text style={styles.infoLabel}>Updated Total:</Text>
+              <Text style={[styles.infoValue, styles.updatedPrice]}>
+                ₱{Number(order.updated_total_price).toFixed(2)}
+              </Text>
+            </View>
+            {order.price_change_reason && (
+              <View style={styles.infoSection}>
+                <Text style={styles.infoLabel}>Price Change Reason:</Text>
+                <Text style={styles.infoValue}>
+                  {order.price_change_reason}
+                </Text>
+              </View>
+            )}
+          </>
+        ) : (
+          <View style={styles.infoSection}>
+            <Text style={styles.infoLabel}>Total:</Text>
+            <Text style={[styles.infoValue, styles.totalPrice]}>
+              ₱{Number(order.total_price).toFixed(2)}
+            </Text>
+          </View>
+        )}
+        {order.payment_method === "gcash" && (
+          <View style={styles.gcashSection}>
+            {order.payment_receipt_expires_at &&
+              order.order_status !== "pending" && (
+                <Text style={styles.paymentExpiryText}>
+                  Payment expires at:{" "}
+                  {formatDateTime(order.payment_receipt_expires_at)}
+                </Text>
+              )}
+
+            {/* Receipt Status Indicators */}
+            {order.gcash_screenshot ? (
+              <View style={styles.paymentProofSection}>
+                <View
+                  style={{
+                    flexDirection: "row",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    marginBottom: 8,
+                  }}
+                >
+                  <Text style={styles.infoLabel}>GCash Screenshot:</Text>
+                  <View
+                    style={{
+                      backgroundColor: "#28a745",
+                      paddingHorizontal: 8,
+                      paddingVertical: 4,
+                      borderRadius: 4,
+                    }}
+                  >
+                    <Text
+                      style={{
+                        color: "#fff",
+                        fontSize: 12,
+                        fontWeight: "600",
+                      }}
+                    >
+                      Uploaded
+                    </Text>
+                  </View>
+                </View>
+                <TouchableOpacity
+                  onPress={() => setPreviewSource(order.gcash_screenshot)}
+                >
+                  <Image
+                    source={{ uri: order.gcash_screenshot }}
+                    style={styles.paymentProof}
+                  />
+                </TouchableOpacity>
+
+                {/* Reject Receipt Button */}
+                {order.order_status === "accepted" && (
+                  <TouchableOpacity
+                    style={[
+                      styles.rejectScreenshotBtn,
+                      rejectingScreenshot && styles.rejectScreenshotBtnDisabled,
+                    ]}
+                    onPress={openRejectScreenshotModal}
+                    disabled={rejectingScreenshot}
+                  >
+                    <Ionicons
+                      name="close-circle-outline"
+                      size={16}
+                      color="#fff"
+                      style={{ marginRight: 6 }}
+                    />
+                    <Text style={styles.rejectReceiptText}>
+                      {rejectingScreenshot
+                        ? "Rejecting..."
+                        : "Reject Screenshot"}
+                    </Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+            ) : (
+              <View style={styles.noReceiptContainer}>
+                <Ionicons
+                  name="alert-circle-outline"
+                  size={24}
+                  color="#ff9800"
+                />
+                <Text style={styles.noReceiptText}>
+                  No GCash receipt uploaded yet
+                </Text>
+              </View>
+            )}
+          </View>
+        )}
+      </View>
+
+      {/* Decline Reason (if applicable) */}
+      {order.order_status === "declined" && order.decline_reason && (
+        <View style={[styles.sectionCard, styles.declineCard]}>
+          <Text style={styles.sectionTitle}>
+            <Ionicons
+              name="close-circle-outline"
+              size={16}
+              color="#dc3545"
+              style={styles.inlineIcon}
+            />{" "}
+            Decline Information
+          </Text>
+          <View style={styles.infoSection}>
+            <Text style={styles.infoLabel}>Reason:</Text>
+            <Text style={[styles.infoValue, styles.declineReason]}>
+              {order.decline_reason}
+            </Text>
+          </View>
+
+          {/* Reopening Request Alert */}
+          {reopeningRequest && (
+            <View style={styles.reopeningRequestContainer}>
+              <View style={styles.reopeningRequestHeader}>
+                <Ionicons name="refresh-circle" size={24} color="#ffa500" />
+                <Text style={styles.reopeningRequestTitle}>
+                  Customer Reopening Request
+                </Text>
+              </View>
+              <Text style={styles.reopeningRequestText}>
+                {order.customer_first_name} {order.customer_last_name} has
+                requested to reopen this order.
+              </Text>
+              <TouchableOpacity
+                style={styles.viewReopeningRequestButton}
+                onPress={handleViewReopeningRequest}
+                activeOpacity={0.7}
+              >
+                <Ionicons name="eye-outline" size={18} color="#fff" />
+                <Text style={styles.viewReopeningRequestButtonText}>
+                  View Request & Respond
+                </Text>
+              </TouchableOpacity>
+            </View>
+          )}
+        </View>
+      )}
+
+      {/* Customer Info Section */}
+      <TouchableOpacity
+        style={styles.customerSection}
+        onPress={() =>
+          navigation.navigate("View Customer Profile", {
+            customerId: order.customer_id,
+          })
+        }
+      >
+        {order.customer_profile_image ? (
+          <Image
+            source={{ uri: order.customer_profile_image }}
+            style={styles.customerAvatar}
+          />
+        ) : (
+          <View style={styles.customerAvatarPlaceholder}>
+            <Text style={styles.customerInitials}>
+              {order.customer_first_name?.[0]}
+              {order.customer_last_name?.[0]}
+            </Text>
+          </View>
+        )}
+        <View style={styles.customerInfo}>
+          <Text style={styles.customerName}>
+            {order.customer_first_name} {order.customer_last_name}
+          </Text>
+          <Text style={styles.customerEmail}>{order.customer_email}</Text>
+        </View>
+      </TouchableOpacity>
+
+      {renderStatusButtons()}
+
+      <ImagePreviewModal
+        visible={!!previewSource}
+        imageUrl={previewSource}
+        title="GCash screenshot"
+        onClose={() => setPreviewSource(null)}
+      />
+
+      {/* Accept Order Modal (optional price adjustment) */}
+      <Modal
+        visible={acceptModalVisible}
+        animationType="slide"
+        transparent={true}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContainer}>
+            <Text style={styles.modalHeader}>Accept Order</Text>
+            <Text style={styles.modalSubtitle}>
+              You can optionally adjust the total before accepting.
+            </Text>
+
+            <View style={styles.infoSection}>
+              <Text style={styles.infoLabel}>Original Total:</Text>
+              <Text style={styles.infoValue}>
+                ₱{Number(order.total_price).toFixed(2)}
+              </Text>
+            </View>
+
+            <View style={styles.infoSection}>
+              <Text style={styles.infoLabel}>New Total (optional):</Text>
+              <TextInput
+                style={styles.customReasonInput}
+                keyboardType="numeric"
+                placeholder={Number(order.total_price).toFixed(2)}
+                value={adjustedTotal}
+                onChangeText={setAdjustedTotal}
+              />
+            </View>
+
+            <Text style={styles.reasonLabel}>
+              Reason for change (optional):
+            </Text>
+            {[
+              "Applied discount",
+              "Correcting system total",
+              "Removed unavailable items",
+              "Other (specify below)",
+            ].map((reason, index) => (
+              <TouchableOpacity
+                key={index}
+                style={[
+                  styles.reasonOption,
+                  (index === 3
+                    ? priceReason === "custom"
+                    : priceReason === reason) && styles.selectedReason,
+                ]}
+                onPress={() => {
+                  if (index === 3) {
+                    setPriceReason("custom");
+                  } else {
+                    setPriceReason(reason);
+                    setCustomPriceReason("");
+                  }
+                }}
+              >
+                <Text
+                  style={[
+                    styles.reasonText,
+                    (index === 3
+                      ? priceReason === "custom"
+                      : priceReason === reason) && styles.selectedReasonText,
+                  ]}
+                >
+                  {reason}
+                </Text>
+              </TouchableOpacity>
+            ))}
+
+            {priceReason === "custom" && (
+              <View style={styles.customReasonContainer}>
+                <Text style={styles.reasonLabel}>Custom reason:</Text>
+                <TextInput
+                  style={[styles.customReasonInput]}
+                  placeholder="Enter your reason for changing the total..."
+                  value={customPriceReason}
+                  onChangeText={setCustomPriceReason}
+                  multiline
+                  numberOfLines={3}
+                />
+              </View>
+            )}
+
+            <View style={styles.modalButtonRow}>
+              <TouchableOpacity
+                style={styles.cancelModalBtn}
+                onPress={cancelAccept}
+                disabled={updatingStatus}
+              >
+                <Text style={styles.cancelModalText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.submitDeclineBtn}
+                onPress={submitAccept}
+                disabled={updatingStatus}
+              >
+                <Text style={styles.submitDeclineText}>
+                  {updatingStatus ? "Saving..." : "Accept Order"}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Decline Reason Modal */}
+      <Modal
+        visible={declineModalVisible}
+        animationType="slide"
+        transparent={true}
+      >
+        <View style={styles.modalOverlay}>
+          <ScrollView
+            style={styles.modalContainer}
+            contentContainerStyle={{ paddingBottom: 20 }}
+          >
+            <Text style={styles.modalHeader}>Decline Order</Text>
+            <Text style={styles.modalSubtitle}>
+              Please provide a reason for declining this order:
+            </Text>
+
+            {/* Preset Reasons */}
+            <Text style={styles.reasonLabel}>Select a reason:</Text>
+            {[
+              "Item not available",
+              "Unavailable options/variations",
+              "Concession is closed or about to close",
+              "Order too large to fulfill",
+              "Other (specify below)",
+            ].map((reason, index) => (
+              <TouchableOpacity
+                key={index}
+                style={[
+                  styles.reasonOption,
+                  selectedReason === (index === 4 ? "custom" : reason) &&
+                    styles.selectedReason,
+                ]}
+                onPress={() => {
+                  setSelectedReason(index === 4 ? "custom" : reason);
+                  if (index !== 4) setCustomReason("");
+                }}
+              >
+                <Text
+                  style={[
+                    styles.reasonText,
+                    selectedReason === (index === 4 ? "custom" : reason) &&
+                      styles.selectedReasonText,
+                  ]}
+                >
+                  {reason}
+                </Text>
+              </TouchableOpacity>
+            ))}
+
+            {/* Item Availability Toggles for "Item not available" */}
+            {selectedReason === "Item not available" && order?.items && (
+              <View style={styles.itemToggleContainer}>
+                <Text style={styles.reasonLabel}>
+                  Mark items as unavailable:
+                </Text>
+                <Text style={styles.itemToggleSubtext}>
+                  Selected items will be marked unavailable in your menu
+                </Text>
+                {/* Get unique items from order */}
+                {Array.from(
+                  new Map(
+                    order.items.map((item: any) => [
+                      item.item_id,
+                      { id: item.item_id, name: item.item_name },
+                    ]),
+                  ).values(),
+                ).map((item: any) => (
+                  <View key={item.id} style={styles.itemToggleRow}>
+                    <Checkbox
+                      value={itemsToToggle[item.id] || false}
+                      onValueChange={(value: boolean) => {
+                        setItemsToToggle((prev) => ({
+                          ...prev,
+                          [item.id]: value,
+                        }));
+                      }}
+                      color={itemsToToggle[item.id] ? "#A40C2D" : undefined}
+                      style={styles.checkbox}
+                    />
+                    <Text style={styles.itemToggleName}>{item.name}</Text>
+                  </View>
+                ))}
+              </View>
+            )}
+
+            {/* Variation Availability Toggles for "Unavailable options/variations" */}
+            {selectedReason === "Unavailable options/variations" &&
+              order?.items && (
+                <View style={styles.itemToggleContainer}>
+                  <Text style={styles.reasonLabel}>
+                    Mark variations as unavailable:
+                  </Text>
+                  <Text style={styles.itemToggleSubtext}>
+                    Selected variations will be marked unavailable in your menu
+                  </Text>
+
+                  {(() => {
+                    // Group variations by item
+                    const itemsWithVariations: Array<{
+                      itemId: number;
+                      itemName: string;
+                      variations: Array<{
+                        variationId: number;
+                        groupName: string;
+                        variationName: string;
+                      }>;
+                    }> = [];
+
+                    console.log("Order Items:", JSON.stringify(order.items));
+                    // Collect unique items with their variations
+                    const processedItems = new Set<number>();
+                    for (const orderItem of order.items) {
+                      if (
+                        !processedItems.has(orderItem.item_id) &&
+                        orderItem.variations &&
+                        orderItem.variations.length > 0
+                      ) {
+                        processedItems.add(orderItem.item_id);
+                        const variations: Array<{
+                          variationId: number;
+                          groupName: string;
+                          variationName: string;
+                        }> = [];
+
+                        // Collect all unique variations for this item from all order items
+                        const seenVariations = new Set<number>();
+                        for (const oi of order.items) {
+                          if (oi.item_id === orderItem.item_id) {
+                            for (const v of oi.variations || []) {
+                              if (!seenVariations.has(v.id)) {
+                                seenVariations.add(v.id);
+                                variations.push({
+                                  variationId: v.id,
+                                  groupName: v.variation_group_name,
+                                  variationName: v.variation_name,
+                                });
+                              }
+                            }
+                          }
+                        }
+                        itemsWithVariations.push({
+                          itemId: orderItem.item_id,
+                          itemName: orderItem.item_name,
+                          variations,
+                        });
+                      }
+                    }
+
+                    if (itemsWithVariations.length === 0) {
+                      return (
+                        <Text
+                          style={[
+                            styles.itemToggleSubtext,
+                            { fontStyle: "italic", marginTop: 10 },
+                          ]}
+                        >
+                          No variations in this order to toggle
+                        </Text>
+                      );
+                    }
+
+                    // Group variations by group name for each item
+                    return itemsWithVariations.map((item, itemIndex) => {
+                      const groupedVariations = new Map<
+                        string,
+                        Array<{ variationId: number; variationName: string }>
+                      >();
+
+                      for (const v of item.variations) {
+                        if (!groupedVariations.has(v.groupName)) {
+                          groupedVariations.set(v.groupName, []);
+                        }
+                        groupedVariations.get(v.groupName)!.push({
+                          variationId: v.variationId,
+                          variationName: v.variationName,
+                        });
+                      }
+                      console.log(
+                        "itemsWithVariations:",
+                        JSON.stringify(itemsWithVariations),
+                      );
+
+                      console.log(
+                        "Grouped Variations:",
+                        JSON.stringify(groupedVariations),
+                      );
+
+                      return (
+                        <View
+                          key={`${item.itemId}-${itemIndex}`}
+                          style={{
+                            marginTop: 15,
+                            paddingTop: 15,
+                            borderTopWidth: 1,
+                            borderTopColor: "#e0e0e0",
+                          }}
+                        >
+                          <Text
+                            style={{
+                              fontSize: 15,
+                              fontWeight: "600",
+                              color: "#A40C2D",
+                              marginBottom: 10,
+                            }}
+                          >
+                            {item.itemName}
+                          </Text>
+
+                          {Array.from(groupedVariations.entries()).map(
+                            ([groupName, variations], groupIndex) => (
+                              <View
+                                key={`${item.itemId}-${groupName}-${groupIndex}`}
+                                style={{ marginBottom: 12 }}
+                              >
+                                <View
+                                  style={{
+                                    flexDirection: "row",
+                                    alignItems: "center",
+                                    marginBottom: 6,
+                                  }}
+                                >
+                                  <Checkbox
+                                    value={variations.every(
+                                      (v) => variationsToToggle[v.variationId],
+                                    )}
+                                    onValueChange={(value: boolean) => {
+                                      const newState = {
+                                        ...variationsToToggle,
+                                      };
+                                      for (const v of variations) {
+                                        newState[v.variationId] = value;
+                                      }
+                                      setVariationsToToggle(newState);
+                                    }}
+                                    color={
+                                      variations.every(
+                                        (v) =>
+                                          variationsToToggle[v.variationId],
+                                      )
+                                        ? "#A40C2D"
+                                        : undefined
+                                    }
+                                    style={styles.checkbox}
+                                  />
+                                  <Text
+                                    style={{
+                                      fontSize: 14,
+                                      fontWeight: "600",
+                                      color: "#555",
+                                      marginLeft: 10,
+                                      flex: 1,
+                                    }}
+                                  >
+                                    {groupName} (Select All)
+                                  </Text>
+                                </View>
+
+                                {variations.map((v, vIndex) => (
+                                  <View
+                                    key={`${item.itemId}-${groupName}-${groupIndex}-${v.variationId}-${vIndex}`}
+                                    style={{
+                                      flexDirection: "row",
+                                      alignItems: "center",
+                                      paddingVertical: 8,
+                                      paddingLeft: 15,
+                                    }}
+                                  >
+                                    <Checkbox
+                                      value={
+                                        variationsToToggle[v.variationId] ||
+                                        false
+                                      }
+                                      onValueChange={(value: boolean) => {
+                                        setVariationsToToggle((prev) => ({
+                                          ...prev,
+                                          [v.variationId]: value,
+                                        }));
+                                      }}
+                                      color={
+                                        variationsToToggle[v.variationId]
+                                          ? "#A40C2D"
+                                          : undefined
+                                      }
+                                      style={styles.checkbox}
+                                    />
+                                    <Text
+                                      style={{
+                                        fontSize: 13,
+                                        color: "#333",
+                                        marginLeft: 10,
+                                        flex: 1,
+                                      }}
+                                    >
+                                      {v.variationName}
+                                    </Text>
+                                  </View>
+                                ))}
+                              </View>
+                            ),
+                          )}
+                        </View>
+                      );
+                    });
+                  })()}
+                </View>
+              )}
+
+            {/* Close Concession Button for "Concession is closed or about to close" */}
+            {selectedReason === "Concession is closed or about to close" && (
+              <View style={styles.itemToggleContainer}>
+                <Text style={styles.reasonLabel}>Close your concession:</Text>
+                <Text style={styles.itemToggleSubtext}>
+                  This will close your concession and prevent new orders
+                </Text>
+                <TouchableOpacity
+                  style={[
+                    styles.submitDeclineBtn,
+                    { marginTop: 10 },
+                    closingConcession && { opacity: 0.6 },
+                  ]}
+                  onPress={async () => {
+                    try {
+                      setClosingConcession(true);
+                      await api.put(
+                        `/concession/${order.concession_id}/status`,
+                        {
+                          status: "closed",
+                        },
+                      );
+                      showToast("success", "Concession closed successfully");
+                    } catch (error) {
+                      console.error("Error closing concession:", error);
+                      showToast("error", "Failed to close concession");
+                    } finally {
+                      setClosingConcession(false);
+                    }
+                  }}
+                  disabled={closingConcession}
+                >
+                  <Text style={styles.submitDeclineText}>
+                    {closingConcession ? "Closing..." : "Close Concession Now"}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            )}
+
+            {/* Custom Reason Input */}
+            {selectedReason === "custom" && (
+              <View style={styles.customReasonContainer}>
+                <Text style={styles.reasonLabel}>Custom reason:</Text>
+                <TextInput
+                  style={styles.customReasonInput}
+                  placeholder="Enter your reason for declining..."
+                  value={customReason}
+                  onChangeText={setCustomReason}
+                  multiline
+                  numberOfLines={3}
+                />
+              </View>
+            )}
+
+            {/* Modal Buttons */}
+            <View style={styles.modalButtonRow}>
+              <TouchableOpacity
+                style={styles.cancelModalBtn}
+                onPress={cancelDecline}
+              >
+                <Text style={styles.cancelModalText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.submitDeclineBtn}
+                onPress={submitDecline}
+                disabled={updatingStatus}
+              >
+                <Text style={styles.submitDeclineText}>
+                  {updatingStatus ? "Declining..." : "Decline Order"}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </ScrollView>
+        </View>
+      </Modal>
+
+      {/* Reject GCash Screenshot Modal */}
+      <Modal
+        visible={rejectScreenshotModalVisible}
+        animationType="slide"
+        transparent={true}
+      >
+        <View style={styles.modalOverlay}>
+          <ScrollView
+            style={styles.modalContainer}
+            contentContainerStyle={{ paddingBottom: 20 }}
+          >
+            <Text style={styles.modalHeader}>Reject GCash Screenshot</Text>
+            <Text style={styles.modalSubtitle}>
+              Please provide a reason for rejecting this GCash screenshot:
+            </Text>
+
+            {/* Rejection Reasons */}
+            <Text style={styles.reasonLabel}>Select a rejection reason:</Text>
+            {[
+              {
+                key: "insufficient_amount",
+                label: "Insufficient payment amount",
+              },
+              {
+                key: "wrong_image",
+                label: "Invalid or incorrect image uploaded",
+              },
+              {
+                key: "unclear_receipt",
+                label: "Receipt image is unclear or unreadable",
+              },
+              { key: "mismatched_name", label: "Account name does not match" },
+              { key: "other", label: "Other (specify below)" },
+            ].map((reason, index) => (
+              <TouchableOpacity
+                key={index}
+                style={[
+                  styles.reasonOption,
+                  selectedRejectionReason === reason.key &&
+                    styles.selectedReason,
+                ]}
+                onPress={() => {
+                  setSelectedRejectionReason(reason.key);
+                  if (reason.key !== "other") setCustomRejectionReason("");
+                }}
+              >
+                <Text
+                  style={[
+                    styles.reasonText,
+                    selectedRejectionReason === reason.key &&
+                      styles.selectedReasonText,
+                  ]}
+                >
+                  {reason.label}
+                </Text>
+              </TouchableOpacity>
+            ))}
+
+            {/* Custom Reason for "Other" */}
+            {selectedRejectionReason === "other" && (
+              <View style={styles.customReasonContainer}>
+                <Text style={styles.reasonLabel}>Custom reason:</Text>
+                <TextInput
+                  style={[styles.customReasonInput]}
+                  placeholder="Enter your reason for rejecting this screenshot..."
+                  value={customRejectionReason}
+                  onChangeText={setCustomRejectionReason}
+                  multiline
+                  numberOfLines={3}
+                />
+              </View>
+            )}
+
+            {/* Restart Timer Toggle */}
+            <View style={styles.toggleContainer}>
+              <Text style={styles.toggleLabel}>Restart payment timer:</Text>
+              <View style={styles.toggleRow}>
+                <Text style={styles.toggleDescription}>
+                  Enable to give the customer more time to upload a new receipt
+                </Text>
+                <Checkbox
+                  value={restartTimer}
+                  onValueChange={setRestartTimer}
+                  color={restartTimer ? "#A40C2D" : undefined}
+                  style={styles.checkbox}
+                />
+              </View>
+            </View>
+
+            <View style={styles.modalButtonRow}>
+              <TouchableOpacity
+                style={styles.cancelModalBtn}
+                onPress={closeRejectScreenshotModal}
+                disabled={rejectingScreenshot}
+              >
+                <Text style={styles.cancelModalText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.submitDeclineBtn}
+                onPress={rejectGCashScreenshot}
+                disabled={rejectingScreenshot}
+              >
+                <Text style={styles.submitDeclineText}>
+                  {rejectingScreenshot ? "Rejecting..." : "Reject Screenshot"}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </ScrollView>
+        </View>
+      </Modal>
+
+      {/* Reopening Request Response Modal */}
+      <ReopeningResponseModal
+        visible={reopeningModalVisible}
+        onClose={() => setReopeningModalVisible(false)}
+        onApprove={handleApproveReopening}
+        onDecline={handleDeclineReopening}
+        request={reopeningRequest}
+        loading={respondingToReopening}
+      />
+    </ScrollView>
+  );
+};
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#fff" },
@@ -1946,10 +2154,51 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   toggleDescription: {
-    fontSize: 14,
+    fontSize: 13,
     color: "#666",
     flex: 1,
-    marginRight: 15,
+    marginRight: 10,
+  },
+  reopeningRequestContainer: {
+    backgroundColor: "#fff9e6",
+    padding: 14,
+    borderRadius: 8,
+    marginTop: 12,
+    borderLeftWidth: 4,
+    borderLeftColor: "#ffa500",
+  },
+  reopeningRequestHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 8,
+    gap: 8,
+  },
+  reopeningRequestTitle: {
+    fontSize: 15,
+    fontWeight: "600",
+    color: "#cc8800",
+    flex: 1,
+  },
+  reopeningRequestText: {
+    fontSize: 14,
+    color: "#666",
+    marginBottom: 12,
+    lineHeight: 20,
+  },
+  viewReopeningRequestButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#ffa500",
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    gap: 8,
+  },
+  viewReopeningRequestButtonText: {
+    color: "#fff",
+    fontSize: 14,
+    fontWeight: "600",
   },
 });
 

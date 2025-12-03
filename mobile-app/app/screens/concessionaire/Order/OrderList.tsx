@@ -28,6 +28,7 @@ interface Order {
   customer_id: number;
   updated_total_price?: number | null;
   price_change_reason?: string | null;
+  reopening_requested?: boolean;
 }
 
 const PAGE_SIZE = 10;
@@ -62,21 +63,34 @@ const OrderList = () => {
     if (!value) return "";
     try {
       // Just parse and format the timestamp as-is (backend will handle timezone conversion)
-      const dateObj = new Date(value)
+      const dateObj = new Date(value);
       if (Number.isNaN(dateObj.getTime())) return String(value);
 
       // Manual formatting
-      const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+      const months = [
+        "Jan",
+        "Feb",
+        "Mar",
+        "Apr",
+        "May",
+        "Jun",
+        "Jul",
+        "Aug",
+        "Sep",
+        "Oct",
+        "Nov",
+        "Dec",
+      ];
       const month = months[dateObj.getMonth()];
-      const day = String(dateObj.getDate()).padStart(2, '0');
+      const day = String(dateObj.getDate()).padStart(2, "0");
       const year = dateObj.getFullYear();
-      
+
       let hours = dateObj.getHours();
-      const minutes = String(dateObj.getMinutes()).padStart(2, '0');
-      const ampm = hours >= 12 ? 'PM' : 'AM';
+      const minutes = String(dateObj.getMinutes()).padStart(2, "0");
+      const ampm = hours >= 12 ? "PM" : "AM";
       hours = hours % 12;
       hours = hours ? hours : 12; // 0 should be 12
-      
+
       return `${month} ${day}, ${year}, ${hours}:${minutes} ${ampm}`;
     } catch {
       return String(value);
@@ -102,13 +116,13 @@ const OrderList = () => {
         if (refresh || pageNum === 1) {
           // Auto-decline any expired GCash receipts in bulk before fetching
           try {
-            await api.post('/order/bulk-decline-expired')
+            await api.post("/order/bulk-decline-expired");
           } catch (e) {
-            console.warn('Bulk decline expired receipts failed:', e)
+            console.warn("Bulk decline expired receipts failed:", e);
           }
 
           const activeRes = await api.get(
-            `/order/concessionare/${user.id}?segment=active&limit=${PAGE_SIZE}`
+            `/order/concessionare/${user.id}?segment=active&limit=${PAGE_SIZE}`,
           );
           const freshActive: Order[] = activeRes.data?.data || [];
           setActiveOrders(freshActive);
@@ -127,7 +141,7 @@ const OrderList = () => {
         if (refresh) setRefreshing(false);
       }
     },
-    [user?.id]
+    [user?.id],
   );
 
   // Only fetch on initial mount, not on every focus
@@ -152,12 +166,14 @@ const OrderList = () => {
       setLoading(true);
       const next = 1;
       const histRes = await api.get(
-        `/order/concessionare/${user.id}?segment=history&page=${next}&limit=${PAGE_SIZE}`
+        `/order/concessionare/${user.id}?segment=history&page=${next}&limit=${PAGE_SIZE}`,
       );
       const { data: chunk, totalPages } = histRes.data;
       setOrders((prev) => {
         const existingIds = new Set(prev.map((o) => o.id));
-        const deduped = (chunk || []).filter((o: any) => !existingIds.has(o.id));
+        const deduped = (chunk || []).filter(
+          (o: any) => !existingIds.has(o.id),
+        );
         return [...prev, ...deduped];
       });
       setHistoryStarted(true);
@@ -176,7 +192,7 @@ const OrderList = () => {
     if (loading || !historyStarted || !hasMoreHistory) return;
 
     const hasHistoryFilterSelected = statusFilter.some((s) =>
-      HISTORY_STATUSES.includes(normalizeStatus(s))
+      HISTORY_STATUSES.includes(normalizeStatus(s)),
     );
     if (!hasHistoryFilterSelected) return;
 
@@ -184,12 +200,14 @@ const OrderList = () => {
       setLoading(true);
       const next = historyPage + 1;
       const histRes = await api.get(
-        `/order/concessionare/${user.id}?segment=history&page=${next}&limit=${PAGE_SIZE}`
+        `/order/concessionare/${user.id}?segment=history&page=${next}&limit=${PAGE_SIZE}`,
       );
       const { data: chunk, totalPages } = histRes.data;
       setOrders((prev) => {
         const existingIds = new Set(prev.map((o) => o.id));
-        const deduped = (chunk || []).filter((o: any) => !existingIds.has(o.id));
+        const deduped = (chunk || []).filter(
+          (o: any) => !existingIds.has(o.id),
+        );
         return [...prev, ...deduped];
       });
       setHistoryPage(next);
@@ -200,12 +218,19 @@ const OrderList = () => {
     } finally {
       setLoading(false);
     }
-  }, [loading, historyStarted, hasMoreHistory, historyPage, statusFilter, user?.id]);
+  }, [
+    loading,
+    historyStarted,
+    hasMoreHistory,
+    historyPage,
+    statusFilter,
+    user?.id,
+  ]);
 
   // When history statuses are selected, lazily fetch them once
   useEffect(() => {
     const hasHistoryFilterSelected = statusFilter.some((s) =>
-      HISTORY_STATUSES.includes(normalizeStatus(s))
+      HISTORY_STATUSES.includes(normalizeStatus(s)),
     );
     if (hasHistoryFilterSelected && !historyStarted) {
       startHistory();
@@ -223,16 +248,16 @@ const OrderList = () => {
           o.first_name.toLowerCase().includes(lowered) ||
           o.last_name.toLowerCase().includes(lowered) ||
           o.concession_name.toLowerCase().includes(lowered) ||
-          o.id.toString().includes(searchQuery)
+          o.id.toString().includes(searchQuery),
       );
     }
 
     if (statusFilter.length > 0) {
       const normalizedSelected = new Set(
-        statusFilter.map((s) => normalizeStatus(s))
+        statusFilter.map((s) => normalizeStatus(s)),
       );
       filtered = filtered.filter((o) =>
-        normalizedSelected.has(normalizeStatus(o.order_status))
+        normalizedSelected.has(normalizeStatus(o.order_status)),
       );
     }
 
@@ -242,35 +267,27 @@ const OrderList = () => {
           filtered.sort(
             (a, b) =>
               new Date(b.created_at).getTime() -
-              new Date(a.created_at).getTime()
+              new Date(a.created_at).getTime(),
           );
           break;
         case "date_asc":
           filtered.sort(
             (a, b) =>
               new Date(a.created_at).getTime() -
-              new Date(b.created_at).getTime()
+              new Date(b.created_at).getTime(),
           );
           break;
         case "price_asc":
           filtered.sort((a, b) => {
-            const totalA = Number(
-              (a.updated_total_price ?? a.total_price) ?? 0
-            );
-            const totalB = Number(
-              (b.updated_total_price ?? b.total_price) ?? 0
-            );
+            const totalA = Number(a.updated_total_price ?? a.total_price ?? 0);
+            const totalB = Number(b.updated_total_price ?? b.total_price ?? 0);
             return totalA - totalB;
           });
           break;
         case "price_desc":
           filtered.sort((a, b) => {
-            const totalA = Number(
-              (a.updated_total_price ?? a.total_price) ?? 0
-            );
-            const totalB = Number(
-              (b.updated_total_price ?? b.total_price) ?? 0
-            );
+            const totalA = Number(a.updated_total_price ?? a.total_price ?? 0);
+            const totalB = Number(b.updated_total_price ?? b.total_price ?? 0);
             return totalB - totalA;
           });
           break;
@@ -286,23 +303,41 @@ const OrderList = () => {
       onPress={() => navigation.navigate("View Order", { orderId: item.id })}
     >
       <View style={{ flex: 1 }}>
-        <Text style={styles.orderId}>Order #{item.id}</Text>
+        <View
+          style={{
+            flexDirection: "row",
+            alignItems: "center",
+            justifyContent: "space-between",
+          }}
+        >
+          <Text style={styles.orderId}>Order #{item.id}</Text>
+          {item.reopening_requested && item.order_status === "declined" && (
+            <View style={styles.reopeningBadge}>
+              <Ionicons name="refresh-circle" size={14} color="#fff" />
+              <Text style={styles.reopeningBadgeText}>Reopening Request</Text>
+            </View>
+          )}
+        </View>
         <Text style={styles.customer}>
           Customer: {item.first_name} {item.last_name}
         </Text>
-        {Array.isArray((item as any).item_names_preview) && (item as any).item_names_preview.length > 0 && (
-          <Text style={styles.itemsPreview}>
-            Items: {(item as any).item_names_preview.join(', ')}
-            {typeof (item as any).item_count === 'number' && (item as any).item_count > (item as any).item_names_preview.length
-              ? ` +${(item as any).item_count - (item as any).item_names_preview.length} more`
-              : ''}
-          </Text>
-        )}
+        {Array.isArray((item as any).item_names_preview) &&
+          (item as any).item_names_preview.length > 0 && (
+            <Text style={styles.itemsPreview}>
+              Items: {(item as any).item_names_preview.join(", ")}
+              {typeof (item as any).item_count === "number" &&
+              (item as any).item_count > (item as any).item_names_preview.length
+                ? ` +${(item as any).item_count - (item as any).item_names_preview.length} more`
+                : ""}
+            </Text>
+          )}
         <Text>
           Status: <Text style={styles.status}>{item.order_status}</Text>
         </Text>
-        {item.order_status === 'declined' && (item as any).decline_reason ? (
-          <Text style={styles.declineReason}>Reason: {(item as any).decline_reason}</Text>
+        {item.order_status === "declined" && (item as any).decline_reason ? (
+          <Text style={styles.declineReason}>
+            Reason: {(item as any).decline_reason}
+          </Text>
         ) : null}
         {item.updated_total_price !== null &&
         item.updated_total_price !== undefined &&
@@ -325,26 +360,25 @@ const OrderList = () => {
   // Ensure ongoing orders (pending, accepted, ready for pickup) appear first
   // Settled orders (completed, declined) appear after
   const groupedSections = (() => {
-    if (statusFilter.length > 0) return [] as { title: string; data: Order[] }[];
+    if (statusFilter.length > 0)
+      return [] as { title: string; data: Order[] }[];
     const groups: Record<string, Order[]> = {};
     for (const o of filteredOrders) {
-      const key = normalizeStatus(o.order_status || 'unknown');
+      const key = normalizeStatus(o.order_status || "unknown");
       if (!groups[key]) groups[key] = [];
       groups[key].push(o);
     }
     const ongoingStatuses = ACTIVE_STATUSES;
     const settledStatuses = HISTORY_STATUSES;
     const toLabel = (s: string) =>
-      s
-        .replace(/-/g, " ")
-        .replace(/^(.)/, (c) => c.toUpperCase());
-    
+      s.replace(/-/g, " ").replace(/^(.)/, (c) => c.toUpperCase());
+
     // Separate ongoing and settled orders
     const ongoingKeys: string[] = [];
     const settledKeys: string[] = [];
     const otherKeys: string[] = [];
-    
-    Object.keys(groups).forEach(key => {
+
+    Object.keys(groups).forEach((key) => {
       if (ongoingStatuses.includes(key)) {
         ongoingKeys.push(key);
       } else if (settledStatuses.includes(key)) {
@@ -353,7 +387,7 @@ const OrderList = () => {
         otherKeys.push(key);
       }
     });
-    
+
     // Sort each group by priority
     const sortByPriority = (keys: string[], priority: string[]) => {
       return keys.sort((a, b) => {
@@ -365,11 +399,11 @@ const OrderList = () => {
         return ai - bi;
       });
     };
-    
+
     const sortedOngoing = sortByPriority(ongoingKeys, ongoingStatuses);
     const sortedSettled = sortByPriority(settledKeys, settledStatuses);
     const sortedOther = otherKeys.sort();
-    
+
     // Combine: ongoing first, then settled, then others
     const allKeys = [...sortedOngoing, ...sortedSettled, ...sortedOther];
     return allKeys.map((k) => ({ title: toLabel(k), data: groups[k] }));
@@ -380,7 +414,9 @@ const OrderList = () => {
     return (
       <View style={styles.fullLoader}>
         <ActivityIndicator size="large" color="#A40C2D" />
-        <Text style={{ marginTop: 10, color: "#A40C2D" }}>Loading orders...</Text>
+        <Text style={{ marginTop: 10, color: "#A40C2D" }}>
+          Loading orders...
+        </Text>
       </View>
     );
   }
@@ -414,57 +450,55 @@ const OrderList = () => {
         <View style={styles.emptyContainer}>
           <Text style={styles.emptyText}>No orders found</Text>
         </View>
+      ) : statusFilter.length > 0 ? (
+        <FlatList
+          data={filteredOrders}
+          keyExtractor={(item) => item.id.toString()}
+          renderItem={renderOrder}
+          contentContainerStyle={{ paddingBottom: 20 }}
+          onEndReached={loadMore}
+          onEndReachedThreshold={0.5}
+          removeClippedSubviews={false}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+          }
+          ListFooterComponent={
+            loading && historyStarted ? (
+              <ActivityIndicator
+                size="small"
+                color="#A40C2D"
+                style={{ marginVertical: 10 }}
+              />
+            ) : null
+          }
+        />
       ) : (
-        statusFilter.length > 0 ? (
-          <FlatList
-            data={filteredOrders}
-            keyExtractor={(item) => item.id.toString()}
-            renderItem={renderOrder}
-            contentContainerStyle={{ paddingBottom: 20 }}
-            onEndReached={loadMore}
-            onEndReachedThreshold={0.5}
-            removeClippedSubviews={false}
-            refreshControl={
-              <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-            }
-            ListFooterComponent={
-              loading && historyStarted ? (
-                <ActivityIndicator
-                  size="small"
-                  color="#A40C2D"
-                  style={{ marginVertical: 10 }}
-                />
-              ) : null
-            }
-          />
-        ) : (
-          <SectionList
-            sections={groupedSections}
-            keyExtractor={(item) => item.id.toString()}
-            renderItem={renderOrder}
-            contentContainerStyle={{ paddingBottom: 20 }}
-            onEndReached={loadMore}
-            onEndReachedThreshold={0.5}
-            removeClippedSubviews={false}
-            refreshControl={
-              <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-            }
-            renderSectionHeader={({ section }) => (
-              <View style={styles.sectionHeader}>
-                <Text style={styles.sectionHeaderText}>{section.title}</Text>
-              </View>
-            )}
-            ListFooterComponent={
-              loading && historyStarted ? (
-                <ActivityIndicator
-                  size="small"
-                  color="#A40C2D"
-                  style={{ marginVertical: 10 }}
-                />
-              ) : null
-            }
-          />
-        )
+        <SectionList
+          sections={groupedSections}
+          keyExtractor={(item) => item.id.toString()}
+          renderItem={renderOrder}
+          contentContainerStyle={{ paddingBottom: 20 }}
+          onEndReached={loadMore}
+          onEndReachedThreshold={0.5}
+          removeClippedSubviews={false}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+          }
+          renderSectionHeader={({ section }) => (
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionHeaderText}>{section.title}</Text>
+            </View>
+          )}
+          ListFooterComponent={
+            loading && historyStarted ? (
+              <ActivityIndicator
+                size="small"
+                color="#A40C2D"
+                style={{ marginVertical: 10 }}
+              />
+            ) : null
+          }
+        />
       )}
 
       <Modal visible={filtersVisible} animationType="slide">
@@ -501,7 +535,9 @@ const OrderList = () => {
               >
                 <Text
                   style={
-                    statusFilter.includes(status) ? styles.active : styles.option
+                    statusFilter.includes(status)
+                      ? styles.active
+                      : styles.option
                   }
                 >
                   {status}
@@ -520,9 +556,7 @@ const OrderList = () => {
             ].map((opt) => (
               <TouchableOpacity
                 key={opt.key}
-                onPress={() =>
-                  setSortBy(sortBy === opt.key ? null : opt.key)
-                }
+                onPress={() => setSortBy(sortBy === opt.key ? null : opt.key)}
               >
                 <Text
                   style={sortBy === opt.key ? styles.active : styles.option}
@@ -597,16 +631,26 @@ const styles = StyleSheet.create({
   customer: { fontSize: 14, marginTop: 4 },
   status: { fontWeight: "600", color: "#A40C2D" },
   itemsPreview: { fontSize: 12, color: "#333", marginTop: 2 },
-  declineReason: { color: "#dc3545", fontSize: 12, fontStyle: "italic", marginTop: 2 },
-  emptyContainer: { flex: 1, justifyContent: "center", alignItems: "center", paddingVertical: 40 },
+  declineReason: {
+    color: "#dc3545",
+    fontSize: 12,
+    fontStyle: "italic",
+    marginTop: 2,
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    paddingVertical: 40,
+  },
   emptyText: { textAlign: "center", color: "#888", fontSize: 16 },
   errorText: { textAlign: "center", color: "red", marginTop: 20 },
   filterContainer: { flex: 1, padding: 20, backgroundColor: "#fff" },
-  filterHeaderContainer: { 
-    flexDirection: "row", 
-    justifyContent: "space-between", 
-    alignItems: "center", 
-    marginBottom: 20 
+  filterHeaderContainer: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 20,
   },
   filterHeader: { fontSize: 18, fontWeight: "bold" },
   sectionHeader: {
@@ -658,10 +702,10 @@ const styles = StyleSheet.create({
     borderColor: "#A40C2D",
     color: "#fff",
   },
-  buttonRow: { 
-    flexDirection: "row", 
-    marginTop: 20, 
-    gap: 10 
+  buttonRow: {
+    flexDirection: "row",
+    marginTop: 20,
+    gap: 10,
   },
   clearBtn: {
     flex: 1,
@@ -686,6 +730,20 @@ const styles = StyleSheet.create({
     position: "absolute",
     bottom: 16,
     alignSelf: "center",
+  },
+  reopeningBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#ffa500",
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    gap: 4,
+  },
+  reopeningBadgeText: {
+    color: "#fff",
+    fontSize: 11,
+    fontWeight: "600",
   },
 });
 

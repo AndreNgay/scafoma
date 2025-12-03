@@ -23,7 +23,12 @@ const RegisterSchema = z
         password: z
             .string({required_error: "Password is required"})
             .min(6, {message: "Password must be at least 6 characters long"}),
-        confirm_password: z.string({required_error: "Please confirm your password"})
+        confirm_password: z.string({required_error: "Please confirm your password"}),
+        contact_number: z
+            .string()
+            .min(5, {message: "Phone number must be at least 5 characters"})
+            .optional(),
+        messenger_link: z.string().optional()
     })
     .refine((data) => data.password === data.confirm_password, {
         message: "Passwords do not match",
@@ -153,6 +158,40 @@ const SignUp = () => {
                             {...register("confirm_password")}
                             className="mt-1 block w-full rounded-md border border-gray-300 shadow-sm px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"/> {errors.confirm_password && (
                             <p className="mt-1 text-sm text-red-600">{errors.confirm_password.message}</p>
+                        )}
+                    </div>
+
+                    {/* Contact Number */}
+                    <div>
+                        <label htmlFor="contact_number" className="block text-sm font-medium text-gray-700">
+                            Phone Number (optional)
+                        </label>
+                        <input
+                            disabled={isLoading}
+                            id="contact_number"
+                            type="tel"
+                            placeholder="+1234567890"
+                            {...register("contact_number")}
+                            className="mt-1 block w-full rounded-md border border-gray-300 shadow-sm px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"/>
+                        {errors.contact_number && (
+                            <p className="mt-1 text-sm text-red-600">{errors.contact_number.message}</p>
+                        )}
+                    </div>
+
+                    {/* Messenger Link */}
+                    <div>
+                        <label htmlFor="messenger_link" className="block text-sm font-medium text-gray-700">
+                            Messenger/Facebook Link (optional)
+                        </label>
+                        <input
+                            disabled={isLoading}
+                            id="messenger_link"
+                            type="url"
+                            placeholder="https://messenger.com/t/username"
+                            {...register("messenger_link")}
+                            className="mt-1 block w-full rounded-md border border-gray-300 shadow-sm px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"/>
+                        {errors.messenger_link && (
+                            <p className="mt-1 text-sm text-red-600">{errors.messenger_link.message}</p>
                         )}
                     </div>
 

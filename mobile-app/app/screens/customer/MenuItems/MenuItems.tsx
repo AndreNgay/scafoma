@@ -39,13 +39,9 @@ interface MenuItem {
 interface Concession {
 	id: number
 	name: string
+	cafeteria_name: string
+	cafeteria_id: number
 	items: MenuItem[]
-}
-
-interface Cafeteria {
-	id: number
-	name: string
-	concessions: Concession[]
 }
 
 // ========================================
@@ -62,65 +58,51 @@ function shuffleArray<T>(array: T[]): T[] {
   return shuffled;
 }
 
-// Group menu items by cafeteria and concession
-function groupMenuItems(items: MenuItem[]): Cafeteria[] {
-	const cafeteriaMap = new Map<number, Cafeteria>()
+// Group menu items by concession (no cafeteria grouping)
+function groupMenuItems(items: MenuItem[]): Concession[] {
+	const concessionMap = new Map<number, Concession>()
 
 	items.forEach((item) => {
-		// Get or create cafeteria
-		if (!cafeteriaMap.has(item.cafeteria_id)) {
-			cafeteriaMap.set(item.cafeteria_id, {
-				id: item.cafeteria_id,
-				name: item.cafeteria_name,
-				concessions: [],
+		// Get or create concession
+		if (!concessionMap.has(item.concession_id)) {
+			concessionMap.set(item.concession_id, {
+				id: item.concession_id,
+				name: item.concession_name,
+				cafeteria_name: item.cafeteria_name,
+				cafeteria_id: item.cafeteria_id,
+				items: [],
 			})
 		}
 
-		const cafeteria = cafeteriaMap.get(item.cafeteria_id)!
-
-		// Get or create concession within cafeteria
-		let concession = cafeteria.concessions.find(
-			(c) => c.id === item.concession_id
-		)
-
-		if (!concession) {
-			concession = {
-				id: item.concession_id,
-				name: item.concession_name,
-				items: [],
-			}
-			cafeteria.concessions.push(concession)
-		}
-
+		const concession = concessionMap.get(item.concession_id)!
     // Add item to concession
     concession.items.push(item);
   });
 
 	// Convert map to array and randomize order
-	const cafeterias = shuffleArray(Array.from(cafeteriaMap.values()))
+	const concessions = shuffleArray(Array.from(concessionMap.values()))
 
-	// Randomize concessions within each cafeteria
-	cafeterias.forEach((cafeteria) => {
-		cafeteria.concessions = shuffleArray(cafeteria.concessions)
+	// Randomize items within each concession
+	concessions.forEach((concession) => {
+		concession.items = shuffleArray(concession.items)
 	})
 
-	return cafeterias
+	return concessions
 }
 
 const MenuItems = () => {
 	// data
 	const [menuItems, setMenuItems] = useState<MenuItem[]>([])
 	const [allMenuItems, setAllMenuItems] = useState<MenuItem[]>([]) // All fetched items
-	const [groupedCafeterias, setGroupedCafeterias] = useState<Cafeteria[]>([])
+	const [groupedConcessions, setGroupedConcessions] = useState<Concession[]>([])
 	const [cafeteriaFilters, setCafeteriaFilters] = useState<any[]>([]) // Available cafeterias for filter
 	const [concessions, setConcessions] = useState<any[]>([])
 	const [categories, setCategories] = useState<string[]>([])
 	const navigation = useNavigation()
 
-  // filter state (only cafeteria filter used in grouped view)
-  const [selectedCafeteriaId, setSelectedCafeteriaId] = useState<number | null>(
-    null,
-  );
+  // filter state (multiple selections)
+  const [selectedCafeteriaIds, setSelectedCafeteriaIds] = useState<number[]>([]);
+  const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
   const [sortBy, setSortBy] = useState<string>("name");
   const [searchQuery, setSearchQuery] = useState<string>("");
 
@@ -156,14 +138,26 @@ const MenuItems = () => {
       const items = res.data.data as MenuItem[];
       setAllMenuItems(items);
 
-      // Apply cafeteria filter if selected
-      const filtered = selectedCafeteriaId
-        ? items.filter((item) => item.cafeteria_id === selectedCafeteriaId)
-        : items;
+      // Apply filters
+      let filtered = items;
+      
+      // Filter by selected cafeterias
+      if (selectedCafeteriaIds.length > 0) {
+        filtered = filtered.filter((item) => 
+          selectedCafeteriaIds.includes(item.cafeteria_id)
+        );
+      }
+      
+      // Filter by selected categories
+      if (selectedCategories.length > 0) {
+        filtered = filtered.filter((item) => 
+          item.category && selectedCategories.includes(item.category)
+        );
+      }
 
-			// Group items by cafeteria and concession
+			// Group items by concession
 			const grouped = groupMenuItems(filtered)
-			setGroupedCafeterias(grouped)
+			setGroupedConcessions(grouped)
 
       // For search results (flat list)
       setMenuItems(filtered);
@@ -188,7 +182,32 @@ const MenuItems = () => {
 
   useEffect(() => {
     fetchItems(false);
-  }, [selectedCafeteriaId, sortBy]);
+  }, [selectedCafeteriaIds, selectedCategories, sortBy]);
+
+  // Update grouped concessions when search changes
+  useEffect(() => {
+    if (searchQuery.trim().length === 0) {
+      // When search is cleared, reset grouped concessions to show all filtered items
+      let filtered = allMenuItems;
+      
+      // Apply cafeteria filters
+      if (selectedCafeteriaIds.length > 0) {
+        filtered = filtered.filter((item) => 
+          selectedCafeteriaIds.includes(item.cafeteria_id)
+        );
+      }
+      
+      // Apply category filters
+      if (selectedCategories.length > 0) {
+        filtered = filtered.filter((item) => 
+          item.category && selectedCategories.includes(item.category)
+        );
+      }
+
+      const grouped = groupMenuItems(filtered);
+      setGroupedConcessions(grouped);
+    }
+  }, [searchQuery, allMenuItems, selectedCafeteriaIds, selectedCategories]);
 
   // Filter menu items for search
   const filteredMenuItems = useMemo(() => {
@@ -317,7 +336,7 @@ const MenuItems = () => {
   );
 
 	// Render a concession card with horizontal scroll of items
-	const renderConcession = (concession: Concession, cafeteriaId: number) => {
+	const renderConcession = (concession: Concession) => {
 		const itemsToShow = concession.items.slice(0, 5) // Show max 5 items
 
 		return (
@@ -331,13 +350,13 @@ const MenuItems = () => {
 							concession: {
 								id: concession.id,
 								concession_name: concession.name,
-								cafeteria_id: cafeteriaId,
+								cafeteria_id: concession.cafeteria_id,
 							},
-							cafeteria: cafeteriaFilters.find((c) => c.id === cafeteriaId),
+							cafeteria: cafeteriaFilters.find((c) => c.id === concession.cafeteria_id),
 						})
 					}
 					activeOpacity={0.7}>
-					<Text style={styles.concessionName}>{concession.name}</Text>
+					<Text style={styles.concessionName}>{concession.name} ({concession.cafeteria_name})</Text>
 					<Ionicons
 						name="chevron-forward"
 						size={18}
@@ -353,10 +372,13 @@ const MenuItems = () => {
 					<TouchableOpacity
 						style={styles.viewAllButton}
 						onPress={() =>
-							(navigation as any).navigate('Full Concession Menu', {
-								concessionId: concession.id,
-								concessionName: concession.name,
-								cafeteriaId: concession.items[0]?.cafeteria_id,
+							(navigation as any).navigate('View Concession', {
+								concession: {
+									id: concession.id,
+									concession_name: concession.name,
+									cafeteria_id: concession.cafeteria_id,
+								},
+								cafeteria: cafeteriaFilters.find((c) => c.id === concession.cafeteria_id),
 							})
 						}>
 						<Text style={styles.viewAllText}>View All</Text>
@@ -371,24 +393,12 @@ const MenuItems = () => {
 
   // Determine if we're showing search results or grouped view
   const isSearching = searchQuery.trim().length > 0;
-	// Render a cafeteria section with all its concessions
-	const renderCafeteria = (cafeteria: Cafeteria) => (
-		<View
-			key={cafeteria.id}
-			style={styles.cafeteriaSection}>
-			<View style={styles.cafeteriaHeader}>
-				<Ionicons
-					name="restaurant"
-					size={22}
-					color="#A40C2D"
-					style={{ marginRight: 8 }}
-				/>
-				<Text style={styles.cafeteriaName}>{cafeteria.name}</Text>
-			</View>
-			{cafeteria.concessions.map((concession) =>
-				renderConcession(concession, cafeteria.id)
+	// Render all concessions directly (no cafeteria grouping)
+	const renderConcessions = () => (
+		<View style={styles.concessionsContainer}>
+			{groupedConcessions.map((concession) =>
+				renderConcession(concession)
 			)}
-			<View style={styles.cafeteriaDivider} />
 		</View>
 	)
   return (
@@ -412,27 +422,38 @@ const MenuItems = () => {
       </View>
 
       {/* Selected Filters Display */}
-      {(selectedCafeteriaId || sortBy !== "name") && !isSearching && (
+      {(selectedCafeteriaIds.length > 0 || selectedCategories.length > 0 || sortBy !== "name") && !isSearching && (
         <View style={styles.selectedFiltersContainer}>
           <Text style={styles.selectedFiltersLabel}>Active Filters:</Text>
           <View style={styles.selectedFiltersRow}>
-            {selectedCafeteriaId && (
-              <View style={styles.selectedFilterChip}>
+            {selectedCafeteriaIds.map((cafId) => (
+              <View key={cafId} style={styles.selectedFilterChip}>
                 <Text style={styles.selectedFilterText}>
-                  {cafeteriaFilters.find((c) => c.id === selectedCafeteriaId)
+                  {cafeteriaFilters.find((c) => c.id === cafId)
                     ?.cafeteria_name ||
-                    cafeteriaFilters.find((c) => c.id === selectedCafeteriaId)
+                    cafeteriaFilters.find((c) => c.id === cafId)
                       ?.name ||
                     "Unknown"}
                 </Text>
                 <TouchableOpacity
-                  onPress={() => setSelectedCafeteriaId(null)}
+                  onPress={() => setSelectedCafeteriaIds(prev => prev.filter(id => id !== cafId))}
                   style={styles.removeFilterBtn}
                 >
                   <Ionicons name="close-circle" size={16} color="#fff" />
                 </TouchableOpacity>
               </View>
-            )}
+            ))}
+            {selectedCategories.map((category) => (
+              <View key={category} style={styles.selectedFilterChip}>
+                <Text style={styles.selectedFilterText}>{category}</Text>
+                <TouchableOpacity
+                  onPress={() => setSelectedCategories(prev => prev.filter(cat => cat !== category))}
+                  style={styles.removeFilterBtn}
+                >
+                  <Ionicons name="close-circle" size={16} color="#fff" />
+                </TouchableOpacity>
+              </View>
+            ))}
             {sortBy !== "name" && (
               <View style={styles.selectedFilterChip}>
                 <Text style={styles.selectedFilterText}>
@@ -464,7 +485,7 @@ const MenuItems = () => {
           }
         />
       ) : (
-        // Grouped View by Cafeteria and Concession
+        // Concessions View (no cafeteria grouping)
         <ScrollView
           contentContainerStyle={{ padding: 10 }}
           refreshControl={
@@ -475,10 +496,10 @@ const MenuItems = () => {
             />
           }
         >
-          {groupedCafeterias.length === 0 ? (
+          {groupedConcessions.length === 0 ? (
             <Text style={styles.emptyText}>No menu items available</Text>
           ) : (
-            groupedCafeterias.map((cafeteria) => renderCafeteria(cafeteria))
+            renderConcessions()
           )}
         </ScrollView>
       )}
@@ -498,27 +519,72 @@ const MenuItems = () => {
           </View>
 
           <ScrollView style={{ flex: 1 }}>
-            {/* Cafeteria Filter (single select) */}
-            <Text style={styles.label}>Cafeteria</Text>
+            {/* Cafeteria Filter (multiple select) */}
+            <Text style={styles.label}>Cafeterias</Text>
             <View style={styles.filterChipRow}>
-              <TouchableOpacity onPress={() => setSelectedCafeteriaId(null)}>
+              <TouchableOpacity 
+                onPress={() => setSelectedCafeteriaIds([])}
+                style={{ marginRight: 8 }}
+              >
                 <Text
                   style={
-                    selectedCafeteriaId === null ? styles.active : styles.option
+                    selectedCafeteriaIds.length === 0 ? styles.active : styles.option
                   }
                 >
                   All Cafeterias
                 </Text>
               </TouchableOpacity>
               {cafeteriaFilters.map((caf) => {
-                const active = selectedCafeteriaId === caf.id;
+                const active = selectedCafeteriaIds.includes(caf.id);
                 return (
                   <TouchableOpacity
                     key={caf.id}
-                    onPress={() => setSelectedCafeteriaId(caf.id)}
+                    onPress={() => {
+                      if (active) {
+                        setSelectedCafeteriaIds(prev => prev.filter(id => id !== caf.id));
+                      } else {
+                        setSelectedCafeteriaIds(prev => [...prev, caf.id]);
+                      }
+                    }}
                   >
                     <Text style={active ? styles.active : styles.option}>
                       {caf.cafeteria_name || caf.name}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+
+            {/* Category Filter (multiple select) */}
+            <Text style={styles.label}>Categories</Text>
+            <View style={styles.filterChipRow}>
+              <TouchableOpacity 
+                onPress={() => setSelectedCategories([])}
+                style={{ marginRight: 8 }}
+              >
+                <Text
+                  style={
+                    selectedCategories.length === 0 ? styles.active : styles.option
+                  }
+                >
+                  All Categories
+                </Text>
+              </TouchableOpacity>
+              {categories.map((category) => {
+                const active = selectedCategories.includes(category);
+                return (
+                  <TouchableOpacity
+                    key={category}
+                    onPress={() => {
+                      if (active) {
+                        setSelectedCategories(prev => prev.filter(cat => cat !== category));
+                      } else {
+                        setSelectedCategories(prev => [...prev, category]);
+                      }
+                    }}
+                  >
+                    <Text style={active ? styles.active : styles.option}>
+                      {category}
                     </Text>
                   </TouchableOpacity>
                 );
@@ -669,9 +735,12 @@ const styles = StyleSheet.create({
     marginTop: 20,
   },
   applyText: { color: "#fff", textAlign: "center", fontWeight: "bold" },
-  // New styles for grouped view
-  cafeteriaSection: {
+  // New styles for concessions view
+  concessionsContainer: {
     marginBottom: 24,
+  },
+  concessionCard: {
+    marginBottom: 16,
     backgroundColor: "#fff",
     paddingVertical: 16,
     paddingHorizontal: 12,
@@ -682,24 +751,6 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.05,
     shadowRadius: 4,
     elevation: 2,
-  },
-  cafeteriaHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginBottom: 16,
-  },
-  cafeteriaName: {
-    fontSize: 20,
-    fontWeight: "bold",
-    color: "#1f2937",
-  },
-  cafeteriaDivider: {
-    height: 1,
-    backgroundColor: "#e5e7eb",
-    marginTop: 10,
-  },
-  concessionCard: {
-    marginBottom: 16,
   },
   concessionHeader: {
     flexDirection: "row",
