@@ -70,8 +70,8 @@ const SignIn: React.FC<Props> = ({ navigation }) => {
 	return (
 		<View style={styles.container}>
 			<View style={styles.card}>
-				<Text style={styles.title}>Welcome back</Text>
-				<Text style={styles.subtitle}>Sign in to continue</Text>
+				<Text style={styles.title}>Cafeteria Ordering</Text>
+				<Text style={styles.subtitle}>Login or Sign up to continue</Text>
 
 				{/* Email Field */}
 				<Controller
@@ -131,7 +131,7 @@ const SignIn: React.FC<Props> = ({ navigation }) => {
 					disabled={loading}>
 					{loading ?
 						<ActivityIndicator color="#fff" />
-					:	<Text style={styles.buttonText}>Sign In</Text>}
+					:	<Text style={styles.buttonText}>Login</Text>}
 				</TouchableOpacity>
 				{/* Forgot Password Link */}
 				<TouchableOpacity onPress={() => navigation.navigate('ForgotPassword')}>
@@ -143,7 +143,7 @@ const SignIn: React.FC<Props> = ({ navigation }) => {
 				{/* Sign Up Link */}
 				<TouchableOpacity onPress={() => navigation.navigate('SignUp')}>
 					<Text style={styles.link}>
-						Don’t have an account?{' '}
+						Click here to create an account:{' '}
 						<Text style={styles.linkHighlight}>Sign up</Text>
 					</Text>
 				</TouchableOpacity>

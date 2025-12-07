@@ -202,7 +202,7 @@ const SignUp = () => {
 					</View>
 					{errors.password && (
 						<Text style={styles.error}>{errors.password.message}</Text>
-					)}{' '}
+					)}
 					{/* Confirm Password */}
 					<Controller
 						control={control}
@@ -310,7 +310,7 @@ const SignUp = () => {
 			<TouchableOpacity onPress={() => navigation.navigate('SignIn')}>
 				<Text style={styles.link}>
 					Already have an account?{' '}
-					<Text style={styles.linkHighlight}>Sign In</Text>{' '}
+					<Text style={styles.linkHighlight}>Sign In</Text>
 				</Text>
 			</TouchableOpacity>
 		</View>
